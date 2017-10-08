@@ -1,3 +1,6 @@
+[![Travis](https://travis-ci.org/ibm-functions/composer.svg?branch=master)](https://travis-ci.org/ibm-functions/composer)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 Composer is a new programming model from [IBM
 Research](https://ibm.biz/serverless-research) for composing [IBM
 Cloud Functions](https://ibm.biz/openwhisk), built on [Apache
