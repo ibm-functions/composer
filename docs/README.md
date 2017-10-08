@@ -64,13 +64,14 @@ releases via `fsh version -u`.
 
 ```
 $ fsh version -u
-You are currently on version 1.3.219
+You are currently on version x.y.z
 Checking for updates... you are up to date!
 ```
 
 We recommend updating the shell via the same `npm install` command
-shown earlier.  Refer to [`npm` troubleshooting](npm.md) if your
-installation fails.
+shown earlier.  Consult the [troubleshooting
+guide](https://github.com/ibm-functions/shell/blob/master/npm.md) if
+your installation fails.
 
 ### Tour of the programming shell
 
@@ -311,12 +312,12 @@ $ fsh app preview @demos/if.js
 
 To create and deploy the actions, you may use the `wsk` CLI or the
 OpenWhisk API directly. For added convenience, `fsh` uses [`npm
-openwhisk`](http://github.com/openwhisk/) and can create actions
+openwhisk`](https://github.com/openwhisk/openwhisk-client-js) and can create actions
 directly.  Its command structure for creating an action will be
 familiar to `wsk` users (but does not offer full parity).  You may
 find it convenient to use `fsh` directly instead for everything,
 including to create and update actions. Read more about [`fsh` vs
-`wsk`](fsh.md).
+`wsk`](https://github.com/ibm-functions/shell/blob/master/fsh.md).
 
 ## Compositions by example
 
