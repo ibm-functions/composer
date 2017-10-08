@@ -1,0 +1,49 @@
+{
+  "name": "@ibm-functions/composer",
+  "version": "0.1.1",
+  "description": "Composer is an IBM Cloud Functions programming model for composing individual functions into larger applications.",
+  "homepage": "https://github.com/ibm-functions/composer",
+  "main": "composer.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ibm-functions/composer.git"
+  },
+  "keywords": [
+    "ibm",
+    "functions",
+    "serverless",
+    "composer",
+    "bluemix",
+    "openwhisk"
+  ],
+  "dependencies": {
+    "redis": "^2.8.0",
+    "clone": "^2.1.1"
+  },
+  "devDependencies": {
+    "mocha": "^3.5.0",
+    "openwhisk": "git://github.com/starpit/openwhisk-client-js.git#add_client_timeout"
+  },
+  "author": {
+    "name": "Olivier Tardieu",
+    "email": "tardieu@us.ibm.com"
+  },
+  "contributors": [
+    {
+      "name": "Kerry Chang",
+      "email": "kerry.chang@ibm.com"
+    },
+    {
+      "name": "Rodric Rabbah",
+      "email": "rabbah@us.ibm.com"
+    },
+    {
+      "name": "Nick Mitchell",
+      "email": "nickm@us.ibm.com"
+    }
+  ],
+  "license": "Apache-2.0"
+}
