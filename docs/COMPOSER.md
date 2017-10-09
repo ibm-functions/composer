@@ -3,7 +3,7 @@
 The [composer](../composer.js) module makes it possible to compose actions programmatically. The module is typically used as illustrated in [samples/demo.js](../samples/demo.js):
 
 ```javascript
-const composer = require('@openwhisk/composer')
+const composer = require('@ibm-functions/composer')
 
 // author action composition
 const app = composer.if('authenticate', /* then */ 'welcome', /* else */ 'login')
