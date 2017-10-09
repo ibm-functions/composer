@@ -193,9 +193,9 @@ shell, and instead using `node` directly. In this case, you must
 import the `composer` and `compile` the FSM explicitly as shown below.
 
 ```javascript
-$ npm install @openwhisk/composer
+$ npm install @ibm-functions/composer
 $ node
-const composer = require('@openwhisk/composer')
+const composer = require('@ibm-functions/composer')
 const app = composer.sequence(args => ({msg: `hello ${args.name}!`}))
 composer.compile(app, 'hello.json')
 ```

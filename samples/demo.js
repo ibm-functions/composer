@@ -16,7 +16,7 @@
 
 'use strict'
 
-const composer = require('@openwhisk/composer')
+const composer = require('@ibm-functions/composer')
 
 // author action composition
 const app = composer.if('authenticate', /* then */ 'welcome', /* else */ 'login')
