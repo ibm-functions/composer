@@ -335,9 +335,9 @@ The following composition methods are currently supported. The rest of the docum
 | [`let`](COMPOSER.md#composerletname-value-task_1-task_2-) | variables | `composer.let('n', 42, ...)` |
 | [`if`](COMPOSER.md#composerifcondition-consequent-alternate) | conditional | `composer.if('authenticate', /* then */ 'welcome', /* else */ 'login')` |
 | [`while`](COMPOSER.md#composerwhilecondition-task) | loop | `composer.while('needMoreData', 'fetchMoreData')` |
-| [`try`](COMPOSER.md#composertrytask-handler) | error handling | `try('DivideByN', /* catch */ 'NaN')` |
-| [`repeat`](COMPOSER.md#composerrepeatcount-task) | repetition | `repeat(42, 'sayHi')` |
-| [`retry`](COMPOSER.md#composerretrycount-task) | error recovery | `retry(3, 'connect')` |
+| [`try`](COMPOSER.md#composertrytask-handler) | error handling | `composer.try('DivideByN', /* catch */ 'NaN')` |
+| [`repeat`](COMPOSER.md#composerrepeatcount-task) | repetition | `composer.repeat(42, 'sayHi')` |
+| [`retry`](COMPOSER.md#composerretrycount-task) | error recovery | `composer.retry(3, 'connect')` |
 | [`retain`](COMPOSER.md#composerretaintask-flag) | parameter retention | `composer.retain('validateInput')` |
 
 ### `if` combinator
