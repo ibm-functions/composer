@@ -86,6 +86,10 @@ class Composer {
         return Array.prototype.map.call(arguments, x => this.task(x), this).reduce(chain)
     }
 
+    seq() {
+        return this.sequence(...arguments)
+    }
+
     if(test, consequent, alternate) {
         if (test == null || consequent == null) throw new ComposerError('Missing arguments in composition', arguments)
         const id = {}

@@ -117,7 +117,7 @@ describe('composer', function () {
                     } catch (error) {
                         assert.equal(error, 'Error: Invalid composition argument')
                     }
-                 })
+                })
 
                 it('42 must throw', function () {
                     try {
@@ -126,7 +126,7 @@ describe('composer', function () {
                     } catch (error) {
                         assert.equal(error, 'Error: Invalid composition argument')
                     }
-                 })
+                })
 
                 it('{ foo: \'bar\' } must throw', function () {
                     try {
@@ -159,6 +159,11 @@ describe('composer', function () {
 
                 it('nested left', function () {
                     return invoke(composer.sequence(composer.sequence('TripleAndIncrement', 'DivideByTwo'), 'DivideByTwo'), { n: 5 })
+                        .then(activation => assert.deepEqual(activation.response.result, { n: 4 }))
+                })
+
+                it('seq', function () {
+                    return invoke(composer.seq('TripleAndIncrement', 'DivideByTwo', 'DivideByTwo'), { n: 5 })
                         .then(activation => assert.deepEqual(activation.response.result, { n: 4 }))
                 })
             })
