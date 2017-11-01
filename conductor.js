@@ -162,6 +162,7 @@ const main = (() => {
                     params.$invoke = result.$fsm
                     params.$state = result.$state
                     params.$stack = result.$stack
+                    params.$callee = result.$callee
                 })
         }
 
@@ -176,9 +177,9 @@ const main = (() => {
         }
 
         // persist session state to redis
-        function persist($fsm, $state, $stack) {
+        function persist($fsm, $state, $stack, $callee) {
             // ensure using set-if-exists that the session has not been killed
-            return db.lsetAsync(sessionStateKey, -1, JSON.stringify({ $fsm, $state, $stack }))
+            return db.lsetAsync(sessionStateKey, -1, JSON.stringify({ $fsm, $state, $stack, $callee }))
                 .catch(() => gone(`Session ${session} has been killed`))
         }
 
@@ -204,6 +205,7 @@ const main = (() => {
 
             let state = resuming ? params.$state : (params.$state || fsm.Entry)
             const stack = params.$stack || []
+            const callee = params.$callee
 
             // wrap params if not a JSON object, branch to error handler if error
             function inspect() {
@@ -229,6 +231,7 @@ const main = (() => {
             delete params.$sessionId
             delete params.$state
             delete params.$stack
+            delete params.$callee
             delete params.$blocking
 
             // run function f on current stack
@@ -251,7 +254,12 @@ const main = (() => {
                 if (!state) {
                     console.log(`Entering final state`)
                     console.log(JSON.stringify(params))
-                    return record(params).then(() => blocking ? params : ({ $session: session }))
+                    return record(params).then(() => {
+                        if (callee) {
+                            return wsk.actions.invoke({ name: callee.name, params: { $sessionId: callee.session, $result: params } })
+                                .catch(error => badRequest(`Failed to return to callee: ${encodeError(error).error}`))
+                        }
+                    }).then(() => blocking ? params : ({ $session: session }))
                 }
 
                 console.log(`Entering ${state}`)
@@ -300,9 +308,16 @@ const main = (() => {
                         if (typeof stack.shift().let !== 'object') return badRequest(`The state named ${current} of type End popped an unexpected stack element`)
                         break
                     case 'Task':
-                        if (typeof json.Action === 'string') { // invoke user action
+                        if (typeof json.Action === 'string' && json.Action.substr(json.Action.length - 4) === '.app') { // invoke app
+                            params.$callee = { name: process.env.__OW_ACTION_NAME, session }
+                            return persist(fsm, state, stack, callee)
+                                .then(() => wsk.actions.invoke({ name: json.Action, params })
+                                    .catch(error => badRequest(`Failed to invoke app ${json.Action}: ${encodeError(error).error}`)))
+                                .then(activation => db.rpushxAsync(sessionTraceKey, activation.activationId))
+                                .then(() => blocking ? getSessionResult() : { $session: session })
+                        } else if (typeof json.Action === 'string') { // invoke user action
                             const invocation = notify ? { name: json.Action, params, blocking: true } : { name: json.Action, params, notify: process.env.__OW_ACTION_NAME, cause: session }
-                            return persist(fsm, state, stack)
+                            return persist(fsm, state, stack, callee)
                                 .then(() => wsk.actions.invoke(invocation)
                                     .catch(error => error.error && error.error.response ? error.error : badRequest(`Failed to invoke action ${json.Action}: ${encodeError(error).error}`))) // catch error reponses
                                 .then(activation => db.rpushxAsync(sessionTraceKey, activation.activationId)
