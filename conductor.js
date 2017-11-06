@@ -35,8 +35,6 @@ function __eval__(__env__, main) {
 
 // keep outer namespace clean
 const main = (() => {
-    const openwhisk = require('openwhisk')
-    const request = require('request-promise')
     const redis = require('redis')
 
     // inline redis-promise to keep action code in a single file
@@ -65,7 +63,6 @@ const main = (() => {
         return client
     }
 
-    let wsk // cached openwhisk instance
     let db // cached redis instance
 
     // encode error object
@@ -92,35 +89,20 @@ const main = (() => {
         }
     }
 
-    function poll(activationId, resolve) { // poll for activation record (1s interval)
-        return wsk.activations.get(activationId).then(resolve, () => setTimeout(() => poll(activationId, resolve), 1000))
-    }
-
     // do invocation
     function invoke(params) {
         // check parameters
         if (!isObject(params.$config)) return badRequest('Missing $config parameter of type object')
         if (typeof params.$config.redis !== 'string') return badRequest('Missing $config.redis parameter of type string')
-        if (typeof params.$config.notify !== 'undefined' && typeof params.$config.notify !== 'boolean') return badRequest('Type of $config.notify parameter must be Boolean')
         if (typeof params.$config.expiration !== 'undefined' && typeof params.$config.expiration !== 'number') return badRequest('Type of $config.expiration parameter must be number')
-        if (typeof params.$activationId !== 'undefined' && typeof params.$activationId !== 'number' && typeof params.$activationId !== 'string') return badRequest('Type of $activationId parameter must be number or string')
-        if (typeof params.$sessionId !== 'undefined' && typeof params.$sessionId !== 'number' && typeof params.$sessionId !== 'string') return badRequest('Type of $sessionId parameter must be number or string')
+        if (typeof params.$session !== 'number' && typeof params.$session !== 'string') return badRequest('Type of $session parameter must be number or string')
         if (typeof params.$invoke !== 'undefined' && !isObject(params.$invoke)) return badRequest('Type of $invoke parameter must be object')
-        if (typeof params.$blocking !== 'undefined' && typeof params.$blocking !== 'boolean') return badRequest('Type of $blocking parameter must be Boolean')
-        if (typeof params.$invoke === 'undefined' && typeof params.$sessionId === 'undefined') return badRequest('Missing $invoke or $sessionId parameter')
+        if (typeof params.$invoke === 'undefined' && typeof params.$resume === 'undefined') return badRequest('Missing $invoke or $resume parameter')
 
         // configuration
-        const notify = params.$config.notify
         const expiration = params.$config.expiration || (86400 * 7)
-        const resuming = typeof params.$sessionId !== 'undefined'
-        const blocking = params.__ow_method || params.$blocking
-        const session = params.$sessionId || process.env.__OW_ACTIVATION_ID
-
-        // initialize openwhisk instance
-        if (!wsk) {
-            wsk = openwhisk({ ignore_certs: true })
-            if (!notify) wsk.actions.qs_options.invoke = ['blocking', 'notify', 'cause']
-        }
+        const resuming = params.$resume
+        const session = params.$session
 
         // redis keys
         const apiKey = process.env.__OW_API_KEY.substring(0, process.env.__OW_API_KEY.indexOf(':'))
@@ -142,19 +124,9 @@ const main = (() => {
                 return obj
             })
         }
-        // retrieve session result from redis
-        function getSessionResult() {
-            return db.brpoplpushAsync(sessionResultKey, sessionResultKey, 30).then(result => {
-                if (typeof result !== 'string') return { $session: session } // timeout
-                const obj = JSON.parse(result)
-                if (!isObject(obj)) throw `Result of session ${session} is not a JSON object`
-                return obj
-            })
-        }
 
         // resume suspended session
         function resume() {
-            params = params.$result
             return db.rpushxAsync(sessionTraceKey, process.env.__OW_ACTIVATION_ID)
                 .then(() => getSessionState()) // obtain live session state
                 .then(result => {
@@ -162,7 +134,6 @@ const main = (() => {
                     params.$invoke = result.$fsm
                     params.$state = result.$state
                     params.$stack = result.$stack
-                    params.$callee = result.$callee
                 })
         }
 
@@ -177,9 +148,9 @@ const main = (() => {
         }
 
         // persist session state to redis
-        function persist($fsm, $state, $stack, $callee) {
+        function persist($fsm, $state, $stack) {
             // ensure using set-if-exists that the session has not been killed
-            return db.lsetAsync(sessionStateKey, -1, JSON.stringify({ $fsm, $state, $stack, $callee }))
+            return db.lsetAsync(sessionStateKey, -1, JSON.stringify({ $fsm, $state, $stack }))
                 .catch(() => gone(`Session ${session} has been killed`))
         }
 
@@ -205,7 +176,6 @@ const main = (() => {
 
             let state = resuming ? params.$state : (params.$state || fsm.Entry)
             const stack = params.$stack || []
-            const callee = params.$callee
 
             // wrap params if not a JSON object, branch to error handler if error
             function inspect() {
@@ -226,13 +196,11 @@ const main = (() => {
 
             // delete $ params
             delete params.$config
-            delete params.$activationId
+            delete params.$session
             delete params.$invoke
-            delete params.$sessionId
+            delete params.$resume
             delete params.$state
             delete params.$stack
-            delete params.$callee
-            delete params.$blocking
 
             // run function f on current stack
             function run(f) {
@@ -254,12 +222,7 @@ const main = (() => {
                 if (!state) {
                     console.log(`Entering final state`)
                     console.log(JSON.stringify(params))
-                    return record(params).then(() => {
-                        if (callee) {
-                            return wsk.actions.invoke({ name: callee.name, params: { $sessionId: callee.session, $result: params } })
-                                .catch(error => badRequest(`Failed to return to callee: ${encodeError(error).error}`))
-                        }
-                    }).then(() => blocking ? params : ({ $session: session }))
+                    return record(params).then(() => ({ $params: params, $session: session }))
                 }
 
                 console.log(`Entering ${state}`)
@@ -308,22 +271,8 @@ const main = (() => {
                         if (typeof stack.shift().let !== 'object') return badRequest(`The state named ${current} of type End popped an unexpected stack element`)
                         break
                     case 'Task':
-                        if (typeof json.Action === 'string' && json.Action.substr(json.Action.length - 4) === '.app') { // invoke app
-                            params.$callee = { name: process.env.__OW_ACTION_NAME, session }
-                            return persist(fsm, state, stack, callee)
-                                .then(() => wsk.actions.invoke({ name: json.Action, params })
-                                    .catch(error => badRequest(`Failed to invoke app ${json.Action}: ${encodeError(error).error}`)))
-                                .then(activation => db.rpushxAsync(sessionTraceKey, activation.activationId))
-                                .then(() => blocking ? getSessionResult() : { $session: session })
-                        } else if (typeof json.Action === 'string') { // invoke user action
-                            const invocation = notify ? { name: json.Action, params, blocking: true } : { name: json.Action, params, notify: process.env.__OW_ACTION_NAME, cause: session }
-                            return persist(fsm, state, stack, callee)
-                                .then(() => wsk.actions.invoke(invocation)
-                                    .catch(error => error.error && error.error.response ? error.error : badRequest(`Failed to invoke action ${json.Action}: ${encodeError(error).error}`))) // catch error reponses
-                                .then(activation => db.rpushxAsync(sessionTraceKey, activation.activationId)
-                                    .then(() => activation.response || !notify ? activation : new Promise(resolve => poll(activation.activationId, resolve)))) // poll if timeout
-                                .then(activation => notify && wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params: { $activationId: activation.activationId, $sessionId: session, $result: activation.response.result } }))
-                                .then(() => blocking ? getSessionResult() : { $session: session })
+                        if (typeof json.Action === 'string') { // invoke user action using notification
+                            return persist(fsm, state, stack).then(() => ({ $next: json.Action, $params: params, $session: session }))
                         } else if (typeof json.Value !== 'undefined') { // value
                             params = JSON.parse(JSON.stringify(json.Value))
                             inspect()
