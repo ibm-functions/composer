@@ -154,7 +154,7 @@ const main = (() => {
                     if (typeof json.Action === 'string') {
                         fsm.Entry = state
                         fsm.Stack = stack
-                        return { action: json.Action, params: params, state: { $invoke: fsm } }
+                        return { action: json.Action, params, state: { $invoke: fsm } }
                     } else if (typeof json.Value !== 'undefined') { // value
                         params = JSON.parse(JSON.stringify(json.Value))
                         inspect()
