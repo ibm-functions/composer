@@ -56,12 +56,12 @@ const main = (() => {
         if (!isObject(params.$invoke)) return badRequest('Type of $invoke parameter must be object')
         const fsm = params.$invoke
         delete params.$invoke
-        
+
         if (typeof fsm.Entry !== 'undefined' && typeof fsm.Entry !== 'string') return badRequest('The type of Entry field of the composition must be string')
         if (!isObject(fsm.States)) return badRequest('The composition has no States field of type object')
         if (typeof fsm.Exit !== 'string') return badRequest('The composition has no Exit field of type string')
         if (typeof fsm.Stack !== 'undefined' && !Array.isArray(fsm.Stack)) return badRequest('The Stack field of the composition must be an array')
-        
+
         let state = fsm.Entry
         const stack = fsm.Stack || []
 
@@ -102,7 +102,7 @@ const main = (() => {
             if (!state) {
                 console.log(`Entering final state`)
                 console.log(JSON.stringify(params))
-                return { $params: params }
+                return { params }
             }
 
             console.log(`Entering ${state}`)
@@ -154,7 +154,7 @@ const main = (() => {
                     if (typeof json.Action === 'string') {
                         fsm.Entry = state
                         fsm.Stack = stack
-                        return { $next: json.Action, $params: params, $invoke: fsm }
+                        return { action: json.Action, params: params, state: { $invoke: fsm } }
                     } else if (typeof json.Value !== 'undefined') { // value
                         params = JSON.parse(JSON.stringify(json.Value))
                         inspect()
