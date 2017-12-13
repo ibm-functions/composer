@@ -519,7 +519,7 @@ The app will now produce the decoded text as its final output.
 
 ```bash
 # create app
-$ fsh app create try @demos/retain.js
+$ fsh app create retain @demos/retain.js
 
 # invoke app with valid parameter
 > fsh app invoke retain -p str aGVsbG8gdHJ5IQ==
