@@ -10,9 +10,9 @@ describe('composer', function () {
     before('deploy conductor and sample actions', function () {
         return composer.deploy(
             [{ name: 'DivideByTwo', action: 'function main({n}) { return { n: n / 2 } }' },
-                { name: 'TripleAndIncrement', action: 'function main({n}) { return { n: n * 3 + 1 } }' },
-                { name: 'isNotOne', action: 'function main({n}) { return { value: n != 1 } }' },
-                { name: 'isEven', action: 'function main({n}) { return { value: n % 2  == 0 } }' }])
+            { name: 'TripleAndIncrement', action: 'function main({n}) { return { n: n * 3 + 1 } }' },
+            { name: 'isNotOne', action: 'function main({n}) { return { value: n != 1 } }' },
+            { name: 'isEven', action: 'function main({n}) { return { value: n % 2  == 0 } }' }])
     })
 
     describe('blocking invocations', function () {

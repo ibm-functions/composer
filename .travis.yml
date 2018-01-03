@@ -6,4 +6,3 @@ env:
   global:
 #    - __OW_API_HOST="OpenWhisk host"
 #    - __OW_API_KEY="OpenWhisk API key"
-#    - REDIS="Redis url"
