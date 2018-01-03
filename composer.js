@@ -16,9 +16,14 @@
 
 'use strict'
 
+// composer module
+
 const clone = require('clone')
 const util = require('util')
 const fs = require('fs')
+const path = require('path')
+const os = require('os')
+const openwhisk = require('openwhisk')
 
 class ComposerError extends Error {
     constructor(message, cause) {
@@ -32,27 +37,28 @@ function chain(front, back) {
     front.States.push(...back.States)
     front.Exit.Next = back.Entry
     front.Exit = back.Exit
+    front.Manifest.push(...back.Manifest)
     return front
 }
 
 function push(id) {
     const Entry = { Type: 'Push', id }
-    return { Entry, States: [Entry], Exit: Entry }
+    return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
 }
 
 function pop(id) {
     const Entry = { Type: 'Pop', id }
-    return { Entry, States: [Entry], Exit: Entry }
+    return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
 }
 
 function begin(id, symbol, value) {
     const Entry = { Type: 'Let', Symbol: symbol, Value: value, id }
-    return { Entry, States: [Entry], Exit: Entry }
+    return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
 }
 
 function end(id) {
     const Entry = { Type: 'End', id }
-    return { Entry, States: [Entry], Exit: Entry }
+    return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
 }
 
 const isObject = obj => typeof (obj) === 'object' && obj !== null && !Array.isArray(obj)
@@ -63,12 +69,11 @@ class Composer {
         if (options != null && options.merge) return this.sequence(this.retain(obj), ({ params, result }) => Object.assign({}, params, result))
         const id = {}
         let Entry
+        let Manifest = []
         if (obj == null) { // identity function (must throw errors if any)
             Entry = { Type: 'Task', Helper: 'null', Function: 'params => params', id }
         } else if (typeof obj === 'object' && typeof obj.Entry === 'object' && Array.isArray(obj.States) && typeof obj.Exit === 'object') { // an action composition
             return clone(obj)
-        } else if (typeof obj === 'object' && typeof obj.Entry === 'string' && typeof obj.States === 'object' && typeof obj.Exit === 'string') { // a compiled composition
-            return this.decompile(obj)
         } else if (typeof obj === 'function') { // function
             Entry = { Type: 'Task', Function: obj.toString(), id }
         } else if (typeof obj === 'string') { // action
@@ -78,7 +83,14 @@ class Composer {
         } else { // error
             throw new ComposerError('Invalid composition argument', obj)
         }
-        return { Entry, States: [Entry], Exit: Entry }
+        return { Entry, States: [Entry], Exit: Entry, Manifest }
+    }
+
+    taskFromFile(name, filename) {
+        if (typeof name !== 'string') throw new ComposerError('Invalid name argument in taskFromFile', name)
+        if (typeof filename !== 'string') throw new ComposerError('Invalid filename argument in taskFromFile', filename)
+        const Entry = { Type: 'Task', Action: name, id: {} }
+        return { Entry, States: [Entry], Exit: Entry, Manifest: [{ name, action: fs.readFileSync(filename, { encoding: 'utf8' }) }] }
     }
 
     sequence() {
@@ -224,10 +236,12 @@ class Composer {
         const id = {}
         if (typeof json === 'function') throw new ComposerError('Value cannot be a function', json.toString())
         const Entry = { Type: 'Task', Value: typeof json === 'undefined' ? {} : json, id }
-        return { Entry, States: [Entry], Exit: Entry }
+        return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
     }
 
-    compile(obj, filename) {
+    compile(name, obj, filename) {
+        if (typeof name !== 'string') throw new ComposerError('Invalid name argument in compile', name)
+        if (typeof filename !== 'undefined' && typeof filename !== 'string') throw new ComposerError('Invalid optional filename argument in compile', filename)
         if (typeof obj !== 'object' || typeof obj.Entry !== 'object' || !Array.isArray(obj.States) || typeof obj.Exit !== 'object') {
             throw new ComposerError('Invalid argument to compile', obj)
         }
@@ -255,30 +269,215 @@ class Composer {
         obj.States.forEach(state => {
             delete state.id
         })
-        const app = { Entry, States, Exit }
-        if (filename) fs.writeFileSync(filename, JSON.stringify(app, null, 4), { encoding: 'utf8' })
+        const action = `${main}\nconst __composition__ =  ${JSON.stringify({ Entry, States, Exit }, null, 4)}\n`
+        if (filename) fs.writeFileSync(filename, action, { encoding: 'utf8' })
+        const app = this.task(name)
+        app.Manifest = clone(obj.Manifest)
+        app.Manifest.push({ name, action, annotations: { conductor: { Entry, States, Exit } } })
         return app
     }
 
-    decompile(obj) {
-        if (typeof obj !== 'object' || typeof obj.Entry !== 'string' || typeof obj.States !== 'object' || typeof obj.Exit !== 'string') {
-            throw new ComposerError('Invalid argument to decompile', obj)
+    deploy(obj, options) {
+        if (typeof obj !== 'object' || !Array.isArray(obj.Manifest) || obj.Manifest.length === 0) {
+            throw new ComposerError('Invalid argument to deploy', obj)
         }
-        obj = clone(obj)
-        const States = []
-        const ids = []
-        for (const name in obj.States) {
-            const state = obj.States[name]
-            if (state.Next) state.Next = obj.States[state.Next]
-            if (state.Then) state.Then = obj.States[state.Then]
-            if (state.Else) state.Else = obj.States[state.Else]
-            if (state.Handler) state.Handler = obj.States[state.Handler]
-            const id = parseInt(name.substring(name.lastIndexOf('_') + 1))
-            state.id = ids[id] = typeof ids[id] !== 'undefined' ? ids[id] : {}
-            States.push(state)
-        }
-        return { Entry: obj.States[obj.Entry], States, Exit: obj.States[obj.Exit] }
+
+        // try to extract apihost and key
+        let apihost
+        let api_key
+
+        try {
+            const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
+            const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
+
+            for (let line of lines) {
+                let parts = line.trim().split('=')
+                if (parts.length === 2) {
+                    if (parts[0] === 'APIHOST') {
+                        apihost = parts[1]
+                    } else if (parts[0] === 'AUTH') {
+                        api_key = parts[1]
+                    }
+                }
+            }
+        } catch (error) { }
+
+        const wsk = openwhisk(Object.assign({ apihost, api_key }, options))
+
+        // return the count of successfully deployed actions
+        return clone(obj.Manifest).reduce(
+            (promise, action) => promise.then(i => wsk.actions.update(action).then(_ => i + 1, err => { console.error(err); return i })), Promise.resolve(0)).then(i => `${i}/${obj.Manifest.length}`)
     }
 }
 
 module.exports = new Composer()
+
+// conductor action
+
+function main(params) {
+    // evaluate main exposing the fields of __env__ as variables
+    function __eval__(__env__, main) {
+        main = `(${main})`
+        let __eval__ = '__eval__=undefined;params=>{try{'
+        for (const name in __env__) {
+            __eval__ += `var ${name}=__env__['${name}'];`
+        }
+        __eval__ += 'return eval(main)(params)}finally{'
+        for (const name in __env__) {
+            __eval__ += `__env__['${name}']=${name};`
+        }
+        __eval__ += '}}'
+        return eval(__eval__)
+    }
+
+    // keep outer namespace clean
+    return (() => {
+        const isObject = obj => typeof (obj) === 'object' && obj !== null && !Array.isArray(obj)
+
+        // encode error object
+        const encodeError = error => ({
+            code: typeof error.code === 'number' && error.code || 500,
+            error: (typeof error.error === 'string' && error.error) || error.message || (typeof error === 'string' && error) || 'An internal error occurred'
+        })
+
+        // error status codes
+        const badRequest = error => Promise.reject({ code: 400, error })
+        const internalError = error => Promise.reject(encodeError(error))
+
+        // catch all
+        return Promise.resolve().then(() => invoke(params)).catch(internalError)
+
+        // do invocation
+        function invoke(params) {
+            const fsm = __composition__
+
+            if (typeof fsm.Entry !== 'undefined' && typeof fsm.Entry !== 'string') return badRequest('The type of Entry field of the composition must be string')
+            if (!isObject(fsm.States)) return badRequest('The composition has no States field of type object')
+            if (typeof fsm.Exit !== 'string') return badRequest('The composition has no Exit field of type string')
+
+            let state = fsm.Entry
+            let stack = []
+
+            // check parameters
+            if (typeof params.$resume !== 'undefined') {
+                if (!isObject(params.$resume)) return badRequest('Type of optional $resume parameter must be object')
+                state = params.$resume.state
+                if (typeof state !== 'undefined' && typeof state !== 'string') return badRequest('Type of optional $resume.state parameter must be string')
+                stack = params.$resume.stack
+                if (typeof state !== 'undefined' && typeof state !== 'string') return badRequest('Type of optional $resume.state parameter must be string')
+                if (!Array.isArray(stack)) return badRequest('The type of $resume.stack must be an array')
+                delete params.$resume
+                inspect() // handle error objects when resuming
+            }
+
+            // wrap params if not a JSON object, branch to error handler if error
+            function inspect() {
+                if (!isObject(params) || Array.isArray(params) || params === null) {
+                    params = { value: params }
+                }
+                if (typeof params.error !== 'undefined') {
+                    params = { error: params.error } // discard all fields but the error field
+                    state = undefined // abort unless there is a handler in the stack
+                    while (stack.length > 0) {
+                        if (state = stack.shift().catch) break
+                    }
+                }
+            }
+
+            // run function f on current stack
+            function run(f) {
+                function set(symbol, value) {
+                    const element = stack.find(element => typeof element.let !== 'undefined' && typeof element.let[symbol] !== 'undefined')
+                    if (typeof element !== 'undefined') element.let[symbol] = JSON.parse(JSON.stringify(value))
+                }
+
+                const env = stack.reduceRight((acc, cur) => typeof cur.let === 'object' ? Object.assign(acc, cur.let) : acc, {})
+                const result = __eval__(env, f)(params)
+                for (const name in env) {
+                    set(name, env[name])
+                }
+                return result
+            }
+
+            while (true) {
+                // final state
+                if (!state) {
+                    console.log(`Entering final state`)
+                    console.log(JSON.stringify(params))
+                    return { params }
+                }
+
+                console.log(`Entering ${state}`)
+
+                if (!isObject(fsm.States[state])) return badRequest(`The composition has no state named ${state}`)
+                const json = fsm.States[state] // json for current state
+                if (json.Type !== 'Choice' && typeof json.Next !== 'string' && state !== fsm.Exit) return badRequest(`The state named ${state} has no Next field`)
+                const current = state // current state
+                state = json.Next // default next state
+
+                switch (json.Type) {
+                    case 'Choice':
+                        if (typeof json.Then !== 'string') return badRequest(`The state named ${current} of type Choice has no Then field`)
+                        if (typeof json.Else !== 'string') return badRequest(`The state named ${current} of type Choice has no Else field`)
+                        state = params.value === true ? json.Then : json.Else
+                        if (stack.length === 0) return badRequest(`The state named ${current} of type Choice attempted to pop from an empty stack`)
+                        const top = stack.shift()
+                        if (typeof top.params !== 'object') return badRequest(`The state named ${current} of type Choice popped an unexpected stack element`)
+                        params = top.params
+                        break
+                    case 'Try':
+                        if (typeof json.Handler !== 'string') return badRequest(`The state named ${current} of type Try has no Handler field`)
+                        stack.unshift({ catch: json.Handler }) // register handler
+                        break
+                    case 'Catch':
+                        if (stack.length === 0) return badRequest(`The state named ${current} of type Catch attempted to pop from an empty stack`)
+                        if (typeof stack.shift().catch !== 'string') return badRequest(`The state named ${current} of type Catch popped an unexpected stack element`)
+                        break
+                    case 'Push':
+                        stack.unshift({ params: JSON.parse(JSON.stringify(params)) })
+                        break
+                    case 'Pop':
+                        if (stack.length === 0) return badRequest(`The state named ${current} of type Pop attempted to pop from an empty stack`)
+                        const tip = stack.shift()
+                        if (typeof tip.params !== 'object') return badRequest(`The state named ${current} of type Pop popped an unexpected stack element`)
+                        params = { result: params, params: tip.params } // combine current params with persisted params popped from stack
+                        break
+                    case 'Let':
+                        stack.unshift({ let: {} })
+                        if (typeof json.Symbol !== 'string') return badRequest(`The state named ${current} of type Let has no Symbol field`)
+                        if (typeof json.Value === 'undefined') return badRequest(`The state named ${current} of type Let has no Value field`)
+                        stack[0].let[json.Symbol] = JSON.parse(JSON.stringify(json.Value))
+                        break
+                    case 'End':
+                        if (stack.length === 0) return badRequest(`The state named ${current} of type End attempted to pop from an empty stack`)
+                        if (typeof stack.shift().let !== 'object') return badRequest(`The state named ${current} of type End popped an unexpected stack element`)
+                        break
+                    case 'Task':
+                        if (typeof json.Action === 'string') {
+                            return { action: json.Action, params, state: { $resume: { state, stack } } }
+                        } else if (typeof json.Value !== 'undefined') { // value
+                            params = JSON.parse(JSON.stringify(json.Value))
+                            inspect()
+                        } else if (typeof json.Function === 'string') { // function
+                            let result
+                            try {
+                                result = run(json.Function)
+                            } catch (error) {
+                                console.error(error)
+                                result = { error: 'An error has occurred: ' + error }
+                            }
+                            params = typeof result === 'undefined' ? {} : JSON.parse(JSON.stringify(result))
+                            inspect()
+                        } else {
+                            return badRequest(`The kind field of the state named ${current} of type Task is missing`)
+                        }
+                        break
+                    case 'Pass':
+                        break
+                    default:
+                        return badRequest(`The state named ${current} has an unknown type`)
+                }
+            }
+        }
+    })()
+}
