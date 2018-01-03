@@ -64,6 +64,30 @@ function end(id) {
 const isObject = obj => typeof (obj) === 'object' && obj !== null && !Array.isArray(obj)
 
 class Composer {
+    constructor(options = {}) {
+        // try to extract apihost and key
+        let apihost
+        let api_key
+
+        try {
+            const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
+            const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
+
+            for (let line of lines) {
+                let parts = line.trim().split('=')
+                if (parts.length === 2) {
+                    if (parts[0] === 'APIHOST') {
+                        apihost = parts[1]
+                    } else if (parts[0] === 'AUTH') {
+                        api_key = parts[1]
+                    }
+                }
+            }
+        } catch (error) { }
+
+        this.wsk = openwhisk(Object.assign({ apihost, api_key }, options))
+    }
+
     task(obj, options) {
         if (options != null && options.output) return this.assign(options.output, obj, options.input)
         if (options != null && options.merge) return this.sequence(this.retain(obj), ({ params, result }) => Object.assign({}, params, result))
@@ -149,7 +173,8 @@ class Composer {
         States.push(...body.States, pop, ...handler.States, Exit)
         body.Exit.Next = pop
         handler.Exit.Next = Exit
-        return { Entry, States, Exit }
+        body.Manifest.push(...handler.Manifest)
+        return { Entry, States, Exit, Manifest: body.Manifest }
     }
 
     retain(body, flag = false) {
@@ -277,36 +302,13 @@ class Composer {
         return app
     }
 
-    deploy(obj, options) {
-        if (typeof obj !== 'object' || !Array.isArray(obj.Manifest) || obj.Manifest.length === 0) {
-            throw new ComposerError('Invalid argument to deploy', obj)
-        }
-
-        // try to extract apihost and key
-        let apihost
-        let api_key
-
-        try {
-            const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
-            const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
-
-            for (let line of lines) {
-                let parts = line.trim().split('=')
-                if (parts.length === 2) {
-                    if (parts[0] === 'APIHOST') {
-                        apihost = parts[1]
-                    } else if (parts[0] === 'AUTH') {
-                        api_key = parts[1]
-                    }
-                }
-            }
-        } catch (error) { }
-
-        const wsk = openwhisk(Object.assign({ apihost, api_key }, options))
+    deploy(obj) {
+        if (typeof obj === 'object' && Array.isArray(obj.Manifest)) obj = obj.Manifest
+        if (!Array.isArray(obj) || obj.length === 0) throw new ComposerError('Invalid argument to deploy', obj)
 
         // return the count of successfully deployed actions
-        return clone(obj.Manifest).reduce(
-            (promise, action) => promise.then(i => wsk.actions.update(action).then(_ => i + 1, err => { console.error(err); return i })), Promise.resolve(0)).then(i => `${i}/${obj.Manifest.length}`)
+        return clone(obj).reduce(
+            (promise, action) => promise.then(i => this.wsk.actions.update(action).then(_ => i + 1, err => { console.error(err); return i })), Promise.resolve(0)).then(i => `${i}/${obj.length}`)
     }
 }
 
@@ -404,7 +406,7 @@ function main(params) {
                 if (!state) {
                     console.log(`Entering final state`)
                     console.log(JSON.stringify(params))
-                    return { params }
+                    if (params.error) return params; else return { params }
                 }
 
                 console.log(`Entering ${state}`)

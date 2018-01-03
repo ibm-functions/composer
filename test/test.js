@@ -1,76 +1,18 @@
 const assert = require('assert')
 const composer = require('../composer')
-const harness = require('../test-harness')()
-const wsk = harness.wsk
-const mgr = harness.mgr
-const run = params => wsk.actions.invoke({ name: 'conductor', params, blocking: true })
-const invoke = (task, params, $blocking = true) => run(Object.assign({ $invoke: composer.compile(task), $blocking }, params))
+const name = 'composer-test-action'
 
-let activationId
+const invoke = (task, params = {}, blocking = true) => composer.deploy(composer.compile(name, task)).then(() => composer.wsk.actions.invoke({ name, params, blocking }))
 
 describe('composer', function () {
     this.timeout(20000)
 
     before('deploy conductor and sample actions', function () {
-        return harness.deploy()
-            .then(() => wsk.actions.update({ name: 'DivideByTwo', action: 'function main({n}) { return { n: n / 2 } }' }))
-            .then(() => wsk.actions.update({ name: 'TripleAndIncrement', action: 'function main({n}) { return { n: n * 3 + 1 } }' }))
-            .then(() => wsk.actions.update({ name: 'isNotOne', action: 'function main({n}) { return { value: n != 1 } }' }))
-            .then(() => wsk.actions.update({ name: 'isEven', action: 'function main({n}) { return { value: n % 2  == 0 } }' }))
-    })
-
-    it('flush', function () {
-        return mgr.flush()
-    })
-
-    it('history must be clean', function () {
-        return mgr.list().then(result => assert.ok(Array.isArray(result.live) && Array.isArray(result.done) && typeof result.next === 'number'
-            && result.live.length === 0 && result.done.length === 0 && result.next === 0))
-    })
-
-    describe('first composition', function () {
-        it('identity task must return input object', function () {
-            return invoke(composer.task(), { foo: 'bar' }).then(activation => {
-                activationId = activation.activationId
-                return assert.deepEqual(activation.response.result, { foo: 'bar' })
-            })
-        })
-
-        it('check history', function () {
-            return mgr.list().then(result => assert.ok(result.live.length === 0 && result.done.length === 1 && result.done[0] === activationId && result.next === 0))
-        })
-
-        it('check trace', function () {
-            return mgr.trace(activationId).then(result => assert.ok(result.trace.length === 1 && result.trace[0] === activationId))
-        })
-    })
-
-    describe('invalid conductor invocations', function () {
-        it('missing both $sessionId and $invoke must fail with 400', function () {
-            return run({}).then(() => assert.fail(), activation => assert.equal(activation.error.response.result.error.code, 400))
-        })
-    })
-
-    describe('nonexistent session', function () {
-        it('resume nonexistent session must fail with 404 (and not record session result)', function () {
-            return run({ $sessionId: 'foo', $invoke: composer.task(), params: {} }).then(() => assert.fail(), activation => assert.equal(activation.error.response.result.error.code, 404))
-        })
-
-        it('get nonexistent session must throw', function () {
-            return mgr.get('foo').then(() => assert.fail(), result => assert.equal(result, 'Cannot find result of session foo'))
-        })
-
-        it('kill nonexistent session must throw', function () {
-            return mgr.kill('foo').then(() => assert.fail(), result => assert.equal(result, 'Cannot find live session foo'))
-        })
-
-        it('purge nonexistent session must throw', function () {
-            return mgr.purge('foo').then(() => assert.fail(), result => assert.equal(result, 'Cannot find session foo'))
-        })
-
-        it('trace nonexistent session must throw', function () {
-            return mgr.trace('foo').then(() => assert.fail(), result => assert.equal(result, 'Cannot find trace for session foo'))
-        })
+        return composer.deploy(
+            [{ name: 'DivideByTwo', action: 'function main({n}) { return { n: n / 2 } }' },
+                { name: 'TripleAndIncrement', action: 'function main({n}) { return { n: n * 3 + 1 } }' },
+                { name: 'isNotOne', action: 'function main({n}) { return { value: n != 1 } }' },
+                { name: 'isEven', action: 'function main({n}) { return { value: n % 2  == 0 } }' }])
     })
 
     describe('blocking invocations', function () {
@@ -261,57 +203,6 @@ describe('composer', function () {
                 return invoke(composer.while('isNotOne', composer.if('isEven', 'DivideByTwo', 'TripleAndIncrement')), { n: 5 })
                     .then(activation => assert.deepEqual(activation.response.result, { n: 1 }))
             })
-        })
-    })
-
-    describe('non-blocking invocations', function () {
-        it('simple app must return session id', function () {
-            return invoke(composer.task(() => 42), {}, false).then(activation => assert.ok(activation.response.result.$session))
-        })
-
-        it('complex app must return session id', function () {
-            return invoke(composer.task('DivideByTwo'), {}, false).then(activation => assert.ok(activation.response.result.$session))
-        })
-
-        it('get after execution must succeed', function () {
-            return invoke(composer.task('DivideByTwo'), { n: 42 }, false)
-                .then(activation => new Promise(resolve => setTimeout(() => resolve(activation), 3000)))
-                .then(activation => mgr.get(activation.response.result.$session))
-                .then(result => assert.deepEqual(result, { n: 21 }))
-        })
-
-        it('get during execution must fail', function () {
-            let session
-            return invoke(composer.while('isNotOne', ({ n }) => ({ n: n - 1 })), { n: 10 }, false)
-                .then(activation => mgr.get(session = activation.response.result.$session))
-                .then(() => assert.fail(), result => assert.equal(result, `Cannot find result of session ${session}`))
-        })
-
-        it('kill after execution must fail', function () {
-            let session
-            return invoke(composer.task('DivideByTwo'), { n: 42 }, false)
-                .then(activation => new Promise(resolve => setTimeout(() => resolve(activation), 3000)))
-                .then(activation => mgr.kill(session = activation.response.result.$session))
-                .then(() => assert.fail(), result => assert.equal(result, `Cannot find live session ${session}`))
-        })
-
-        it('kill during execution must succeed', function () {
-            return invoke(composer.while('isNotOne', ({ n }) => ({ n: n - 1 })), { n: 10 }, false)
-                .then(activation => mgr.kill(activation.response.result.$session))
-                .then(result => assert.deepEqual(result, 'OK'))
-        })
-
-        it('purge after execution must succeed', function () {
-            return invoke(composer.task('DivideByTwo'), { n: 42 }, false)
-                .then(activation => new Promise(resolve => setTimeout(() => resolve(activation), 3000)))
-                .then(activation => mgr.purge(activation.response.result.$session))
-                .then(result => assert.deepEqual(result, 'OK'))
-        })
-
-        it('purge during execution must succeed', function () {
-            return invoke(composer.while('isNotOne', ({ n }) => ({ n: n - 1 })), { n: 10 }, false)
-                .then(activation => mgr.purge(activation.response.result.$session))
-                .then(result => assert.deepEqual(result, 'OK'))
         })
     })
 })
