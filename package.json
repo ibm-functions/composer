@@ -20,12 +20,12 @@
     "openwhisk"
   ],
   "dependencies": {
+    "openwhisk": "^3.11.0",
     "redis": "^2.8.0",
     "clone": "^2.1.1"
   },
   "devDependencies": {
-    "mocha": "^3.5.0",
-    "openwhisk": "git://github.com/starpit/openwhisk-client-js.git#add_client_timeout"
+    "mocha": "^3.5.0"
   },
   "author": {
     "name": "Olivier Tardieu",
