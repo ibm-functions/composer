@@ -18,11 +18,12 @@
 
 // composer module
 
-const clone = require('clone')
-const util = require('util')
 const fs = require('fs')
-const path = require('path')
 const os = require('os')
+const path = require('path')
+const util = require('util')
+
+const clone = require('clone')
 const openwhisk = require('openwhisk')
 
 class ComposerError extends Error {
@@ -61,11 +62,11 @@ function end(id) {
     return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
 }
 
-const isObject = obj => typeof (obj) === 'object' && obj !== null && !Array.isArray(obj)
+const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
 
 class Composer {
     constructor(options = {}) {
-        // try to extract apihost and key
+        // try to extract apihost and key from wskprops
         let apihost
         let api_key
 
@@ -91,19 +92,22 @@ class Composer {
     task(obj, options) {
         if (options != null && options.output) return this.assign(options.output, obj, options.input)
         if (options != null && options.merge) return this.sequence(this.retain(obj), ({ params, result }) => Object.assign({}, params, result))
-        const id = {}
         let Entry
         let Manifest = []
         if (obj == null) { // identity function (must throw errors if any)
-            Entry = { Type: 'Task', Helper: 'null', Function: 'params => params', id }
-        } else if (typeof obj === 'object' && typeof obj.Entry === 'object' && Array.isArray(obj.States) && typeof obj.Exit === 'object') { // an action composition
+            Entry = { Type: 'Task', Helper: 'null', Function: 'params => params' }
+        } else if (Array.isArray(obj)) {
+            Entry = { Type: 'Task', Action: obj.slice(-1)[0].name }
+            Manifest = clone(obj)
+        } else if (typeof obj === 'object' && typeof obj.Entry === 'object'
+            && Array.isArray(obj.States) && typeof obj.Exit === 'object' && Array.isArray(obj.Manifest)) { // an action composition
             return clone(obj)
         } else if (typeof obj === 'function') { // function
-            Entry = { Type: 'Task', Function: obj.toString(), id }
+            Entry = { Type: 'Task', Function: obj.toString() }
         } else if (typeof obj === 'string') { // action
-            Entry = { Type: 'Task', Action: obj, id }
-        } else if (typeof obj === 'object' && typeof obj.Helper !== 'undefined' && typeof obj.Function === 'string') { //helper function
-            Entry = { Type: 'Task', Function: obj.Function, Helper: obj.Helper, id }
+            Entry = { Type: 'Task', Action: obj }
+        } else if (typeof obj === 'object' && typeof obj.Helper === 'string' && typeof obj.Function === 'string') { // helper function
+            Entry = { Type: 'Task', Function: obj.Function, Helper: obj.Helper }
         } else { // error
             throw new ComposerError('Invalid composition argument', obj)
         }
@@ -111,9 +115,9 @@ class Composer {
     }
 
     taskFromFile(name, filename) {
-        if (typeof name !== 'string') throw new ComposerError('Invalid name argument in taskFromFile', name)
-        if (typeof filename !== 'string') throw new ComposerError('Invalid filename argument in taskFromFile', filename)
-        const Entry = { Type: 'Task', Action: name, id: {} }
+        if (typeof name !== 'string') throw new ComposerError('Invalid name argument for taskFromFile', name)
+        if (typeof filename !== 'string') throw new ComposerError('Invalid filename argument for taskFromFile', filename)
+        const Entry = { Type: 'Task', Action: name }
         return { Entry, States: [Entry], Exit: Entry, Manifest: [{ name, action: fs.readFileSync(filename, { encoding: 'utf8' }) }] }
     }
 
@@ -142,6 +146,8 @@ class Composer {
         alternate.Exit.Next = Exit
         test.States.push(Exit)
         test.Exit = Exit
+        test.Manifest.push(...consequent.Manifest)
+        test.Manifest.push(...alternate.Manifest)
         return test
     }
 
@@ -158,6 +164,7 @@ class Composer {
         body.Exit.Next = test.Entry
         test.States.push(Exit)
         test.Exit = Exit
+        test.Manifest.push(...body.Manifest)
         return test
     }
 
@@ -258,27 +265,22 @@ class Composer {
     }
 
     value(json) {
-        const id = {}
         if (typeof json === 'function') throw new ComposerError('Value cannot be a function', json.toString())
-        const Entry = { Type: 'Task', Value: typeof json === 'undefined' ? {} : json, id }
+        const Entry = { Type: 'Task', Value: typeof json === 'undefined' ? {} : json }
         return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
     }
 
     compile(name, obj, filename) {
-        if (typeof name !== 'string') throw new ComposerError('Invalid name argument in compile', name)
-        if (typeof filename !== 'undefined' && typeof filename !== 'string') throw new ComposerError('Invalid optional filename argument in compile', filename)
-        if (typeof obj !== 'object' || typeof obj.Entry !== 'object' || !Array.isArray(obj.States) || typeof obj.Exit !== 'object') {
-            throw new ComposerError('Invalid argument to compile', obj)
-        }
-        obj = clone(obj)
+        if (typeof name !== 'string') throw new ComposerError('Invalid name argument for compile', name)
+        if (typeof filename !== 'undefined' && typeof filename !== 'string') throw new ComposerError('Invalid optional filename argument for compile', filename)
+        obj = this.task(obj)
         const States = {}
         let Entry
         let Exit
-        let Count = 0
+        let count = 0
         obj.States.forEach(state => {
-            if (typeof state.id.id === 'undefined') state.id.id = Count++
-        })
-        obj.States.forEach(state => {
+            if (typeof state.id === 'undefined') state.id = {}
+            if (typeof state.id.id === 'undefined') state.id.id = count++
             const id = (state.Type === 'Task' ? state.Action && 'action' || state.Function && 'function' || state.Value && 'value' : state.Type.toLowerCase()) + '_' + state.id.id
             States[id] = state
             state.id = id
@@ -296,19 +298,17 @@ class Composer {
         })
         const action = `${main}\nconst __composition__ =  ${JSON.stringify({ Entry, States, Exit }, null, 4)}\n`
         if (filename) fs.writeFileSync(filename, action, { encoding: 'utf8' })
-        const app = this.task(name)
-        app.Manifest = clone(obj.Manifest)
-        app.Manifest.push({ name, action, annotations: { conductor: { Entry, States, Exit } } })
-        return app
+        obj.Manifest.push({ name, action, annotations: { conductor: { Entry, States, Exit } } })
+        return obj.Manifest
     }
 
     deploy(obj) {
-        if (typeof obj === 'object' && Array.isArray(obj.Manifest)) obj = obj.Manifest
-        if (!Array.isArray(obj) || obj.length === 0) throw new ComposerError('Invalid argument to deploy', obj)
+        if (!Array.isArray(obj) || obj.length === 0) throw new ComposerError('Invalid argument for deploy', obj)
 
         // return the count of successfully deployed actions
         return clone(obj).reduce(
-            (promise, action) => promise.then(i => this.wsk.actions.update(action).then(_ => i + 1, err => { console.error(err); return i })), Promise.resolve(0)).then(i => `${i}/${obj.length}`)
+            (promise, action) => promise.then(i => this.wsk.actions.update(action).then(_ => i + 1, err => { console.error(err); return i })), Promise.resolve(0)
+        ).then(i => `${i}/${obj.length}`)
     }
 }
 
@@ -334,7 +334,7 @@ function main(params) {
 
     // keep outer namespace clean
     return (() => {
-        const isObject = obj => typeof (obj) === 'object' && obj !== null && !Array.isArray(obj)
+        const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
 
         // encode error object
         const encodeError = error => ({
