@@ -96,7 +96,7 @@ class Composer {
         let Manifest = []
         if (obj == null) { // identity function (must throw errors if any)
             Entry = { Type: 'Task', Helper: 'null', Function: 'params => params' }
-        } else if (Array.isArray(obj)) {
+        } else if (Array.isArray(obj) && obj.length > 0 && typeof obj.slice(-1)[0].name === 'string') {
             Entry = { Type: 'Task', Action: obj.slice(-1)[0].name }
             Manifest = clone(obj)
         } else if (typeof obj === 'object' && typeof obj.Entry === 'object'
