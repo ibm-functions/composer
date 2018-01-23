@@ -245,7 +245,7 @@ OpenWhisk apply.
 All app activations are asynchronous and non-blocking. The immediate
 result of an invocation is a _session id_, which you may use to query
 the app for its final output. For development convenience, the shell
-implements a client-side poll to provide a the final output of the
+implements a client-side poll to provide the final output of the
 app, if it is ready within 30 seconds. Otherwise, you may use the
 session id to retrieve the output; in this way, working with a session
 id is similar to working with an activation id when invoking an
@@ -519,7 +519,7 @@ The app will now produce the decoded text as its final output.
 
 ```bash
 # create app
-$ fsh app create try @demos/retain.js
+$ fsh app create retain @demos/retain.js
 
 # invoke app with valid parameter
 > fsh app invoke retain -p str aGVsbG8gdHJ5IQ==
