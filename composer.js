@@ -90,8 +90,8 @@ class Composer {
     }
 
     task(obj, options) {
-        if (options != null && options.output) return this.assign(options.output, obj, options.input)
-        if (options != null && options.merge) return this.sequence(this.retain(obj), ({ params, result }) => Object.assign({}, params, result))
+        if (options && options.output) return this.assign(options.output, obj, options.input)
+        if (options && options.merge) return this.sequence(this.retain(obj), ({ params, result }) => Object.assign({}, params, result))
         let Entry
         let Manifest = []
         if (obj == null) { // identity function (must throw errors if any)
@@ -106,11 +106,10 @@ class Composer {
             Entry = { Type: 'Task', Function: obj.toString() }
         } else if (typeof obj === 'string') { // action
             Entry = { Type: 'Task', Action: obj }
-        } else if (typeof obj === 'object' && typeof obj.Helper === 'string' && typeof obj.Function === 'string') { // helper function
-            Entry = { Type: 'Task', Function: obj.Function, Helper: obj.Helper }
         } else { // error
             throw new ComposerError('Invalid composition argument', obj)
         }
+        if (options && options.Helper) Entry.Helper = options.Helper
         return { Entry, States: [Entry], Exit: Entry, Manifest }
     }
 
@@ -191,21 +190,17 @@ class Composer {
         const id = {}
         if (!flag) return chain(push(id), chain(this.task(body), pop(id)))
 
-        let helperFunc_1 = { 'Helper': 'retain_1', 'Function': 'params => ({params})' }
-        let helperFunc_3 = { 'Helper': 'retain_3', 'Function': 'params => ({params})' }
-        let helperFunc_2 = { 'Helper': 'retain_2', 'Function': 'params => ({ params: params.params, result: params.result.params })' }
-
         return this.sequence(
             this.retain(
                 this.try(
                     this.sequence(
                         body,
-                        helperFunc_1
+                        this.task(params => ({ params }), { Helper: 'retain_1' })
                     ),
-                    helperFunc_3
+                    this.task(params => ({ params }), { Helper: 'retain_3' })
                 )
             ),
-            helperFunc_2
+            this.task(params => ({ params: params.params, result: params.result.params }), { Helper: 'retain_2' })
         )
     }
 
@@ -213,11 +208,8 @@ class Composer {
         if (dest == null || body == null) throw new ComposerError('Missing arguments in composition', arguments)
         if (typeof flag !== 'boolean') throw new ComposerError('Invalid assign flag', flag)
 
-        let helperFunc_1 = { 'Helper': 'assign_1', 'Function': 'params => params[source]' };
-        let helperFunc_2 = { 'Helper': 'assign_2', 'Function': 'params => { params.params[dest] = params.result; return params.params }' };
-
-        const t = source ? this.let('source', source, this.retain(this.sequence(helperFunc_1, body), flag)) : this.retain(body, flag)
-        return this.let('dest', dest, t, helperFunc_2)
+        const t = source ? this.let('source', source, this.retain(this.sequence(this.task(params => params[source], { Helper: 'assign_1' }), body), flag)) : this.retain(body, flag)
+        return this.let('dest', dest, t, this.task(params => { params.params[dest] = params.result; return params.params }, { Helper: 'assign_2' }))
     }
 
     let(arg1, arg2) {
@@ -244,24 +236,19 @@ class Composer {
         if (body == null) throw new ComposerError('Missing arguments in composition', arguments)
         if (typeof count !== 'number') throw new ComposerError('Invalid retry count', count)
 
-        let helperFunc_1 = { 'Helper': 'retry_1', 'Function': "params => typeof params.result.error !== 'undefined' && count-- > 0" }
-        let helperFunc_2 = { 'Helper': 'retry_2', 'Function': 'params => params.params' }
-        let helperFunc_3 = { 'Helper': 'retry_3', 'Function': 'params => params.result' }
-
         return this.let('count', count,
             this.retain(body, true),
             this.while(
-                helperFunc_1,
-                this.sequence(helperFunc_2, this.retain(body, true))),
-            helperFunc_3)
+                this.task(params => typeof params.result.error !== 'undefined' && count-- > 0, { Helper: 'retry_1' }),
+                this.sequence(this.task(params => params.params, { Helper: 'retry_2' }), this.retain(body, true))),
+            this.task(params => params.result, { Helper: 'retry_3' }))
     }
 
     repeat(count, body) {
         if (body == null) throw new ComposerError('Missing arguments in composition', arguments)
         if (typeof count !== 'number') throw new ComposerError('Invalid repeat count', count)
 
-        let helperFunc_1 = { 'Helper': 'repeat_1', 'Function': '() => count-- > 0' }
-        return this.let('count', count, this.while(helperFunc_1, body))
+        return this.let('count', count, this.while(this.task(() => count-- > 0, { Helper: 'repeat_1' }), body))
     }
 
     value(json) {
