@@ -94,30 +94,31 @@ class Composer {
         if (options && options.merge) return this.sequence(this.retain(obj), ({ params, result }) => Object.assign({}, params, result))
         let Entry
         let Manifest = []
-        if (obj == null) { // identity function (must throw errors if any)
-            Entry = { Type: 'Task', Helper: 'null', Function: 'params => params' }
+        if (obj == null) {
+            // case null: identity function (must throw errors if any)
+            return this.task(params => params, { Helper: 'null' })
         } else if (Array.isArray(obj) && obj.length > 0 && typeof obj.slice(-1)[0].name === 'string') {
-            Entry = { Type: 'Task', Action: obj.slice(-1)[0].name }
+            // case array: last action in the array
             Manifest = clone(obj)
-        } else if (typeof obj === 'object' && typeof obj.Entry === 'object'
-            && Array.isArray(obj.States) && typeof obj.Exit === 'object' && Array.isArray(obj.Manifest)) { // an action composition
+            Entry = { Type: 'Task', Action: obj.slice(-1)[0].name }
+        } else if (typeof obj === 'object' && typeof obj.Entry === 'object' && Array.isArray(obj.States) && typeof obj.Exit === 'object' && Array.isArray(obj.Manifest)) {
+            // case object: composition
             return clone(obj)
-        } else if (typeof obj === 'function') { // function
+        } else if (typeof obj === 'function') {
+            // case function: inline function
             Entry = { Type: 'Task', Function: obj.toString() }
-        } else if (typeof obj === 'string') { // action
+        } else if (typeof obj === 'string') {
+            // case string: action
+            if (options && options.filename) Manifest = [{ name: obj, action: fs.readFileSync(options.filename, { encoding: 'utf8' }) }]
+            if (options && typeof options.action === 'string') Manifest = [{ name: obj, action: options.action }]
+            if (options && typeof options.action === 'function') Manifest = [{ name: obj, action: options.action.toString() }]
             Entry = { Type: 'Task', Action: obj }
-        } else { // error
+        } else {
+            // error
             throw new ComposerError('Invalid composition argument', obj)
         }
         if (options && options.Helper) Entry.Helper = options.Helper
         return { Entry, States: [Entry], Exit: Entry, Manifest }
-    }
-
-    taskFromFile(name, filename) {
-        if (typeof name !== 'string') throw new ComposerError('Invalid name argument for taskFromFile', name)
-        if (typeof filename !== 'string') throw new ComposerError('Invalid filename argument for taskFromFile', filename)
-        const Entry = { Type: 'Task', Action: name }
-        return { Entry, States: [Entry], Exit: Entry, Manifest: [{ name, action: fs.readFileSync(filename, { encoding: 'utf8' }) }] }
     }
 
     sequence() {
