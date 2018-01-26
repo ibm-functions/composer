@@ -87,11 +87,12 @@ class Composer {
         } catch (error) { }
 
         this.wsk = openwhisk(Object.assign({ apihost, api_key }, options))
+        this.merge = (result, params) => Object.assign(params, result)
     }
 
     task(obj, options) {
-        if (options && options.output) return this.assign(options.output, obj, options.input)
-        if (options && options.merge) return this.sequence(this.retain(obj), ({ params, result }) => Object.assign({}, params, result))
+        if (options && options.pre) return this.preprocess(obj, options)
+        if (options && options.post) return this.postprocess(obj, options)
         let Entry
         let Manifest = []
         if (obj == null) {
@@ -119,6 +120,31 @@ class Composer {
         }
         if (options && options.Helper) Entry.Helper = options.Helper
         return { Entry, States: [Entry], Exit: Entry, Manifest }
+    }
+
+
+    preprocess(obj, options) {
+        const pre = options.pre.toString()
+        return this.sequence(this.retain(this.value({ pre })), ({ params, result }) => {
+            const dict = eval(result.pre)(params)
+            return typeof dict === 'undefined' ? params : dict
+        }, this.task(obj, Object.assign({}, options, { pre: undefined })))
+    }
+
+    postprocess(obj, options) {
+        const post = options.post.toString()
+        if (options.post.length === 1) {
+            return this.sequence(this.task(obj, Object.assign({}, options, { post: undefined })), this.retain(this.value({ post })), ({ params, result }) => {
+                const dict = eval(result.post)(params)
+                return typeof dict === 'undefined' ? params : dict
+            })
+        } else {
+            // save params
+            return this.sequence(this.retain(this.task(obj, Object.assign({}, options, { post: undefined }))), this.retain(this.value({ post })), ({ params, result }) => {
+                const dict = eval(result.post)(params.result, params.params)
+                return typeof dict === 'undefined' ? params.result : dict
+            })
+        }
     }
 
     sequence() {
@@ -253,7 +279,6 @@ class Composer {
     }
 
     value(json) {
-        if (typeof json === 'function') throw new ComposerError('Value cannot be a function', json.toString())
         const Entry = { Type: 'Task', Value: typeof json === 'undefined' ? {} : json }
         return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
     }
@@ -261,6 +286,7 @@ class Composer {
     compile(name, obj, filename) {
         if (typeof name !== 'string') throw new ComposerError('Invalid name argument for compile', name)
         if (typeof filename !== 'undefined' && typeof filename !== 'string') throw new ComposerError('Invalid optional filename argument for compile', filename)
+        if (typeof obj === 'undefied') new ComposerError('Missing arguments in composition', arguments)
         obj = this.task(obj)
         const States = {}
         let Entry
