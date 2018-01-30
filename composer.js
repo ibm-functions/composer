@@ -224,7 +224,7 @@ class Composer {
                     this.try(
                         this.sequence(body, this.function(result => ({ result }), { helper: 'retain_1' })),
                         this.function(result => ({ result }), { helper: 'retain_3' })),
-                    options.field),
+                    { field: options.field }),
                 this.function(({ params, result }) => ({ params, result: result.result }), { helper: 'retain_2' }))
         } else {
             // return { params, result: body(params) } if no error, otherwise body(params)
