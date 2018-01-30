@@ -130,17 +130,32 @@ describe('composer', function () {
                     return invoke(composer.if('isEven', 'DivideByTwo', 'TripleAndIncrement'), { n: 3 })
                         .then(activation => assert.deepEqual(activation.response.result, { n: 10 }))
                 })
+
+                it('then branch no retain', function () {
+                    return invoke(composer.if('isEven', params => { params.then = true }, params => { params.else = true }, true), { n: 2 })
+                        .then(activation => assert.deepEqual(activation.response.result, { value: true, then: true }))
+                })
+
+                it('else branch no retain', function () {
+                    return invoke(composer.if('isEven', params => { params.then = true }, params => { params.else = true }, true), { n: 3 })
+                        .then(activation => assert.deepEqual(activation.response.result, { value: false, else: true }))
+                })
             })
 
             describe('while', function () {
-                it('test 1', function () {
+                it('a few iterations', function () {
                     return invoke(composer.while('isNotOne', ({ n }) => ({ n: n - 1 })), { n: 4 })
                         .then(activation => assert.deepEqual(activation.response.result, { n: 1 }))
                 })
 
-                it('test 2', function () {
+                it('no iteration', function () {
                     return invoke(composer.while(() => false, ({ n }) => ({ n: n - 1 })), { n: 1 })
                         .then(activation => assert.deepEqual(activation.response.result, { n: 1 }))
+                })
+
+                it('no retain', function () {
+                    return invoke(composer.while(({ n }) => ({ n, value: n !== 1 }), ({ n }) => ({ n: n - 1 }), true), { n: 4 })
+                        .then(activation => assert.deepEqual(activation.response.result, { value: false, n: 1 }))
                 })
             })
 

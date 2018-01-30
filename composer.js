@@ -110,12 +110,12 @@ class Composer {
         return Array.prototype.map.call(arguments, x => this.task(x), this).reduce(chain)
     }
 
-    if(test, consequent, alternate) {
-        if (arguments.length > 3) throw new Error('Too many arguments')
+    if(test, consequent, alternate, options) {
+        if (arguments.length > 4) throw new Error('Too many arguments')
         const id = {}
-        test = chain(push(id), this.task(test))
-        consequent = chain(pop(id, 'pop', 'then'), this.task(consequent))
-        alternate = chain(pop(id, 'pop', 'else'), this.task(alternate))
+        test = options ? this.task(test) : chain(push(id), this.task(test))
+        consequent = options ? this.task(consequent) : chain(pop(id, 'pop', 'then'), this.task(consequent))
+        alternate = options ? this.task(alternate) : chain(pop(id, 'pop', 'else'), this.task(alternate))
         const exit = { type: 'pass', id }
         const choice = { type: 'choice', then: consequent.entry, else: alternate.entry, id }
         test.states.push(choice)
@@ -131,19 +131,19 @@ class Composer {
         return test
     }
 
-    while(test, body) {
-        if (arguments.length > 2) throw new Error('Too many arguments')
+    while(test, body, options) {
+        if (arguments.length > 3) throw new Error('Too many arguments')
         const id = {}
-        test = chain(push(id), this.task(test))
-        const consequent = chain(pop(id, 'pop', 'then'), this.task(body))
-        const alternate = pop(id, 'pop', 'else')
-        const choice = { type: 'choice', then: consequent.entry, else: alternate.entry, id }
+        test = options ? this.task(test) : chain(push(id), this.task(test))
+        const consequent = options ? this.task(body) : chain(pop(id, 'pop', 'then'), this.task(body))
+        const exit = options ? { type: 'pass', id } : pop(id, 'pop', 'else').entry
+        const choice = { type: 'choice', then: consequent.entry, else: exit, id }
         test.states.push(choice)
         test.states.push(...consequent.states)
-        test.states.push(...alternate.states)
+        test.states.push(exit)
         test.exit.next = choice
         consequent.exit.next = test.entry
-        test.exit = alternate.exit
+        test.exit = exit
         test.Manifest.push(...consequent.Manifest)
         return test
     }
