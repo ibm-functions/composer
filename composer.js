@@ -197,15 +197,15 @@ class Composer {
         return { entry, states: [entry], exit: entry, Manifest: [] }
     }
 
-    action(action, options = {}) {
+    action(name, options = {}) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
-        if (typeof action !== 'string') throw new ComposerError('Invalid argument', f)
+        if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         let Manifest = []
-        if (options.filename) Manifest = [{ name: obj, action: fs.readFileSync(options.filename, { encoding: 'utf8' }) }]
-        if (typeof options.action === 'string') Manifest = [{ name: obj, action: options.action }]
-        if (typeof options.action === 'function') Manifest = [{ name: obj, action: `${options.action}` }]
-        const entry = { type: 'action', action }
+        if (options.filename) Manifest = [{ name, action: fs.readFileSync(options.filename, { encoding: 'utf8' }) }]
+        if (typeof options.action === 'string') Manifest = [{ name, action: options.action }]
+        if (typeof options.action === 'function') Manifest = [{ name, action: `${options.action}` }]
+        const entry = { type: 'action', action: name }
         return { entry, states: [entry], exit: entry, Manifest }
     }
 
