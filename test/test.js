@@ -132,12 +132,12 @@ describe('composer', function () {
                 })
 
                 it('then branch no retain', function () {
-                    return invoke(composer.if('isEven', params => { params.then = true }, params => { params.else = true }, true), { n: 2 })
+                    return invoke(composer.if('isEven', params => { params.then = true }, params => { params.else = true }, { nosave: true }), { n: 2 })
                         .then(activation => assert.deepEqual(activation.response.result, { value: true, then: true }))
                 })
 
                 it('else branch no retain', function () {
-                    return invoke(composer.if('isEven', params => { params.then = true }, params => { params.else = true }, true), { n: 3 })
+                    return invoke(composer.if('isEven', params => { params.then = true }, params => { params.else = true }, { nosave: true }), { n: 3 })
                         .then(activation => assert.deepEqual(activation.response.result, { value: false, else: true }))
                 })
             })
@@ -154,7 +154,7 @@ describe('composer', function () {
                 })
 
                 it('no retain', function () {
-                    return invoke(composer.while(({ n }) => ({ n, value: n !== 1 }), ({ n }) => ({ n: n - 1 }), true), { n: 4 })
+                    return invoke(composer.while(({ n }) => ({ n, value: n !== 1 }), ({ n }) => ({ n: n - 1 }), { nosave: true }), { n: 4 })
                         .then(activation => assert.deepEqual(activation.response.result, { value: false, n: 1 }))
                 })
             })
@@ -217,11 +217,11 @@ describe('composer', function () {
                 })
 
                 it('test 2', function () {
-                    return invoke(composer.retain('TripleAndIncrement', true), { n: 3 })
+                    return invoke(composer.retain('TripleAndIncrement', { catch: true }), { n: 3 })
                         .then(activation => assert.deepEqual(activation.response.result, { params: { n: 3 }, result: { n: 10 } }))
                 })
                 it('test 3', function () {
-                    return invoke(composer.retain('TripleAndIncrement', ({ n }) => ({ n: -n })), { n: 3 })
+                    return invoke(composer.retain('TripleAndIncrement', { filter: ({ n }) => ({ n: -n }) }), { n: 3 })
                         .then(activation => assert.deepEqual(activation.response.result, { params: { n: -3 }, result: { n: 10 } }))
                 })
             })

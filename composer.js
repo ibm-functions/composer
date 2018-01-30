@@ -28,8 +28,10 @@ const openwhisk = require('openwhisk')
 class ComposerError extends Error {
     constructor(message, cause) {
         super(message)
-        const index = this.stack.indexOf('\n')
-        this.stack = this.stack.substring(0, index) + '\nCause: ' + util.inspect(cause) + this.stack.substring(index)
+        if (typeof cause !== 'undefined') {
+            const index = this.stack.indexOf('\n')
+            this.stack = this.stack.substring(0, index) + '\nCause: ' + util.inspect(cause) + this.stack.substring(index)
+        }
     }
 }
 
@@ -81,7 +83,7 @@ class Composer {
     }
 
     task(obj) {
-        if (arguments.length > 1) throw new Error('Too many arguments')
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (obj == null) {
             // case null: identity function (must throw errors if any)
             return this.function(params => params, { helper: 'null' })
@@ -110,12 +112,13 @@ class Composer {
         return Array.prototype.map.call(arguments, x => this.task(x), this).reduce(chain)
     }
 
-    if(test, consequent, alternate, options) {
-        if (arguments.length > 4) throw new Error('Too many arguments')
+    if(test, consequent, alternate, options = {}) {
+        if (arguments.length > 4) throw new ComposerError('Too many arguments')
+        if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
         const id = {}
-        test = options ? this.task(test) : chain(push(id), this.task(test))
-        consequent = options ? this.task(consequent) : chain(pop(id, 'pop', 'then'), this.task(consequent))
-        alternate = options ? this.task(alternate) : chain(pop(id, 'pop', 'else'), this.task(alternate))
+        test = options.nosave ? this.task(test) : chain(push(id), this.task(test))
+        consequent = options.nosave ? this.task(consequent) : chain(pop(id, 'pop', 'then'), this.task(consequent))
+        alternate = options.nosave ? this.task(alternate) : chain(pop(id, 'pop', 'else'), this.task(alternate))
         const exit = { type: 'pass', id }
         const choice = { type: 'choice', then: consequent.entry, else: alternate.entry, id }
         test.states.push(choice)
@@ -131,12 +134,13 @@ class Composer {
         return test
     }
 
-    while(test, body, options) {
-        if (arguments.length > 3) throw new Error('Too many arguments')
+    while(test, body, options = {}) {
+        if (arguments.length > 3) throw new ComposerError('Too many arguments')
+        if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
         const id = {}
-        test = options ? this.task(test) : chain(push(id), this.task(test))
-        const consequent = options ? this.task(body) : chain(pop(id, 'pop', 'then'), this.task(body))
-        const exit = options ? { type: 'pass', id } : pop(id, 'pop', 'else').entry
+        test = options.nosave ? this.task(test) : chain(push(id), this.task(test))
+        const consequent = options.nosave ? this.task(body) : chain(pop(id, 'pop', 'then'), this.task(body))
+        const exit = options.nosave ? { type: 'pass', id } : pop(id, 'pop', 'else').entry
         const choice = { type: 'choice', then: consequent.entry, else: exit, id }
         test.states.push(choice)
         test.states.push(...consequent.states)
@@ -149,7 +153,7 @@ class Composer {
     }
 
     try(body, handler) {
-        if (arguments.length > 2) throw new Error('Too many arguments')
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
         const id = {}
         handler = this.task(handler)
         body = chain(push(id, { catch: handler.entry }), chain(this.task(body), pop(id)))
@@ -164,7 +168,7 @@ class Composer {
     }
 
     finally(body, handler) {
-        if (arguments.length > 2) throw new Error('Too many arguments')
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
         const id = {}
         handler = this.task(handler)
         return chain(push(id, { catch: handler.entry }), chain(this.task(body), chain(pop(id), handler)))
@@ -177,48 +181,55 @@ class Composer {
     }
 
     value(v) {
-        if (arguments.length > 1) throw new Error('Too many arguments')
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof v === 'function') throw new ComposerError('Invalid argument', v)
         const entry = { type: 'value', value: typeof v === 'undefined' ? {} : JSON.parse(JSON.stringify(v)) }
         return { entry, states: [entry], exit: entry, Manifest: [] }
     }
 
-    function(f, options) {
-        if (arguments.length > 2) throw new Error('Too many arguments')
+    function(f, options = {}) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
         if (typeof f === 'function') f = `${f}`
         if (typeof f !== 'string') throw new ComposerError('Invalid argument', f)
         const entry = { type: 'function', function: f }
-        if (options && options.helper) entry.Helper = options.helper
+        if (options.helper) entry.helper = options.helper
         return { entry, states: [entry], exit: entry, Manifest: [] }
     }
 
-    action(action, options) {
-        if (arguments.length > 2) throw new Error('Too many arguments')
+    action(action, options = {}) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
         if (typeof action !== 'string') throw new ComposerError('Invalid argument', f)
         let Manifest = []
-        if (options && options.filename) Manifest = [{ name: obj, action: fs.readFileSync(options.filename, { encoding: 'utf8' }) }]
-        if (options && typeof options.action === 'string') Manifest = [{ name: obj, action: options.action }]
-        if (options && typeof options.action === 'function') Manifest = [{ name: obj, action: `${options.action}` }]
+        if (options.filename) Manifest = [{ name: obj, action: fs.readFileSync(options.filename, { encoding: 'utf8' }) }]
+        if (typeof options.action === 'string') Manifest = [{ name: obj, action: options.action }]
+        if (typeof options.action === 'function') Manifest = [{ name: obj, action: `${options.action}` }]
         const entry = { type: 'action', action }
         return { entry, states: [entry], exit: entry, Manifest }
     }
 
-    retain(body, options) {
-        if (arguments.length > 2) throw new Error('Too many arguments')
-        if (typeof options === 'undefined' || typeof options === 'string' || options === false) {
-            const id = {}
-            return chain(push(id, options), chain(this.task(body), pop(id, 'collect')))
-        } else if (options === true) {
+    retain(body, options = {}) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
+        if (typeof options.filter === 'function') {
+            // return { params: filter(params), result: body(params) }
+            return this.sequence(this.retain(options.filter),
+                this.retain(this.finally(this.function(({ params }) => params, { helper: 'retain_4' }), body), { field: 'result', catch: options.catch }))
+        }
+        if (options.catch) {
+            // return { params, result: body(params) } even if result is an error
             return this.sequence(
                 this.retain(
                     this.try(
                         this.sequence(body, this.function(result => ({ result }), { helper: 'retain_1' })),
-                        this.function(result => ({ result }), { helper: 'retain_3' }))),
+                        this.function(result => ({ result }), { helper: 'retain_3' })),
+                    options.field),
                 this.function(({ params, result }) => ({ params, result: result.result }), { helper: 'retain_2' }))
-        } else if (typeof options === 'function') {
-            return this.sequence(this.retain(options), this.retain(this.finally(this.function(({ params }) => params, { helper: 'retain_4' }), body), 'result'))
         } else {
-            throw new ComposerError('Invalid argument', options)
+            // return { params, result: body(params) } if no error, otherwise body(params)
+            const id = {}
+            return chain(push(id, options.field), chain(this.task(body), pop(id, 'collect')))
         }
     }
 
@@ -229,7 +240,7 @@ class Composer {
 
     retry(count) { // varargs
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
-        const attempt = this.retain(this.sequence(...Array.prototype.slice.call(arguments, 1)), true)
+        const attempt = this.retain(this.sequence(...Array.prototype.slice.call(arguments, 1)), { catch: true })
         return this.let({ count },
             attempt,
             this.while(
