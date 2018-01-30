@@ -167,12 +167,7 @@ class Composer {
         if (arguments.length > 2) throw new Error('Too many arguments')
         const id = {}
         handler = this.task(handler)
-        body = chain(push(id, { catch: handler.entry }), chain(this.task(body), pop(id)))
-        body.states.push(...handler.states)
-        body.exit.next = handler.entry
-        body.exit = handler.exit
-        body.Manifest.push(...handler.Manifest)
-        return body
+        return chain(push(id, { catch: handler.entry }), chain(this.task(body), chain(pop(id), handler)))
     }
 
     let(obj) { // varargs
