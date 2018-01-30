@@ -37,7 +37,7 @@ describe('composer', function () {
                 })
 
                 it('function must fail', function () {
-                    return invoke(composer.task(() => n)).then(() => assert.fail(), activation => assert.equal(activation.error.response.result.error, 'An error has occurred: ReferenceError: n is not defined'))
+                    return invoke(composer.task(() => n)).then(() => assert.fail(), activation => assert.ok(activation.error.response.result.error.startsWith('An exception was caught at state')))
                 })
             })
 
@@ -57,7 +57,7 @@ describe('composer', function () {
                         invoke(composer.task(false))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Invalid composition argument')
+                        assert.equal(error, 'Error: Invalid argument')
                     }
                 })
 
@@ -66,7 +66,7 @@ describe('composer', function () {
                         invoke(composer.task(42))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Invalid composition argument')
+                        assert.equal(error, 'Error: Invalid argument')
                     }
                 })
 
@@ -75,7 +75,7 @@ describe('composer', function () {
                         invoke(composer.task({ foo: 'bar' }))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Invalid composition argument')
+                        assert.equal(error, 'Error: Invalid argument')
                     }
                 })
             })
@@ -111,6 +111,16 @@ describe('composer', function () {
             })
 
             describe('if', function () {
+                it('then branch no else branch', function () {
+                    return invoke(composer.if('isEven', 'DivideByTwo'), { n: 4 })
+                        .then(activation => assert.deepEqual(activation.response.result, { n: 2 }))
+                })
+
+                it('no else branch', function () {
+                    return invoke(composer.if('isEven', 'DivideByTwo'), { n: 3 })
+                        .then(activation => assert.deepEqual(activation.response.result, { n: 3 }))
+                })
+
                 it('then branch', function () {
                     return invoke(composer.if('isEven', 'DivideByTwo', 'TripleAndIncrement'), { n: 4 })
                         .then(activation => assert.deepEqual(activation.response.result, { n: 2 }))
@@ -122,7 +132,6 @@ describe('composer', function () {
                 })
             })
 
-
             describe('while', function () {
                 it('test 1', function () {
                     return invoke(composer.while('isNotOne', ({ n }) => ({ n: n - 1 })), { n: 4 })
@@ -131,20 +140,6 @@ describe('composer', function () {
 
                 it('test 2', function () {
                     return invoke(composer.while(() => false, ({ n }) => ({ n: n - 1 })), { n: 1 })
-                        .then(activation => assert.deepEqual(activation.response.result, { n: 1 }))
-                })
-            })
-
-            describe('retain', function () {
-                it('test 1', function () {
-                    return invoke(composer.retain('TripleAndIncrement'), { n: 3 })
-                        .then(activation => assert.deepEqual(activation.response.result, { params: { n: 3 }, result: { n: 10 } }))
-                })
-            })
-
-            describe('repeat', function () {
-                it('test 1', function () {
-                    return invoke(composer.repeat(3, 'DivideByTwo'), { n: 8 })
                         .then(activation => assert.deepEqual(activation.response.result, { n: 1 }))
                 })
             })
@@ -161,36 +156,76 @@ describe('composer', function () {
                 })
             })
 
+            describe('finally', function () {
+                it('test 1', function () {
+                    return invoke(composer.finally(() => true, params => ({ params })))
+                        .then(activation => assert.deepEqual(activation.response.result, { params: { value: true } }))
+                })
+
+                it('test 2', function () {
+                    return invoke(composer.finally(() => ({ error: 'foo' }), params => ({ params })))
+                        .then(activation => assert.deepEqual(activation.response.result, { params: { error: 'foo' } }))
+                })
+            })
+
             describe('let', function () {
                 it('one variable', function () {
-                    return invoke(composer.let('x', 42, () => x))
+                    return invoke(composer.let({ x: 42 }, () => x))
                         .then(activation => assert.deepEqual(activation.response.result, { value: 42 }))
                 })
 
                 it('masking', function () {
-                    return invoke(composer.let('x', 42, composer.let('x', 69, () => x)))
+                    return invoke(composer.let({ x: 42 }, composer.let({ x: 69 }, () => x)))
                         .then(activation => assert.deepEqual(activation.response.result, { value: 69 }))
                 })
 
                 it('two variables', function () {
-                    return invoke(composer.let('x', 42, composer.let('y', 69, () => x + y)))
+                    return invoke(composer.let({ x: 42 }, composer.let({ y: 69 }, () => x + y)))
+                        .then(activation => assert.deepEqual(activation.response.result, { value: 111 }))
+                })
+
+                it('two variables combined', function () {
+                    return invoke(composer.let({ x: 42, y: 69 }, () => x + y))
                         .then(activation => assert.deepEqual(activation.response.result, { value: 111 }))
                 })
 
                 it('scoping', function () {
-                    return invoke(composer.let('x', 42, composer.let('x', 69, () => x), ({ value }) => value + x))
+                    return invoke(composer.let({ x: 42 }, composer.let({ x: 69 }, () => x), ({ value }) => value + x))
                         .then(activation => assert.deepEqual(activation.response.result, { value: 111 }))
+                })
+            })
+
+            describe('retain', function () {
+                it('test 1', function () {
+                    return invoke(composer.retain('TripleAndIncrement'), { n: 3 })
+                        .then(activation => assert.deepEqual(activation.response.result, { params: { n: 3 }, result: { n: 10 } }))
+                })
+
+                it('test 2', function () {
+                    return invoke(composer.retain('TripleAndIncrement', true), { n: 3 })
+                        .then(activation => assert.deepEqual(activation.response.result, { params: { n: 3 }, result: { n: 10 } }))
+                })
+                it('test 3', function () {
+                    return invoke(composer.retain('TripleAndIncrement', ({ n }) => ({ n: -n })), { n: 3 })
+                        .then(activation => assert.deepEqual(activation.response.result, { params: { n: -3 }, result: { n: 10 } }))
+                })
+            })
+
+            describe('repeat', function () {
+                it('test 1', function () {
+                    return invoke(composer.repeat(3, 'DivideByTwo'), { n: 8 })
+                        .then(activation => assert.deepEqual(activation.response.result, { n: 1 }))
                 })
             })
 
             describe('retry', function () {
                 it('test 1', function () {
-                    return invoke(composer.let('x', 2, composer.retry(2, () => x-- > 0 ? { error: 'foo' } : 42)))
+                    return invoke(composer.let({ x: 2 }, composer.retry(2, () => x-- > 0 ? { error: 'foo' } : 42)))
                         .then(activation => assert.deepEqual(activation.response.result, { value: 42 }))
                 })
 
                 it('test 2', function () {
-                    return invoke(composer.let('x', 2, composer.retry(1, () => x-- > 0 ? { error: 'foo' } : 42)))
+                    return invoke(composer.let({ x: 2 }, composer.retry(1, () => x-- > 0 ? { error: 'foo' } : 42)))
                         .then(() => assert.fail(), activation => assert.deepEqual(activation.error.response.result.error, 'foo'))
                 })
             })

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 IBM Corporation
+ * Copyright 2017-2018 IBM Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const util = require('util')
-
 const clone = require('clone')
 const openwhisk = require('openwhisk')
 
@@ -34,35 +33,26 @@ class ComposerError extends Error {
     }
 }
 
+// build a sequence of front and back, mutating front
 function chain(front, back) {
-    front.States.push(...back.States)
-    front.Exit.Next = back.Entry
-    front.Exit = back.Exit
+    front.states.push(...back.states)
+    front.exit.next = back.entry
+    front.exit = back.exit
     front.Manifest.push(...back.Manifest)
     return front
 }
 
-function push(id) {
-    const Entry = { Type: 'Push', id }
-    return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
+// composition with one push state
+function push(id, op) {
+    const entry = { type: 'push', id, op }
+    return { entry, states: [entry], exit: entry, Manifest: [] }
 }
 
-function pop(id) {
-    const Entry = { Type: 'Pop', id }
-    return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
+// composition with one pop state
+function pop(id, op, branch) {
+    const entry = { type: 'pop', id, op, branch }
+    return { entry, states: [entry], exit: entry, Manifest: [] }
 }
-
-function begin(id, symbol, value) {
-    const Entry = { Type: 'Let', Symbol: symbol, Value: value, id }
-    return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
-}
-
-function end(id) {
-    const Entry = { Type: 'End', id }
-    return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
-}
-
-const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
 
 class Composer {
     constructor(options = {}) {
@@ -87,242 +77,210 @@ class Composer {
         } catch (error) { }
 
         this.wsk = openwhisk(Object.assign({ apihost, api_key }, options))
-        this.merge = (result, params) => Object.assign(params, result)
+        this.seq = this.sequence
     }
 
-    task(obj, options) {
-        if (options && options.pre) return this.preprocess(obj, options)
-        if (options && options.post) return this.postprocess(obj, options)
-        let Entry
-        let Manifest = []
+    task(obj) {
+        if (arguments.length > 1) throw new Error('Too many arguments')
         if (obj == null) {
             // case null: identity function (must throw errors if any)
-            return this.task(params => params, { Helper: 'null' })
+            return this.function(params => params, { helper: 'null' })
         } else if (Array.isArray(obj) && obj.length > 0 && typeof obj.slice(-1)[0].name === 'string') {
             // case array: last action in the array
-            Manifest = clone(obj)
-            Entry = { Type: 'Task', Action: obj.slice(-1)[0].name }
-        } else if (typeof obj === 'object' && typeof obj.Entry === 'object' && Array.isArray(obj.States) && typeof obj.Exit === 'object' && Array.isArray(obj.Manifest)) {
+            const Manifest = clone(obj)
+            const entry = { type: 'action', action: obj.slice(-1)[0].name }
+            return { entry, states: [entry], exit: entry, Manifest }
+        } else if (typeof obj === 'object' && typeof obj.entry === 'object' && Array.isArray(obj.states) && typeof obj.exit === 'object' && Array.isArray(obj.Manifest)) {
             // case object: composition
             return clone(obj)
         } else if (typeof obj === 'function') {
             // case function: inline function
-            Entry = { Type: 'Task', Function: obj.toString() }
+            return this.function(obj)
         } else if (typeof obj === 'string') {
             // case string: action
-            if (options && options.filename) Manifest = [{ name: obj, action: fs.readFileSync(options.filename, { encoding: 'utf8' }) }]
-            if (options && typeof options.action === 'string') Manifest = [{ name: obj, action: options.action }]
-            if (options && typeof options.action === 'function') Manifest = [{ name: obj, action: options.action.toString() }]
-            Entry = { Type: 'Task', Action: obj }
+            return this.action(obj)
         } else {
             // error
-            throw new ComposerError('Invalid composition argument', obj)
-        }
-        if (options && options.Helper) Entry.Helper = options.Helper
-        return { Entry, States: [Entry], Exit: Entry, Manifest }
-    }
-
-
-    preprocess(obj, options) {
-        const pre = options.pre.toString()
-        return this.sequence(this.retain(this.value({ pre })), ({ params, result }) => {
-            const dict = eval(result.pre)(params)
-            return typeof dict === 'undefined' ? params : dict
-        }, this.task(obj, Object.assign({}, options, { pre: undefined })))
-    }
-
-    postprocess(obj, options) {
-        const post = options.post.toString()
-        if (options.post.length === 1) {
-            return this.sequence(this.task(obj, Object.assign({}, options, { post: undefined })), this.retain(this.value({ post })), ({ params, result }) => {
-                const dict = eval(result.post)(params)
-                return typeof dict === 'undefined' ? params : dict
-            })
-        } else {
-            // save params
-            return this.sequence(this.retain(this.task(obj, Object.assign({}, options, { post: undefined }))), this.retain(this.value({ post })), ({ params, result }) => {
-                const dict = eval(result.post)(params.result, params.params)
-                return typeof dict === 'undefined' ? params.result : dict
-            })
+            throw new ComposerError('Invalid argument', obj)
         }
     }
 
-    sequence() {
+    sequence() { // varargs
         if (arguments.length == 0) return this.task()
         return Array.prototype.map.call(arguments, x => this.task(x), this).reduce(chain)
     }
 
-    seq() {
-        return this.sequence(...arguments)
-    }
-
     if(test, consequent, alternate) {
-        if (test == null || consequent == null) throw new ComposerError('Missing arguments in composition', arguments)
+        if (arguments.length > 3) throw new Error('Too many arguments')
         const id = {}
         test = chain(push(id), this.task(test))
-        consequent = this.task(consequent)
-        alternate = this.task(alternate)
-        const Exit = { Type: 'Pass', id }
-        const choice = { Type: 'Choice', Then: consequent.Entry, Else: alternate.Entry, id }
-        test.States.push(choice)
-        test.States.push(...consequent.States)
-        test.States.push(...alternate.States)
-        test.Exit.Next = choice
-        consequent.Exit.Next = Exit
-        alternate.Exit.Next = Exit
-        test.States.push(Exit)
-        test.Exit = Exit
+        consequent = chain(pop(id, 'pop', 'then'), this.task(consequent))
+        alternate = chain(pop(id, 'pop', 'else'), this.task(alternate))
+        const exit = { type: 'pass', id }
+        const choice = { type: 'choice', then: consequent.entry, else: alternate.entry, id }
+        test.states.push(choice)
+        test.states.push(...consequent.states)
+        test.states.push(...alternate.states)
+        test.states.push(exit)
+        test.exit.next = choice
+        consequent.exit.next = exit
+        alternate.exit.next = exit
+        test.exit = exit
         test.Manifest.push(...consequent.Manifest)
         test.Manifest.push(...alternate.Manifest)
         return test
     }
 
     while(test, body) {
-        if (test == null || body == null) throw new ComposerError('Missing arguments in composition', arguments)
+        if (arguments.length > 2) throw new Error('Too many arguments')
         const id = {}
         test = chain(push(id), this.task(test))
-        body = this.task(body)
-        const Exit = { Type: 'Pass', id }
-        const choice = { Type: 'Choice', Then: body.Entry, Else: Exit, id }
-        test.States.push(choice)
-        test.States.push(...body.States)
-        test.Exit.Next = choice
-        body.Exit.Next = test.Entry
-        test.States.push(Exit)
-        test.Exit = Exit
-        test.Manifest.push(...body.Manifest)
+        const consequent = chain(pop(id, 'pop', 'then'), this.task(body))
+        const alternate = pop(id, 'pop', 'else')
+        const choice = { type: 'choice', then: consequent.entry, else: alternate.entry, id }
+        test.states.push(choice)
+        test.states.push(...consequent.states)
+        test.states.push(...alternate.states)
+        test.exit.next = choice
+        consequent.exit.next = test.entry
+        test.exit = alternate.exit
+        test.Manifest.push(...consequent.Manifest)
         return test
     }
 
     try(body, handler) {
-        if (body == null || handler == null) throw new ComposerError('Missing arguments in composition', arguments)
+        if (arguments.length > 2) throw new Error('Too many arguments')
         const id = {}
-        body = this.task(body)
         handler = this.task(handler)
-        const Exit = { Type: 'Pass', id }
-        const Entry = { Type: 'Try', Next: body.Entry, Handler: handler.Entry, id }
-        const pop = { Type: 'Catch', Next: Exit, id }
-        const States = [Entry]
-        States.push(...body.States, pop, ...handler.States, Exit)
-        body.Exit.Next = pop
-        handler.Exit.Next = Exit
+        body = chain(push(id, { catch: handler.entry }), chain(this.task(body), pop(id)))
+        const exit = { type: 'pass', id }
+        body.states.push(...handler.states)
+        body.states.push(exit)
+        body.exit.next = exit
+        handler.exit.next = exit
+        body.exit = exit
         body.Manifest.push(...handler.Manifest)
-        return { Entry, States, Exit, Manifest: body.Manifest }
+        return body
     }
 
-    retain(body, flag = false) {
-        if (body == null) throw new ComposerError('Missing arguments in composition', arguments)
-        if (typeof flag !== 'boolean') throw new ComposerError('Invalid retain flag', flag)
-
+    finally(body, handler) {
+        if (arguments.length > 2) throw new Error('Too many arguments')
         const id = {}
-        if (!flag) return chain(push(id), chain(this.task(body), pop(id)))
-
-        return this.sequence(
-            this.retain(
-                this.try(
-                    this.sequence(
-                        body,
-                        this.task(params => ({ params }), { Helper: 'retain_1' })
-                    ),
-                    this.task(params => ({ params }), { Helper: 'retain_3' })
-                )
-            ),
-            this.task(params => ({ params: params.params, result: params.result.params }), { Helper: 'retain_2' })
-        )
+        handler = this.task(handler)
+        body = chain(push(id, { catch: handler.entry }), chain(this.task(body), pop(id)))
+        body.states.push(...handler.states)
+        body.exit.next = handler.entry
+        body.exit = handler.exit
+        body.Manifest.push(...handler.Manifest)
+        return body
     }
 
-    assign(dest, body, source, flag = false) {
-        if (dest == null || body == null) throw new ComposerError('Missing arguments in composition', arguments)
-        if (typeof flag !== 'boolean') throw new ComposerError('Invalid assign flag', flag)
-
-        const t = source ? this.let('source', source, this.retain(this.sequence(this.task(params => params[source], { Helper: 'assign_1' }), body), flag)) : this.retain(body, flag)
-        return this.let('dest', dest, t, this.task(params => { params.params[dest] = params.result; return params.params }, { Helper: 'assign_2' }))
+    let(obj) { // varargs
+        if (typeof obj !== 'object' || obj === null) throw new ComposerError('Invalid argument', obj)
+        const id = {}
+        return chain(push(id, { let: JSON.parse(JSON.stringify(obj)) }), chain(this.sequence(...Array.prototype.slice.call(arguments, 1)), pop(id)))
     }
 
-    let(arg1, arg2) {
-        if (arg1 == null) throw new ComposerError('Missing arguments in composition', arguments)
-        if (typeof arg1 === 'string') {
+    value(v) {
+        if (arguments.length > 1) throw new Error('Too many arguments')
+        if (typeof v === 'function') throw new ComposerError('Invalid argument', v)
+        const entry = { type: 'value', value: typeof v === 'undefined' ? {} : JSON.parse(JSON.stringify(v)) }
+        return { entry, states: [entry], exit: entry, Manifest: [] }
+    }
+
+    function(f, options) {
+        if (arguments.length > 2) throw new Error('Too many arguments')
+        if (typeof f === 'function') f = `${f}`
+        if (typeof f !== 'string') throw new ComposerError('Invalid argument', f)
+        const entry = { type: 'function', function: f }
+        if (options && options.helper) entry.Helper = options.helper
+        return { entry, states: [entry], exit: entry, Manifest: [] }
+    }
+
+    action(action, options) {
+        if (arguments.length > 2) throw new Error('Too many arguments')
+        if (typeof action !== 'string') throw new ComposerError('Invalid argument', f)
+        let Manifest = []
+        if (options && options.filename) Manifest = [{ name: obj, action: fs.readFileSync(options.filename, { encoding: 'utf8' }) }]
+        if (options && typeof options.action === 'string') Manifest = [{ name: obj, action: options.action }]
+        if (options && typeof options.action === 'function') Manifest = [{ name: obj, action: `${options.action}` }]
+        const entry = { type: 'action', action }
+        return { entry, states: [entry], exit: entry, Manifest }
+    }
+
+    retain(body, options) {
+        if (arguments.length > 2) throw new Error('Too many arguments')
+        if (typeof options === 'undefined' || typeof options === 'string' || options === false) {
             const id = {}
-            return chain(begin(id, arg1, arg2), chain(this.sequence(...Array.prototype.slice.call(arguments, 2)), end(id)))
-        } else if (isObject(arg1)) {
-            const enter = []
-            const exit = []
-            for (const name in arg1) {
-                const id = {}
-                enter.push(begin(id, name, arg1[name]))
-                exit.unshift(end(id))
-            }
-            if (enter.length == 0) return this.sequence(...Array.prototype.slice.call(arguments, 1))
-            return chain(enter.reduce(chain), chain(this.sequence(...Array.prototype.slice.call(arguments, 1)), exit.reduce(chain)))
+            return chain(push(id, options), chain(this.task(body), pop(id, 'collect')))
+        } else if (options === true) {
+            return this.sequence(
+                this.retain(
+                    this.try(
+                        this.sequence(body, this.function(result => ({ result }), { helper: 'retain_1' })),
+                        this.function(result => ({ result }), { helper: 'retain_3' }))),
+                this.function(({ params, result }) => ({ params, result: result.result }), { helper: 'retain_2' }))
+        } else if (typeof options === 'function') {
+            return this.sequence(this.retain(options), this.retain(this.finally(this.function(({ params }) => params, { helper: 'retain_4' }), body), 'result'))
         } else {
-            throw new ComposerError('Invalid first let argument', arg1)
+            throw new ComposerError('Invalid argument', options)
         }
     }
 
-    retry(count, body) {
-        if (body == null) throw new ComposerError('Missing arguments in composition', arguments)
-        if (typeof count !== 'number') throw new ComposerError('Invalid retry count', count)
+    repeat(count) { // varargs
+        if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
+        return this.let({ count }, this.while(this.function(() => count-- > 0, { helper: 'repeat_1' }), this.sequence(...Array.prototype.slice.call(arguments, 1))))
+    }
 
-        return this.let('count', count,
-            this.retain(body, true),
+    retry(count) { // varargs
+        if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
+        const attempt = this.retain(this.sequence(...Array.prototype.slice.call(arguments, 1)), true)
+        return this.let({ count },
+            attempt,
             this.while(
-                this.task(params => typeof params.result.error !== 'undefined' && count-- > 0, { Helper: 'retry_1' }),
-                this.sequence(this.task(params => params.params, { Helper: 'retry_2' }), this.retain(body, true))),
-            this.task(params => params.result, { Helper: 'retry_3' }))
+                this.function(({ result }) => typeof result.error !== 'undefined' && count-- > 0, { helper: 'retry_1' }),
+                this.finally(this.function(({ params }) => params, { helper: 'retry_2' }), attempt)),
+            this.function(({ result }) => result, { helper: 'retry_3' }))
     }
 
-    repeat(count, body) {
-        if (body == null) throw new ComposerError('Missing arguments in composition', arguments)
-        if (typeof count !== 'number') throw new ComposerError('Invalid repeat count', count)
-
-        return this.let('count', count, this.while(this.task(() => count-- > 0, { Helper: 'repeat_1' }), body))
-    }
-
-    value(json) {
-        const Entry = { Type: 'Task', Value: typeof json === 'undefined' ? {} : json }
-        return { Entry, States: [Entry], Exit: Entry, Manifest: [] }
-    }
-
+    // produce action code
     compile(name, obj, filename) {
-        if (typeof name !== 'string') throw new ComposerError('Invalid name argument for compile', name)
-        if (typeof filename !== 'undefined' && typeof filename !== 'string') throw new ComposerError('Invalid optional filename argument for compile', filename)
-        if (typeof obj === 'undefied') new ComposerError('Missing arguments in composition', arguments)
+        if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
+        if (typeof filename !== 'undefined' && typeof filename !== 'string') throw new ComposerError('Invalid argument', filename)
         obj = this.task(obj)
-        const States = {}
-        let Entry
-        let Exit
+        const states = {}
+        let entry
+        let exit
         let count = 0
-        obj.States.forEach(state => {
+        obj.states.forEach(state => {
             if (typeof state.id === 'undefined') state.id = {}
             if (typeof state.id.id === 'undefined') state.id.id = count++
-            const id = (state.Type === 'Task' ? state.Action && 'action' || state.Function && 'function' || state.Value && 'value' : state.Type.toLowerCase()) + '_' + state.id.id
-            States[id] = state
+            const id = state.type + '_' + (state.branch ? state.branch + '_' : '') + state.id.id
+            states[id] = state
             state.id = id
-            if (state === obj.Entry) Entry = id
-            if (state === obj.Exit) Exit = id
+            if (state === obj.entry) entry = id
+            if (state === obj.exit) exit = id
         })
-        obj.States.forEach(state => {
-            if (state.Next) state.Next = state.Next.id
-            if (state.Then) state.Then = state.Then.id
-            if (state.Else) state.Else = state.Else.id
-            if (state.Handler) state.Handler = state.Handler.id
+        obj.states.forEach(state => {
+            if (state.next) state.next = state.next.id
+            if (state.then) state.then = state.then.id
+            if (state.else) state.else = state.else.id
+            if (state.op && state.op.catch) state.op.catch = state.op.catch.id
         })
-        obj.States.forEach(state => {
-            delete state.id
-        })
-        const action = `${main}\nconst __composition__ =  ${JSON.stringify({ Entry, States, Exit }, null, 4)}\n`
+        obj.states.forEach(state => delete state.id)
+        const composition = { entry, states, exit }
+        const action = `const __eval__ = main => eval(main)\n${main}\nconst __composition__ = ${JSON.stringify(composition, null, 4)}\n`
         if (filename) fs.writeFileSync(filename, action, { encoding: 'utf8' })
-        obj.Manifest.push({ name, action, annotations: { conductor: { Entry, States, Exit } } })
+        obj.Manifest.push({ name, action, annotations: { conductor: composition } })
         return obj.Manifest
     }
 
-    deploy(obj) {
-        if (!Array.isArray(obj) || obj.length === 0) throw new ComposerError('Invalid argument for deploy', obj)
-
-        // return the count of successfully deployed actions
-        return clone(obj).reduce(
-            (promise, action) => promise.then(i => this.wsk.actions.update(action).then(_ => i + 1, err => { console.error(err); return i })), Promise.resolve(0)
-        ).then(i => `${i}/${obj.length}`)
+    // deploy actions, return count of successfully deployed actions
+    deploy(actions) {
+        if (!Array.isArray(actions)) throw new ComposerError('Invalid argument', array)
+        // clone array as openwhisk mutates the actions
+        return clone(actions).reduce(
+            (promise, action) => promise.then(i => this.wsk.actions.update(action).then(_ => i + 1, err => { console.error(err); return i })), Promise.resolve(0))
     }
 }
 
@@ -331,169 +289,151 @@ module.exports = new Composer()
 // conductor action
 
 function main(params) {
-    // evaluate main exposing the fields of __env__ as variables
-    function __eval__(__env__, main) {
-        main = `(${main})`
-        let __eval__ = '__eval__=undefined;params=>{try{'
-        for (const name in __env__) {
-            __eval__ += `var ${name}=__env__['${name}'];`
+    const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
+
+    // encode error object
+    const encodeError = error => ({
+        code: typeof error.code === 'number' && error.code || 500,
+        error: (typeof error.error === 'string' && error.error) || error.message || (typeof error === 'string' && error) || 'An internal error occurred'
+    })
+
+    // error status codes
+    const badRequest = error => Promise.reject({ code: 400, error })
+    const internalError = error => Promise.reject(encodeError(error))
+
+    // catch all
+    return Promise.resolve().then(() => invoke(params)).catch(internalError)
+
+    // do invocation
+    function invoke(params) {
+        // initial state and stack
+        let state = __composition__.entry
+        let stack = []
+
+        // check parameters
+        if (typeof __composition__.entry !== 'string') return badRequest('The composition has no entry field of type string')
+        if (!isObject(__composition__.states)) return badRequest('The composition has no states field of type object')
+        if (typeof __composition__.exit !== 'string') return badRequest('The composition has no exit field of type string')
+
+        // restore state and stack when resuming
+        if (typeof params.$resume !== 'undefined') {
+            if (!isObject(params.$resume)) return badRequest('The type of optional $resume parameter must be object')
+            state = params.$resume.state
+            stack = params.$resume.stack
+            if (typeof state !== 'undefined' && typeof state !== 'string') return badRequest('The type of optional $resume.state parameter must be string')
+            if (!Array.isArray(stack)) return badRequest('The type of $resume.stack must be an array')
+            delete params.$resume
+            inspect() // handle error objects when resuming
         }
-        __eval__ += 'return eval(main)(params)}finally{'
-        for (const name in __env__) {
-            __eval__ += `__env__['${name}']=${name};`
+
+        // wrap params if not a dictionary, branch to error handler if error
+        function inspect() {
+            if (!isObject(params)) params = { value: params }
+            if (typeof params.error !== 'undefined') {
+                params = { error: params.error } // discard all fields but the error field
+                state = undefined // abort unless there is a handler in the stack
+                while (stack.length > 0) {
+                    if (state = stack.shift().catch) break
+                }
+            }
         }
-        __eval__ += '}}'
-        return eval(__eval__)
-    }
 
-    // keep outer namespace clean
-    return (() => {
-        const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
-
-        // encode error object
-        const encodeError = error => ({
-            code: typeof error.code === 'number' && error.code || 500,
-            error: (typeof error.error === 'string' && error.error) || error.message || (typeof error === 'string' && error) || 'An internal error occurred'
-        })
-
-        // error status codes
-        const badRequest = error => Promise.reject({ code: 400, error })
-        const internalError = error => Promise.reject(encodeError(error))
-
-        // catch all
-        return Promise.resolve().then(() => invoke(params)).catch(internalError)
-
-        // do invocation
-        function invoke(params) {
-            const fsm = __composition__
-
-            if (typeof fsm.Entry !== 'undefined' && typeof fsm.Entry !== 'string') return badRequest('The type of Entry field of the composition must be string')
-            if (!isObject(fsm.States)) return badRequest('The composition has no States field of type object')
-            if (typeof fsm.Exit !== 'string') return badRequest('The composition has no Exit field of type string')
-
-            let state = fsm.Entry
-            let stack = []
-
-            // check parameters
-            if (typeof params.$resume !== 'undefined') {
-                if (!isObject(params.$resume)) return badRequest('Type of optional $resume parameter must be object')
-                state = params.$resume.state
-                if (typeof state !== 'undefined' && typeof state !== 'string') return badRequest('Type of optional $resume.state parameter must be string')
-                stack = params.$resume.stack
-                if (typeof state !== 'undefined' && typeof state !== 'string') return badRequest('Type of optional $resume.state parameter must be string')
-                if (!Array.isArray(stack)) return badRequest('The type of $resume.stack must be an array')
-                delete params.$resume
-                inspect() // handle error objects when resuming
+        // run function f on current stack
+        function run(f) {
+            // update value of topmost matching symbol on stack if any
+            function set(symbol, value) {
+                const element = stack.find(element => typeof element.let !== 'undefined' && typeof element.let[symbol] !== 'undefined')
+                if (typeof element !== 'undefined') element.let[symbol] = JSON.parse(JSON.stringify(value))
             }
 
-            // wrap params if not a JSON object, branch to error handler if error
-            function inspect() {
-                if (!isObject(params) || Array.isArray(params) || params === null) {
-                    params = { value: params }
-                }
-                if (typeof params.error !== 'undefined') {
-                    params = { error: params.error } // discard all fields but the error field
-                    state = undefined // abort unless there is a handler in the stack
-                    while (stack.length > 0) {
-                        if (state = stack.shift().catch) break
+            // collapse stack for invocation
+            const env = stack.reduceRight((acc, cur) => typeof cur.let === 'object' ? Object.assign(acc, cur.let) : acc, {})
+            let main = '(function main(){try{'
+            for (const name in env) main += `var ${name}=arguments[1]['${name}'];`
+            main += `return eval((${f}))(arguments[0])}finally{`
+            for (const name in env) main += `arguments[1]['${name}']=${name};`
+            main += '}})'
+            try {
+                return __eval__(main)(params, env)
+            } finally {
+                for (const name in env) set(name, env[name])
+            }
+        }
+
+        while (true) {
+            // final state, return composition result
+            if (!state) {
+                console.log(`Entering final state`)
+                console.log(JSON.stringify(params))
+                if (params.error) return params; else return { params }
+            }
+
+            // process one state
+            console.log(`Entering ${state}`)
+
+            if (!isObject(__composition__.states[state])) return badRequest(`State ${state} definition is missing`)
+            const json = __composition__.states[state] // json definition for current state
+            const current = state // current state for error messages
+            if (json.type !== 'choice' && typeof json.next !== 'string' && state !== __composition__.exit) return badRequest(`State ${state} has no next field`)
+            state = json.next // default next state
+
+            switch (json.type) {
+                case 'choice':
+                    if (typeof json.then !== 'string') return badRequest(`State ${current} has no then field`)
+                    if (typeof json.else !== 'string') return badRequest(`State ${current} has no else field`)
+                    state = params.value === true ? json.then : json.else
+                    break
+                case 'push':
+                    if (typeof json.op === 'string') { // push { params: params[op] }
+                        stack.unshift(JSON.parse(JSON.stringify({ params: params[json.op] })))
+                    } else if (typeof json.op !== 'undefined') { // push op
+                        stack.unshift(JSON.parse(JSON.stringify(json.op)))
+                    } else { // push { params }
+                        stack.unshift(JSON.parse(JSON.stringify({ params })))
                     }
-                }
-            }
-
-            // run function f on current stack
-            function run(f) {
-                function set(symbol, value) {
-                    const element = stack.find(element => typeof element.let !== 'undefined' && typeof element.let[symbol] !== 'undefined')
-                    if (typeof element !== 'undefined') element.let[symbol] = JSON.parse(JSON.stringify(value))
-                }
-
-                const env = stack.reduceRight((acc, cur) => typeof cur.let === 'object' ? Object.assign(acc, cur.let) : acc, {})
-                const result = __eval__(env, f)(params)
-                for (const name in env) {
-                    set(name, env[name])
-                }
-                return result
-            }
-
-            while (true) {
-                // final state
-                if (!state) {
-                    console.log(`Entering final state`)
-                    console.log(JSON.stringify(params))
-                    if (params.error) return params; else return { params }
-                }
-
-                console.log(`Entering ${state}`)
-
-                if (!isObject(fsm.States[state])) return badRequest(`The composition has no state named ${state}`)
-                const json = fsm.States[state] // json for current state
-                if (json.Type !== 'Choice' && typeof json.Next !== 'string' && state !== fsm.Exit) return badRequest(`The state named ${state} has no Next field`)
-                const current = state // current state
-                state = json.Next // default next state
-
-                switch (json.Type) {
-                    case 'Choice':
-                        if (typeof json.Then !== 'string') return badRequest(`The state named ${current} of type Choice has no Then field`)
-                        if (typeof json.Else !== 'string') return badRequest(`The state named ${current} of type Choice has no Else field`)
-                        state = params.value === true ? json.Then : json.Else
-                        if (stack.length === 0) return badRequest(`The state named ${current} of type Choice attempted to pop from an empty stack`)
-                        const top = stack.shift()
-                        if (typeof top.params !== 'object') return badRequest(`The state named ${current} of type Choice popped an unexpected stack element`)
-                        params = top.params
-                        break
-                    case 'Try':
-                        if (typeof json.Handler !== 'string') return badRequest(`The state named ${current} of type Try has no Handler field`)
-                        stack.unshift({ catch: json.Handler }) // register handler
-                        break
-                    case 'Catch':
-                        if (stack.length === 0) return badRequest(`The state named ${current} of type Catch attempted to pop from an empty stack`)
-                        if (typeof stack.shift().catch !== 'string') return badRequest(`The state named ${current} of type Catch popped an unexpected stack element`)
-                        break
-                    case 'Push':
-                        stack.unshift({ params: JSON.parse(JSON.stringify(params)) })
-                        break
-                    case 'Pop':
-                        if (stack.length === 0) return badRequest(`The state named ${current} of type Pop attempted to pop from an empty stack`)
-                        const tip = stack.shift()
-                        if (typeof tip.params !== 'object') return badRequest(`The state named ${current} of type Pop popped an unexpected stack element`)
-                        params = { result: params, params: tip.params } // combine current params with persisted params popped from stack
-                        break
-                    case 'Let':
-                        stack.unshift({ let: {} })
-                        if (typeof json.Symbol !== 'string') return badRequest(`The state named ${current} of type Let has no Symbol field`)
-                        if (typeof json.Value === 'undefined') return badRequest(`The state named ${current} of type Let has no Value field`)
-                        stack[0].let[json.Symbol] = JSON.parse(JSON.stringify(json.Value))
-                        break
-                    case 'End':
-                        if (stack.length === 0) return badRequest(`The state named ${current} of type End attempted to pop from an empty stack`)
-                        if (typeof stack.shift().let !== 'object') return badRequest(`The state named ${current} of type End popped an unexpected stack element`)
-                        break
-                    case 'Task':
-                        if (typeof json.Action === 'string') {
-                            return { action: json.Action, params, state: { $resume: { state, stack } } }
-                        } else if (typeof json.Value !== 'undefined') { // value
-                            params = JSON.parse(JSON.stringify(json.Value))
-                            inspect()
-                        } else if (typeof json.Function === 'string') { // function
-                            let result
-                            try {
-                                result = run(json.Function)
-                            } catch (error) {
-                                console.error(error)
-                                result = { error: 'An error has occurred: ' + error }
-                            }
-                            params = typeof result === 'undefined' ? {} : JSON.parse(JSON.stringify(result))
-                            inspect()
-                        } else {
-                            return badRequest(`The kind field of the state named ${current} of type Task is missing`)
-                        }
-                        break
-                    case 'Pass':
-                        break
-                    default:
-                        return badRequest(`The state named ${current} has an unknown type`)
-                }
+                    break
+                case 'pop':
+                    if (stack.length === 0) return badRequest(`State ${current} attempted to pop from an empty stack`)
+                    const top = stack.shift()
+                    switch (json.op) {
+                        case 'pop':
+                            params = top.params
+                            break
+                        case 'collect':
+                            params = { params: top.params, result: params }
+                            break
+                        default:
+                        // drop
+                    }
+                    break
+                case 'action':
+                    if (typeof json.action !== 'string') return badRequest(`State ${current} specifies an invalid action`)
+                    return { action: json.action, params, state: { $resume: { state, stack } } } // invoke continuation
+                    break
+                case 'value':
+                    if (typeof json.value === 'undefined') return badRequest(`State ${current} specifies an invalid value`)
+                    params = JSON.parse(JSON.stringify(json.value))
+                    inspect()
+                    break
+                case 'function':
+                    if (typeof json.function !== 'string') return badRequest(`State ${current} specifies an invalid function`)
+                    let result
+                    try {
+                        result = run(json.function)
+                    } catch (error) {
+                        console.error(error)
+                        result = { error: `An exception was caught at state ${current} (see log for details)` }
+                    }
+                    if (typeof result === 'function') result = { error: `State ${current} evaluated to a function` }
+                    // if a function has only side effects and no return value, return params
+                    params = JSON.parse(JSON.stringify(typeof result === 'undefined' ? params : result))
+                    inspect()
+                    break
+                case 'pass':
+                    break
+                default:
+                    return badRequest(`State ${current} has an unknown type`)
             }
         }
-    })()
+    }
 }
