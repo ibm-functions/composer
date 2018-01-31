@@ -206,9 +206,14 @@ class Composer {
         if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         let Manifest = []
-        if (options.filename) Manifest = [{ name, action: fs.readFileSync(options.filename, { encoding: 'utf8' }) }]
-        if (typeof options.action === 'string') Manifest = [{ name, action: options.action }]
-        if (typeof options.action === 'function') {
+        if (options.filename) { // read action code from file
+            Manifest = [{ name, action: fs.readFileSync(options.filename, { encoding: 'utf8' }) }]
+        } else if (options.sequence) { // native sequence
+            const components = options.sequence.map(a => a.indexOf('/') == -1 ? `/_/${a}` : a)
+            Manifest = [{ name, action: { exec: { kind: 'sequence', components } } }]
+        } else if (typeof options.action === 'string' || typeof options.action === 'object' && options.action !== null) {
+            Manifest = [{ name, action: options.action }]
+        } else if (typeof options.action === 'function') {
             const action = `${options.action}`
             if (action.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', options.action)
             Manifest = [{ name, action }]
