@@ -190,7 +190,11 @@ class Composer {
     function(f, options = {}) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
-        if (typeof f === 'function') f = `${f}`
+        if (typeof f === 'function') {
+            const code = `${f}`
+            if (code === 'function () { [native code] }') throw new ComposerError('Cannot capture native function', f)
+            f = code
+        }
         if (typeof f !== 'string') throw new ComposerError('Invalid argument', f)
         const entry = { type: 'function', function: f }
         if (options.helper) entry.helper = options.helper
@@ -204,7 +208,11 @@ class Composer {
         let Manifest = []
         if (options.filename) Manifest = [{ name, action: fs.readFileSync(options.filename, { encoding: 'utf8' }) }]
         if (typeof options.action === 'string') Manifest = [{ name, action: options.action }]
-        if (typeof options.action === 'function') Manifest = [{ name, action: `${options.action}` }]
+        if (typeof options.action === 'function') {
+            const action = `${options.action}`
+            if (action.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', options.action)
+            Manifest = [{ name, action }]
+        }
         const entry = { type: 'action', action: name }
         return { entry, states: [entry], exit: entry, Manifest }
     }
