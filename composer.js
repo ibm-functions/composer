@@ -279,12 +279,16 @@ class Composer {
                 while (state.catch && state.catch.type === 'pass' && state.catch.next && state.catch.next.type === 'pass') state.catch = state.catch.next
             }
         })
-        obj.states.forEach(state => { if (state.type === 'pass' && state.next && state.next.type == 'pass') delete states[state.id] })
         obj.states.forEach(state => {
+            if (state.type === 'pass' && state.next && state.next.type == 'pass') delete states[state.id]
             if (state.next) state.next = state.next.id
-            if (state.then) state.then = state.then.id
-            if (state.else) state.else = state.else.id
-            if (state.catch) state.catch = state.catch.id
+            if (state.type === 'choice') {
+                if (state.then) state.then = state.then.id
+                if (state.else) state.else = state.else.id
+            }
+            if (state.type === 'try') {
+                if (state.catch) state.catch = state.catch.id
+            }
         })
         obj.states.forEach(state => delete state.id)
         const composition = { entry, states, exit }
