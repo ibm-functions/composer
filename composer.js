@@ -35,25 +35,20 @@ class ComposerError extends Error {
     }
 }
 
-// build a sequence of front and back, mutating front
+// build a composition with a single state
+function singleton(entry, Manifest = []) {
+    return { entry, states: [entry], exit: entry, Manifest }
+}
+
+// chain two compositions, mutating front
 function chain(front, back) {
+    if (front.type) front = singleton(front)
+    if (back.type) back = singleton(back)
     front.states.push(...back.states)
     front.exit.next = back.entry
     front.exit = back.exit
     front.Manifest.push(...back.Manifest)
     return front
-}
-
-// composition with one push state
-function push(id, op) {
-    const entry = { type: 'push', id, op }
-    return { entry, states: [entry], exit: entry, Manifest: [] }
-}
-
-// composition with one pop state
-function pop(id, op, branch) {
-    const entry = { type: 'pop', id, op, branch }
-    return { entry, states: [entry], exit: entry, Manifest: [] }
 }
 
 class Composer {
@@ -89,9 +84,7 @@ class Composer {
             return this.function(params => params, { helper: 'null' })
         } else if (Array.isArray(obj) && obj.length > 0 && typeof obj.slice(-1)[0].name === 'string') {
             // case array: last action in the array
-            const Manifest = clone(obj)
-            const entry = { type: 'action', action: obj.slice(-1)[0].name }
-            return { entry, states: [entry], exit: entry, Manifest }
+            return singleton({ type: 'action', action: obj.slice(-1)[0].name }, clone(obj))
         } else if (typeof obj === 'object' && typeof obj.entry === 'object' && Array.isArray(obj.states) && typeof obj.exit === 'object' && Array.isArray(obj.Manifest)) {
             // case object: composition
             return clone(obj)
@@ -116,9 +109,9 @@ class Composer {
         if (arguments.length > 4) throw new ComposerError('Too many arguments')
         if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
         const id = {}
-        test = options.nosave ? this.task(test) : chain(push(id), this.task(test))
-        consequent = options.nosave ? this.task(consequent) : chain(pop(id, 'pop', 'then'), this.task(consequent))
-        alternate = options.nosave ? this.task(alternate) : chain(pop(id, 'pop', 'else'), this.task(alternate))
+        test = options.nosave ? this.task(test) : chain({ type: 'push', id }, this.task(test))
+        consequent = options.nosave ? this.task(consequent) : chain({ type: 'pop', id, branch: 'then' }, this.task(consequent))
+        alternate = options.nosave ? this.task(alternate) : chain({ type: 'pop', id, branch: 'else' }, this.task(alternate))
         const exit = { type: 'pass', id }
         const choice = { type: 'choice', then: consequent.entry, else: alternate.entry, id }
         test.states.push(choice)
@@ -138,9 +131,9 @@ class Composer {
         if (arguments.length > 3) throw new ComposerError('Too many arguments')
         if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
         const id = {}
-        test = options.nosave ? this.task(test) : chain(push(id), this.task(test))
-        const consequent = options.nosave ? this.task(body) : chain(pop(id, 'pop', 'then'), this.task(body))
-        const exit = options.nosave ? { type: 'pass', id } : pop(id, 'pop', 'else').entry
+        test = options.nosave ? this.task(test) : chain({ type: 'push', id }, this.task(test))
+        const consequent = options.nosave ? this.task(body) : chain({ type: 'pop', id, branch: 'then' }, this.task(body))
+        const exit = options.nosave ? { type: 'pass', id } : { type: 'pop', id, branch: 'else' }
         const choice = { type: 'choice', then: consequent.entry, else: exit, id }
         test.states.push(choice)
         test.states.push(...consequent.states)
@@ -156,7 +149,7 @@ class Composer {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         const id = {}
         handler = this.task(handler)
-        body = chain(push(id, { catch: handler.entry }), chain(this.task(body), pop(id)))
+        body = [{ type: 'enter', id, frame: { catch: handler.entry } }, this.task(body), { type: 'exit', id }].reduce(chain)
         const exit = { type: 'pass', id }
         body.states.push(...handler.states)
         body.states.push(exit)
@@ -171,20 +164,20 @@ class Composer {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         const id = {}
         handler = this.task(handler)
-        return chain(push(id, { catch: handler.entry }), chain(this.task(body), chain(pop(id), handler)))
+        return [{ type: 'enter', id, frame: { catch: handler.entry } }, this.task(body), { type: 'exit', id }, handler].reduce(chain)
     }
 
     let(obj) { // varargs
         if (typeof obj !== 'object' || obj === null) throw new ComposerError('Invalid argument', obj)
         const id = {}
-        return chain(push(id, { let: JSON.parse(JSON.stringify(obj)) }), chain(this.sequence(...Array.prototype.slice.call(arguments, 1)), pop(id)))
+        return [{ type: 'enter', id, frame: { let: JSON.parse(JSON.stringify(obj)) } }, this.sequence(...Array.prototype.slice.call(arguments, 1)), { type: 'exit', id }].reduce(chain)
     }
 
     value(v) {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof v === 'function') throw new ComposerError('Invalid argument', v)
-        const entry = { type: 'value', value: typeof v === 'undefined' ? {} : JSON.parse(JSON.stringify(v)) }
-        return { entry, states: [entry], exit: entry, Manifest: [] }
+        return singleton({ type: 'value', value: typeof v === 'undefined' ? {} : JSON.parse(JSON.stringify(v)) })
+
     }
 
     function(f, options = {}) {
@@ -196,9 +189,8 @@ class Composer {
             f = code
         }
         if (typeof f !== 'string') throw new ComposerError('Invalid argument', f)
-        const entry = { type: 'function', function: f }
-        if (options.helper) entry.helper = options.helper
-        return { entry, states: [entry], exit: entry, Manifest: [] }
+        return singleton({ type: 'function', function: f, helper: options.helper })
+
     }
 
     action(name, options = {}) {
@@ -218,8 +210,7 @@ class Composer {
             if (action.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', options.action)
             Manifest = [{ name, action }]
         }
-        const entry = { type: 'action', action: name }
-        return { entry, states: [entry], exit: entry, Manifest }
+        return singleton( { type: 'action', action: name })
     }
 
     retain(body, options = {}) {
@@ -242,7 +233,7 @@ class Composer {
         } else {
             // return { params, result: body(params) } if no error, otherwise body(params)
             const id = {}
-            return chain(push(id, options.field), chain(this.task(body), pop(id, 'collect')))
+            return [{ type: 'push', id, field: options.field }, this.task(body), { type: 'pop', id, collect: true }].reduce(chain)
         }
     }
 
@@ -285,7 +276,7 @@ class Composer {
             if (state.next) state.next = state.next.id
             if (state.then) state.then = state.then.id
             if (state.else) state.else = state.else.id
-            if (state.op && state.op.catch) state.op.catch = state.op.catch.id
+            if (state.frame && state.frame.catch) state.frame.catch = state.frame.catch.id
         })
         obj.states.forEach(state => delete state.id)
         const composition = { entry, states, exit }
@@ -404,28 +395,22 @@ function main(params) {
                     if (typeof json.else !== 'string') return badRequest(`State ${current} has no else field`)
                     state = params.value === true ? json.then : json.else
                     break
+                case 'enter':
+                    if (!isObject(json.frame)) return badRequest(`State ${current} specified an invalid frame`)
+                    stack.unshift(json.frame)
+                    break
+                case 'exit':
+                    if (stack.length === 0) return badRequest(`State ${current} attempted to pop from an empty stack`)
+                    stack.shift()
+                    break
                 case 'push':
-                    if (typeof json.op === 'string') { // push { params: params[op] }
-                        stack.unshift(JSON.parse(JSON.stringify({ params: params[json.op] })))
-                    } else if (typeof json.op !== 'undefined') { // push op
-                        stack.unshift(JSON.parse(JSON.stringify(json.op)))
-                    } else { // push { params }
-                        stack.unshift(JSON.parse(JSON.stringify({ params })))
-                    }
+                    if (typeof json.field !== 'undefined' && typeof json.field !== 'string') return badRequest(`State ${current} is invalid`)
+                    stack.unshift(JSON.parse(JSON.stringify({ params: json.field ? params[json.field] : params })))
                     break
                 case 'pop':
                     if (stack.length === 0) return badRequest(`State ${current} attempted to pop from an empty stack`)
-                    const top = stack.shift()
-                    switch (json.op) {
-                        case 'pop':
-                            params = top.params
-                            break
-                        case 'collect':
-                            params = { params: top.params, result: params }
-                            break
-                        default:
-                        // drop
-                    }
+                    if (typeof json.collect !== 'undefined' && typeof json.collect !== 'boolean') return badRequest(`State ${current} is invalid`)
+                    params = json.collect ? { params: stack.shift().params, result: params } : stack.shift().params
                     break
                 case 'action':
                     if (typeof json.action !== 'string') return badRequest(`State ${current} specifies an invalid action`)
@@ -433,7 +418,7 @@ function main(params) {
                     break
                 case 'value':
                     if (typeof json.value === 'undefined') return badRequest(`State ${current} specifies an invalid value`)
-                    params = JSON.parse(JSON.stringify(json.value))
+                    params = json.value
                     inspect()
                     break
                 case 'function':
