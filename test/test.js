@@ -307,8 +307,18 @@ describe('composer', function () {
                         .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
                 })
 
-                it('while must throw even without iterations', function () {
+                it('try must throw', function () {
+                    return invoke(composer.try(composer.try(), error => ({ message: error.error })), { error: 'foo' })
+                        .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
+                })
+
+                it('while must throw', function () {
                     return invoke(composer.try(composer.while(composer.value(false)), error => ({ message: error.error })), { error: 'foo' })
+                        .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
+                })
+
+                it('if must throw', function () {
+                    return invoke(composer.try(composer.if(composer.value(false)), error => ({ message: error.error })), { error: 'foo' })
                         .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
                 })
 

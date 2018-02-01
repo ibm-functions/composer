@@ -81,7 +81,7 @@ class Composer {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (obj == null) {
             // case null: identity function (must throw errors if any)
-            return this.function(params => params, { helper: 'null' })
+            return singleton({ type: 'pass', id: {} })
         } else if (Array.isArray(obj) && obj.length > 0 && typeof obj.slice(-1)[0].name === 'string') {
             // case array: last action in the array
             return singleton({ type: 'action', action: obj.slice(-1)[0].name }, clone(obj))
@@ -151,7 +151,7 @@ class Composer {
         const id = {}
         handler = this.task(handler)
         const exit = { type: 'pass', id }
-        body = [{ type: 'enter', id, frame: { catch: handler.entry } }, this.task(body), { type: 'exit', id }, exit].reduce(chain)
+        body = [{ type: 'try', id, catch: handler.entry }, this.task(body), { type: 'exit', id }, exit].reduce(chain)
         body.states.push(...handler.states)
         handler.exit.next = exit
         body.Manifest.push(...handler.Manifest)
@@ -162,13 +162,13 @@ class Composer {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         const id = {}
         handler = this.task(handler)
-        return [{ type: 'enter', id, frame: { catch: handler.entry } }, this.task(body), { type: 'exit', id }, handler].reduce(chain)
+        return [{ type: 'try', id, catch: handler.entry }, this.task(body), { type: 'exit', id }, handler].reduce(chain)
     }
 
     let(obj) { // varargs
         if (typeof obj !== 'object' || obj === null) throw new ComposerError('Invalid argument', obj)
         const id = {}
-        return [{ type: 'enter', id, frame: { let: JSON.parse(JSON.stringify(obj)) } }, this.sequence(...Array.prototype.slice.call(arguments, 1)), { type: 'exit', id }].reduce(chain)
+        return [{ type: 'let', id, let: JSON.parse(JSON.stringify(obj)) }, this.sequence(...Array.prototype.slice.call(arguments, 1)), { type: 'exit', id }].reduce(chain)
     }
 
     value(v) {
@@ -208,7 +208,7 @@ class Composer {
             if (action.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', options.action)
             Manifest = [{ name, action }]
         }
-        return singleton( { type: 'action', action: name })
+        return singleton({ type: 'action', action: name })
     }
 
     retain(body, options = {}) {
@@ -270,12 +270,21 @@ class Composer {
             state.id = id
             if (state === obj.entry) entry = id
             if (state === obj.exit) exit = id
+            while (state.next && state.next.type === 'pass' && state.next.next && state.next.next.type === 'pass') state.next = state.next.next
+            if (state.type === 'choice') {
+                while (state.then && state.then.type === 'pass' && state.then.next && state.then.next.type === 'pass') state.then = state.then.next
+                while (state.else && state.else.type === 'pass' && state.else.next && state.else.next.type === 'pass') state.else = state.else.next
+            }
+            if (state.type === 'try') {
+                while (state.catch && state.catch.type === 'pass' && state.catch.next && state.catch.next.type === 'pass') state.catch = state.catch.next
+            }
         })
+        obj.states.forEach(state => { if (state.type === 'pass' && state.next && state.next.type == 'pass') delete states[state.id] })
         obj.states.forEach(state => {
             if (state.next) state.next = state.next.id
             if (state.then) state.then = state.then.id
             if (state.else) state.else = state.else.id
-            if (state.frame && state.frame.catch) state.frame.catch = state.frame.catch.id
+            if (state.catch) state.catch = state.catch.id
         })
         obj.states.forEach(state => delete state.id)
         const composition = { entry, states, exit }
@@ -394,9 +403,11 @@ function main(params) {
                     if (typeof json.else !== 'string') return badRequest(`State ${current} has no else field`)
                     state = params.value === true ? json.then : json.else
                     break
-                case 'enter':
-                    if (!isObject(json.frame)) return badRequest(`State ${current} specified an invalid frame`)
-                    stack.unshift(json.frame)
+                case 'try':
+                    stack.unshift({ catch: json.catch })
+                    break
+                case 'let':
+                    stack.unshift({ let: json.let })
                     break
                 case 'exit':
                     if (stack.length === 0) return badRequest(`State ${current} attempted to pop from an empty stack`)
@@ -435,6 +446,7 @@ function main(params) {
                     inspect()
                     break
                 case 'pass':
+                    inspect()
                     break
                 default:
                     return badRequest(`State ${current} has an unknown type`)
