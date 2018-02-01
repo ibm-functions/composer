@@ -133,15 +133,16 @@ class Composer {
         const id = {}
         test = options.nosave ? this.task(test) : chain({ type: 'push', id }, this.task(test))
         const consequent = options.nosave ? this.task(body) : chain({ type: 'pop', id, label: 'then' }, this.task(body))
-        const exit = options.nosave ? { type: 'pass', id } : { type: 'pop', id, label: 'else' }
-        const choice = { type: 'choice', then: consequent.entry, else: exit, id }
+        const alternate = options.nosave ? this.task() : chain({ type: 'pop', id, label: 'else' }, this.task())
+        const choice = { type: 'choice', then: consequent.entry, else: alternate.entry, id }
         test.states.push(choice)
         test.states.push(...consequent.states)
-        test.states.push(exit)
+        test.states.push(...alternate.states)
         test.exit.next = choice
         consequent.exit.next = test.entry
-        test.exit = exit
+        test.exit = alternate.exit
         test.Manifest.push(...consequent.Manifest)
+        test.states.push(...alternate.Manifest)
         return test
     }
 
@@ -149,13 +150,10 @@ class Composer {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         const id = {}
         handler = this.task(handler)
-        body = [{ type: 'enter', id, frame: { catch: handler.entry } }, this.task(body), { type: 'exit', id }].reduce(chain)
         const exit = { type: 'pass', id }
+        body = [{ type: 'enter', id, frame: { catch: handler.entry } }, this.task(body), { type: 'exit', id }, exit].reduce(chain)
         body.states.push(...handler.states)
-        body.states.push(exit)
-        body.exit.next = exit
         handler.exit.next = exit
-        body.exit = exit
         body.Manifest.push(...handler.Manifest)
         return body
     }

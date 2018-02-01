@@ -307,6 +307,11 @@ describe('composer', function () {
                         .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
                 })
 
+                it('while must throw even without iterations', function () {
+                    return invoke(composer.try(composer.while(composer.value(false)), error => ({ message: error.error })), { error: 'foo' })
+                        .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
+                })
+
                 it('too many arguments', function () {
                     try {
                         invoke(composer.try('isNotOne', 'isNotOne', 'isNotOne'))
