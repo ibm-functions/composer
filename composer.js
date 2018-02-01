@@ -110,8 +110,8 @@ class Composer {
         if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
         const id = {}
         test = options.nosave ? this.task(test) : chain({ type: 'push', id }, this.task(test))
-        consequent = options.nosave ? this.task(consequent) : chain({ type: 'pop', id, branch: 'then' }, this.task(consequent))
-        alternate = options.nosave ? this.task(alternate) : chain({ type: 'pop', id, branch: 'else' }, this.task(alternate))
+        consequent = options.nosave ? this.task(consequent) : chain({ type: 'pop', id, label: 'then' }, this.task(consequent))
+        alternate = options.nosave ? this.task(alternate) : chain({ type: 'pop', id, label: 'else' }, this.task(alternate))
         const exit = { type: 'pass', id }
         const choice = { type: 'choice', then: consequent.entry, else: alternate.entry, id }
         test.states.push(choice)
@@ -132,8 +132,8 @@ class Composer {
         if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
         const id = {}
         test = options.nosave ? this.task(test) : chain({ type: 'push', id }, this.task(test))
-        const consequent = options.nosave ? this.task(body) : chain({ type: 'pop', id, branch: 'then' }, this.task(body))
-        const exit = options.nosave ? { type: 'pass', id } : { type: 'pop', id, branch: 'else' }
+        const consequent = options.nosave ? this.task(body) : chain({ type: 'pop', id, label: 'then' }, this.task(body))
+        const exit = options.nosave ? { type: 'pass', id } : { type: 'pop', id, label: 'else' }
         const choice = { type: 'choice', then: consequent.entry, else: exit, id }
         test.states.push(choice)
         test.states.push(...consequent.states)
@@ -266,7 +266,8 @@ class Composer {
         obj.states.forEach(state => {
             if (typeof state.id === 'undefined') state.id = {}
             if (typeof state.id.id === 'undefined') state.id.id = count++
-            const id = state.type + '_' + (state.branch ? state.branch + '_' : '') + state.id.id
+            const id = state.type + '_' + (state.label ? state.label + '_' : '') + state.id.id
+            delete state.label
             states[id] = state
             state.id = id
             if (state === obj.entry) entry = id
