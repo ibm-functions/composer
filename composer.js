@@ -192,7 +192,7 @@ class Composer {
         if (typeof options !== 'object' || options === null) throw new ComposerError('Invalid argument', options)
         if (typeof f === 'function') {
             const code = `${f}`
-            if (code === 'function () { [native code] }') throw new ComposerError('Cannot capture native function', f)
+            if (code.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', f)
             f = code
         }
         if (typeof f !== 'string') throw new ComposerError('Invalid argument', f)
@@ -264,6 +264,7 @@ class Composer {
 
     // produce action code
     compile(name, obj, filename) {
+        if (arguments.length > 3) throw new ComposerError('Too many arguments')
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         if (typeof filename !== 'undefined' && typeof filename !== 'string') throw new ComposerError('Invalid argument', filename)
         obj = this.task(obj)
@@ -296,6 +297,7 @@ class Composer {
 
     // deploy actions, return count of successfully deployed actions
     deploy(actions) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (!Array.isArray(actions)) throw new ComposerError('Invalid argument', array)
         // clone array as openwhisk mutates the actions
         return clone(actions).reduce(
@@ -303,7 +305,7 @@ class Composer {
     }
 }
 
-module.exports = new Composer()
+module.exports = options => new Composer(options)
 
 // conductor action
 

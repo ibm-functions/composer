@@ -1,5 +1,5 @@
 const assert = require('assert')
-const composer = require('../composer')
+const composer = require('../composer')()
 const name = 'TestAction'
 
 // compile, deploy, and blocking invoke
