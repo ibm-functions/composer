@@ -289,7 +289,7 @@ function conductor(composition) {
                 var alternate = [{ type: 'pass', path }]
                 if (!options.nosave) consequent = chain([{ type: 'pop', path }], consequent)
                 if (!options.nosave) alternate = chain([{ type: 'pop', path }], alternate)
-                var fsm = chain(compile(json.test, path + ':test'), [{ type: 'choice', then: 1, else: consequent.length + 1, path }])
+                var fsm = chain(compile(json.test, path + '.test'), [{ type: 'choice', then: 1, else: consequent.length + 1, path }])
                 if (!options.nosave) fsm = chain([{ type: 'push', path }], fsm)
                 consequent.slice(-1)[0].next = 1 - fsm.length - consequent.length
                 fsm.push(...consequent)
@@ -374,12 +374,10 @@ function conductor(composition) {
             }
 
             // process one state
-            console.log(`Entering ${state}`)
-
             const json = fsm[state] // json definition for current state
+            console.log(`Entering state ${state} at path fsm${json.path}`)
             const current = state
             state = typeof json.next === 'undefined' ? undefined : current + json.next // default next state
-            console.log(json)
             switch (json.type) {
                 case 'choice':
                     state = current + (params.value ? json.then : json.else)
