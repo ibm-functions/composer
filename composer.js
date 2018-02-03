@@ -231,87 +231,75 @@ module.exports = options => new Composer(options)
 // conductor action
 
 function __init__(composition) {
-    class FSM {
-        constructor(exit) {
-            this.states = [exit]
-        }
-
-        last() {
-            return this.states[this.states.length - 1]
-        }
-    }
-
     function chain(front, back) {
-        if (!(front instanceof FSM)) front = new FSM(front)
-        if (!(back instanceof FSM)) back = new FSM(back)
-        front.last().next = back.states[0]
-        front.states.push(...back.states)
+        front.slice(-1)[0].next = back[0]
+        front.push(...back)
         return front
     }
 
     function compile(json, path = '') {
         if (Array.isArray(json)) {
-            if (json.length === 0) return new FSM({ type: 'pass', path })
-            return json.map((json, index) => compile(json, path + ':' + index)).reduce(chain)
+            if (json.length === 0) return [{ type: 'pass', path }]
+            return json.map((json, index) => compile(json, path + '[' + index + ']')).reduce(chain)
         }
         const options = json.options || {}
         switch (json.type) {
             case 'action':
-                return new FSM({ type: json.type, name: json.name, path })
+                return [{ type: json.type, name: json.name, path }]
             case 'function':
-                return new FSM({ type: json.type, exec: json.exec, path })
+                return [{ type: json.type, exec: json.exec, path }]
             case 'literal':
-                return new FSM({ type: json.type, value: json.value, path })
+                return [{ type: json.type, value: json.value, path }]
             case 'finally':
-                var body = compile(json.body, path + ':1')
-                const finalizer = compile(json.finalizer, path + ':2')
-                return [{ type: 'try', catch: finalizer.states[0], path }, body, { type: 'exit', path }, finalizer].reduce(chain)
+                var body = compile(json.body, path + '.body')
+                const finalizer = compile(json.finalizer, path + '.finalizer')
+                return [[{ type: 'try', catch: finalizer[0], path }], body, [{ type: 'exit', path }], finalizer].reduce(chain)
             case 'let':
-                var body = compile(json.body, path + ':1')
-                return [{ type: 'let', let: json.declarations, path }, body, { type: 'exit', path }].reduce(chain)
+                var body = compile(json.body, path + '.body')
+                return [[{ type: 'let', let: json.declarations, path }], body, [{ type: 'exit', path }]].reduce(chain)
             case 'retain':
-                var body = compile(json.body, path + ':1')
-                var fsm = [{ type: 'push', path }, body, { type: 'pop', collect: true, path }].reduce(chain)
-                if (options.field) fsm.states[0].field = options.field
+                var body = compile(json.body, path + '.body')
+                var fsm = [[{ type: 'push', path }], body, [{ type: 'pop', collect: true, path }]].reduce(chain)
+                if (options.field) fsm[0].field = options.field
                 return fsm
             case 'try':
-                var body = compile(json.body, path + ':1')
-                const handler = chain(compile(json.handler, path + ':2'),{ type: 'pass', path })
-                var fsm = [{ type: 'try', catch: handler.states[0], path }, body].reduce(chain)
-                fsm.last().next = handler.last()
-                fsm.states.push(...handler.states)
+                var body = compile(json.body, path + '.body')
+                const handler = chain(compile(json.handler, path + '.handler'), [{ type: 'pass', path }])
+                var fsm = [[{ type: 'try', catch: handler[0], path }], body].reduce(chain)
+                fsm.slice(-1)[0].next = handler.slice(-1)[0]
+                fsm.push(...handler)
                 return fsm
             case 'if':
-                var consequent = compile(json.consequent, path + ':2')
-                var alternate = chain(compile(json.alternate, path + ':3'), { type: 'pass', path })
-                if (!options.nosave) consequent = chain({ type: 'pop', path }, consequent)
-                if (!options.nosave) alternate = chain({ type: 'pop', path }, alternate)
-                var fsm = chain(compile(json.test, path + ':1'), { type: 'choice', then: consequent.states[0], else: alternate.states[0], path })
-                if (!options.nosave) fsm = chain({ type: 'push', path }, fsm)
-                consequent.last().next = alternate.last()
-                fsm.states.push(...consequent.states)
-                fsm.states.push(...alternate.states)
+                var consequent = compile(json.consequent, path + '.consequent')
+                var alternate = chain(compile(json.alternate, path + '.alternate'), [{ type: 'pass', path }])
+                if (!options.nosave) consequent = chain([{ type: 'pop', path }], consequent)
+                if (!options.nosave) alternate = chain([{ type: 'pop', path }], alternate)
+                var fsm = chain(compile(json.test, path + '.test'), [{ type: 'choice', then: consequent[0], else: alternate[0], path }])
+                if (!options.nosave) fsm = chain([{ type: 'push', path }], fsm)
+                consequent.slice(-1)[0].next = alternate.slice(-1)[0]
+                fsm.push(...consequent)
+                fsm.push(...alternate)
                 return fsm
             case 'while':
-                var consequent = compile(json.body, path + ':2')
-                var alternate = new FSM({ type: 'pass', path })
-                if (!options.nosave) consequent = chain({ type: 'pop', path }, consequent)
-                if (!options.nosave) alternate = chain({ type: 'pop', path }, alternate)
-                var fsm = chain(compile(json.test, path + ':1'), { type: 'choice', then: consequent.states[0], else: alternate.states[0], path })
-                if (!options.nosave) fsm = chain({ type: 'push', path }, fsm)
-                consequent.last().next = fsm.states[0]
-                fsm.states.push(...consequent.states)
-                fsm.states.push(...alternate.states)
+                var consequent = compile(json.body, path + '.body')
+                var alternate = [{ type: 'pass', path }]
+                if (!options.nosave) consequent = chain([{ type: 'pop', path }], consequent)
+                if (!options.nosave) alternate = chain([{ type: 'pop', path }], alternate)
+                var fsm = chain(compile(json.test, path + ':test'), [{ type: 'choice', then: consequent[0], else: alternate[0], path }])
+                if (!options.nosave) fsm = chain([{ type: 'push', path }], fsm)
+                consequent.slice(-1)[0].next = fsm[0]
+                fsm.push(...consequent)
+                fsm.push(...alternate)
                 return fsm
         }
     }
 
     const fsm = compile(composition)
 
-    fsm.states.forEach(state => {
+    fsm.forEach(state => {
         Object.keys(state).forEach(key => {
             if (state[key].type) {
-                state[key] = fsm.states.indexOf(state[key])
+                state[key] = fsm.indexOf(state[key])
             }
         })
     })
@@ -404,8 +392,8 @@ function main(params) {
             // process one state
             console.log(`Entering ${state}`)
 
-            if (!isObject(__composition__.states[state])) return badRequest(`State ${state} definition is missing`)
-            const json = __composition__.states[state] // json definition for current state
+            if (!isObject(__composition__[state])) return badRequest(`State ${state} definition is missing`)
+            const json = __composition__[state] // json definition for current state
             const current = state // current state for error messages
             //      if (json.type !== 'choice' && typeof json.next !== 'string' && state !== __composition__.exit) return badRequest(`State ${state} has no next field`)
             state = json.next // default next state
