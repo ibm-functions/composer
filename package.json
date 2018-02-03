@@ -20,8 +20,7 @@
     "openwhisk"
   ],
   "dependencies": {
-    "openwhisk": "^3.11.0",
-    "clone": "^2.1.1"
+    "openwhisk": "^3.11.0"
   },
   "devDependencies": {
     "mocha": "^3.5.0"
