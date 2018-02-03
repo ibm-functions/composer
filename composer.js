@@ -128,6 +128,11 @@ class Composer {
         return new Composition({ type: 'while', test: this.task(test), body: this.task(body), options: validate(options) })
     }
 
+    dowhile(body, test, options) {
+        if (arguments.length > 3) throw new ComposerError('Too many arguments')
+        return new Composition({ type: 'dowhile', test: this.task(test), body: this.task(body), options: validate(options) })
+    }
+
     try(body, handler, options) {
         if (arguments.length > 3) throw new ComposerError('Too many arguments')
         return new Composition({ type: 'try', body: this.task(body), handler: this.task(handler), options: validate(options) })
@@ -293,6 +298,21 @@ function conductor(composition) {
                 if (!options.nosave) fsm = chain([{ type: 'push', path }], fsm)
                 consequent.slice(-1)[0].next = 1 - fsm.length - consequent.length
                 fsm.push(...consequent)
+                fsm.push(...alternate)
+                return fsm
+            case 'dowhile':
+                var test = compile(json.test, path + '.test')
+                if (!options.nosave) test = chain([{ type: 'push', path }], test)
+                var fsm = [compile(json.body, path + '.body'), test, [{ type: 'choice', then: 1, else: 2, path }]].reduce(chain)
+                if (options.nosave) {
+                    fsm.slice(-1)[0].then = 1 - fsm.length
+                    fsm.slice(-1)[0].else = 1
+                } else {
+                    fsm.push({ type: 'pop', path })
+                    fsm.slice(-1)[0].next = 1 - fsm.length
+                }
+                var alternate = [{ type: 'pass', path }]
+                if (!options.nosave) alternate = chain([{ type: 'pop', path }], alternate)
                 fsm.push(...alternate)
                 return fsm
         }

@@ -314,6 +314,41 @@ describe('composer', function () {
                 })
             })
 
+            describe('dowhile', function () {
+                it('a few iterations', function () {
+                    return invoke(composer.dowhile(({ n }) => ({ n: n - 1 }), 'isNotOne'), { n: 4 })
+                        .then(activation => assert.deepEqual(activation.response.result, { n: 1 }))
+                })
+
+                it('one iteration', function () {
+                    return invoke(composer.dowhile(({ n }) => ({ n: n - 1 }), () => false), { n: 1 })
+                        .then(activation => assert.deepEqual(activation.response.result, { n: 0 }))
+                })
+
+                it('nosave option', function () {
+                    return invoke(composer.dowhile(({ n }) => ({ n: n - 1 }), ({ n }) => ({ n, value: n !== 1 }), { nosave: true }), { n: 4 })
+                        .then(activation => assert.deepEqual(activation.response.result, { value: false, n: 1 }))
+                })
+
+                it('invalid options', function () {
+                    try {
+                        invoke(composer.dowhile(({ n }) => ({ n: n - 1 }), 'isNotOne', ({ n }) => ({ n: n - 1 })), { n: 4 })
+                        assert.fail()
+                    } catch (error) {
+                        assert.ok(error.message.startsWith('Invalid options'))
+                    }
+                })
+
+                it('too many arguments', function () {
+                    try {
+                        invoke(composer.dowhile(({ n }) => ({ n: n - 1 }), 'isNotOne', {}, ({ n }) => ({ n: n - 1 })), { n: 4 })
+                        assert.fail()
+                    } catch (error) {
+                        assert.ok(error.message.startsWith('Too many arguments'))
+                    }
+                })
+            })
+
             describe('try', function () {
                 it('no error', function () {
                     return invoke(composer.try(() => true, error => ({ message: error.error })))
