@@ -232,7 +232,7 @@ module.exports = options => new Composer(options)
 
 function __init__(composition) {
     function chain(front, back) {
-        front.slice(-1)[0].next = back[0]
+        front.slice(-1)[0].next = 1
         front.push(...back)
         return front
     }
@@ -253,7 +253,9 @@ function __init__(composition) {
             case 'finally':
                 var body = compile(json.body, path + '.body')
                 const finalizer = compile(json.finalizer, path + '.finalizer')
-                return [[{ type: 'try', catch: finalizer[0], path }], body, [{ type: 'exit', path }], finalizer].reduce(chain)
+                var fsm = [[{ type: 'try', path }], body, [{ type: 'exit', path }], finalizer].reduce(chain)
+                fsm[0].catch = fsm.length - finalizer.length
+                return fsm
             case 'let':
                 var body = compile(json.body, path + '.body')
                 return [[{ type: 'let', let: json.declarations, path }], body, [{ type: 'exit', path }]].reduce(chain)
@@ -265,8 +267,9 @@ function __init__(composition) {
             case 'try':
                 var body = compile(json.body, path + '.body')
                 const handler = chain(compile(json.handler, path + '.handler'), [{ type: 'pass', path }])
-                var fsm = [[{ type: 'try', catch: handler[0], path }], body].reduce(chain)
-                fsm.slice(-1)[0].next = handler.slice(-1)[0]
+                var fsm = [[{ type: 'try', path }], body].reduce(chain)
+                fsm[0].catch = fsm.length
+                fsm.slice(-1)[0].next = handler.length
                 fsm.push(...handler)
                 return fsm
             case 'if':
@@ -274,9 +277,9 @@ function __init__(composition) {
                 var alternate = chain(compile(json.alternate, path + '.alternate'), [{ type: 'pass', path }])
                 if (!options.nosave) consequent = chain([{ type: 'pop', path }], consequent)
                 if (!options.nosave) alternate = chain([{ type: 'pop', path }], alternate)
-                var fsm = chain(compile(json.test, path + '.test'), [{ type: 'choice', then: consequent[0], else: alternate[0], path }])
+                var fsm = chain(compile(json.test, path + '.test'), [{ type: 'choice', then: 1, else: consequent.length + 1, path }])
                 if (!options.nosave) fsm = chain([{ type: 'push', path }], fsm)
-                consequent.slice(-1)[0].next = alternate.slice(-1)[0]
+                consequent.slice(-1)[0].next = alternate.length
                 fsm.push(...consequent)
                 fsm.push(...alternate)
                 return fsm
@@ -285,26 +288,16 @@ function __init__(composition) {
                 var alternate = [{ type: 'pass', path }]
                 if (!options.nosave) consequent = chain([{ type: 'pop', path }], consequent)
                 if (!options.nosave) alternate = chain([{ type: 'pop', path }], alternate)
-                var fsm = chain(compile(json.test, path + ':test'), [{ type: 'choice', then: consequent[0], else: alternate[0], path }])
+                var fsm = chain(compile(json.test, path + ':test'), [{ type: 'choice', then: 1, else: consequent.length + 1, path }])
                 if (!options.nosave) fsm = chain([{ type: 'push', path }], fsm)
-                consequent.slice(-1)[0].next = fsm[0]
+                consequent.slice(-1)[0].next = 1 - fsm.length - consequent.length
                 fsm.push(...consequent)
                 fsm.push(...alternate)
                 return fsm
         }
     }
 
-    const fsm = compile(composition)
-
-    fsm.forEach(state => {
-        Object.keys(state).forEach(key => {
-            if (state[key].type) {
-                state[key] = fsm.indexOf(state[key])
-            }
-        })
-    })
-
-    return fsm
+    return compile(composition)
 }
 
 function __eval__(main) { return eval(main) }
@@ -392,20 +385,20 @@ function main(params) {
             // process one state
             console.log(`Entering ${state}`)
 
-            if (!isObject(__composition__[state])) return badRequest(`State ${state} definition is missing`)
             const json = __composition__[state] // json definition for current state
+            if (!json) return badRequest(`State ${state} definition is missing`)
             const current = state // current state for error messages
             //      if (json.type !== 'choice' && typeof json.next !== 'string' && state !== __composition__.exit) return badRequest(`State ${state} has no next field`)
-            state = json.next // default next state
+            state = typeof json.next === 'undefined' ? undefined : current + json.next // default next state
             console.log(json)
             switch (json.type) {
                 case 'choice':
                     //                    if (typeof json.then !== 'string') return badRequest(`State ${current} has no then field`)
                     //                    if (typeof json.else !== 'string') return badRequest(`State ${current} has no else field`)
-                    state = params.value === true ? json.then : json.else
+                    state = current + (params.value ? json.then : json.else)
                     break
                 case 'try':
-                    stack.unshift({ catch: json.catch })
+                    stack.unshift({ catch: current + json.catch })
                     break
                 case 'let':
                     stack.unshift({ let: json.let })
