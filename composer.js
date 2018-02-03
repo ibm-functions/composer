@@ -64,7 +64,7 @@ class Composition {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         const actions = []
-        if ((this.actions || []).findIndex(action => action.name === name) !== -1) throw new ComposerError('Duplicate action name', name)
+        if (this.actions && this.actions.findIndex(action => action.name === name) !== -1) throw new ComposerError('Duplicate action name', name)
         const code = `${__init__}\n${__eval__}${main}\nconst __composition__ = __init__(${JSON.stringify(this.composition, null, 4)})\n`
         actions.push(...this.actions || [], { name, action: { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: this.composition }] } })
         return new Composition({ type: 'action', name }, actions)
@@ -234,16 +234,18 @@ function __init__(composition) {
     class FSM {
         constructor(exit) {
             this.states = [exit]
-            this.exit = exit
+        }
+
+        last() {
+            return this.states[this.states.length - 1]
         }
     }
 
     function chain(front, back) {
         if (!(front instanceof FSM)) front = new FSM(front)
         if (!(back instanceof FSM)) back = new FSM(back)
+        front.last().next = back.states[0]
         front.states.push(...back.states)
-        front.exit.next = back.states[0]
-        front.exit = back.exit
         return front
     }
 
@@ -274,21 +276,21 @@ function __init__(composition) {
                 return fsm
             case 'try':
                 var body = compile(json.body, path + ':1')
-                const handler = compile(json.handler, path + ':2')
-                var fsm = [{ type: 'try', catch: handler.states[0], path }, body, { type: 'pass', path }].reduce(chain)
+                const handler = chain(compile(json.handler, path + ':2'),{ type: 'pass', path })
+                var fsm = [{ type: 'try', catch: handler.states[0], path }, body].reduce(chain)
+                fsm.last().next = handler.last()
                 fsm.states.push(...handler.states)
-                handler.exit.next = fsm.exit
                 return fsm
             case 'if':
-                var consequent = chain(compile(json.consequent, path + ':2'), { type: 'pass', path })
-                var alternate = compile(json.alternate, path + ':3')
+                var consequent = compile(json.consequent, path + ':2')
+                var alternate = chain(compile(json.alternate, path + ':3'), { type: 'pass', path })
                 if (!options.nosave) consequent = chain({ type: 'pop', path }, consequent)
                 if (!options.nosave) alternate = chain({ type: 'pop', path }, alternate)
                 var fsm = chain(compile(json.test, path + ':1'), { type: 'choice', then: consequent.states[0], else: alternate.states[0], path })
                 if (!options.nosave) fsm = chain({ type: 'push', path }, fsm)
+                consequent.last().next = alternate.last()
                 fsm.states.push(...consequent.states)
                 fsm.states.push(...alternate.states)
-                fsm.exit = alternate.exit.next = consequent.exit
                 return fsm
             case 'while':
                 var consequent = compile(json.body, path + ':2')
@@ -297,10 +299,9 @@ function __init__(composition) {
                 if (!options.nosave) alternate = chain({ type: 'pop', path }, alternate)
                 var fsm = chain(compile(json.test, path + ':1'), { type: 'choice', then: consequent.states[0], else: alternate.states[0], path })
                 if (!options.nosave) fsm = chain({ type: 'push', path }, fsm)
+                consequent.last().next = fsm.states[0]
                 fsm.states.push(...consequent.states)
                 fsm.states.push(...alternate.states)
-                consequent.exit.next = fsm.states[0]
-                fsm.exit = alternate.exit
                 return fsm
         }
     }
@@ -314,7 +315,6 @@ function __init__(composition) {
             }
         })
     })
-    fsm.exit = fsm.states.indexOf(fsm.exit)
 
     return fsm
 }
