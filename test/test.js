@@ -3,17 +3,17 @@ const composer = require('../composer')()
 const name = 'TestAction'
 
 // compile, deploy, and blocking invoke
-const invoke = (task, params = {}, blocking = true) => composer.deploy(composer.compile(name, task)).then(() => composer.wsk.actions.invoke({ name, params, blocking }))
+const invoke = (task, params = {}, blocking = true) => task.named(name).deploy().then(() => composer.wsk.actions.invoke({ name, params, blocking }))
 
 describe('composer', function () {
     this.timeout(20000)
 
     before('deploy test actions', function () {
-        return composer.deploy(
-            [{ name: 'DivideByTwo', action: 'function main({n}) { return { n: n / 2 } }' },
-            { name: 'TripleAndIncrement', action: 'function main({n}) { return { n: n * 3 + 1 } }' },
-            { name: 'isNotOne', action: 'function main({n}) { return { value: n != 1 } }' },
-            { name: 'isEven', action: 'function main({n}) { return { value: n % 2  == 0 } }' }])
+        return Promise.all([
+            composer.action('DivideByTwo', { action: 'function main({n}) { return { n: n / 2 } }' }).deploy(),
+            composer.action('TripleAndIncrement', { action: 'function main({n}) { return { n: n * 3 + 1 } }' }).deploy(),
+            composer.action('isNotOne', { action: 'function main({n}) { return { value: n != 1 } }' }).deploy(),
+            composer.action('isEven', { action: 'function main({n}) { return { value: n % 2 == 0 } }' }).deploy()])
     })
 
     describe('blocking invocations', function () {
@@ -31,16 +31,16 @@ describe('composer', function () {
                     invoke(composer.function('foo', 'bar'))
                     assert.fail()
                 } catch (error) {
-                    assert.equal(error, 'Error: Invalid argument')
+                    assert.ok(error.message.startsWith('Invalid options'))
                 }
             })
 
-            it('invalid name argument', function () {
+            it('invalid argument', function () {
                 try {
                     invoke(composer.function(42))
                     assert.fail()
                 } catch (error) {
-                    assert.equal(error, 'Error: Invalid argument')
+                    assert.ok(error.message.startsWith('Invalid argument'))
                 }
             })
 
@@ -49,26 +49,44 @@ describe('composer', function () {
                     invoke(composer.function('foo', {}, 'bar'))
                     assert.fail()
                 } catch (error) {
-                    assert.equal(error, 'Error: Too many arguments')
+                    assert.ok(error.message.startsWith('Too many arguments'))
                 }
             })
         })
 
-        describe('values', function () {
+        describe('literals', function () {
             it('true', function () {
-                return invoke(composer.value(true)).then(activation => assert.deepEqual(activation.response.result, { value: true }))
+                return invoke(composer.literal(true)).then(activation => assert.deepEqual(activation.response.result, { value: true }))
             })
 
             it('42', function () {
-                return invoke(composer.value(42)).then(activation => assert.deepEqual(activation.response.result, { value: 42 }))
+                return invoke(composer.literal(42)).then(activation => assert.deepEqual(activation.response.result, { value: 42 }))
+            })
+
+            it('invalid options', function () {
+                try {
+                    invoke(composer.literal('foo', 'bar'))
+                    assert.fail()
+                } catch (error) {
+                    assert.ok(error.message.startsWith('Invalid options'))
+                }
+            })
+
+            it('invalid argument', function () {
+                try {
+                    invoke(composer.literal(invoke))
+                    assert.fail()
+                } catch (error) {
+                    assert.ok(error.message.startsWith('Invalid argument'))
+                }
             })
 
             it('too many arguments', function () {
                 try {
-                    invoke(composer.value('foo', 'bar'))
+                    invoke(composer.literal('foo', {}, 'bar'))
                     assert.fail()
                 } catch (error) {
-                    assert.equal(error, 'Error: Too many arguments')
+                    assert.ok(error.message.startsWith('Too many arguments'))
                 }
             })
         })
@@ -98,21 +116,21 @@ describe('composer', function () {
                 return invoke(composer.function('({ n }) => n % 2 === 0'), { n: 4 }).then(activation => assert.deepEqual(activation.response.result, { value: true }))
             })
 
-            it('invalid options argument', function () {
+            it('invalid options', function () {
                 try {
                     invoke(composer.function(() => n, 'foo'))
                     assert.fail()
                 } catch (error) {
-                    assert.equal(error, 'Error: Invalid argument')
+                    assert.ok(error.message.startsWith('Invalid options'))
                 }
             })
 
-            it('invalid function argument', function () {
+            it('invalid argument', function () {
                 try {
                     invoke(composer.function(42))
                     assert.fail()
                 } catch (error) {
-                    assert.equal(error, 'Error: Invalid argument')
+                    assert.ok(error.message.startsWith('Invalid argument'))
                 }
             })
 
@@ -121,7 +139,7 @@ describe('composer', function () {
                     invoke(composer.function(() => n, {}, () => { }))
                     assert.fail()
                 } catch (error) {
-                    assert.equal(error, 'Error: Too many arguments')
+                    assert.ok(error.message.startsWith('Too many arguments'))
                 }
             })
         })
@@ -155,7 +173,7 @@ describe('composer', function () {
                         invoke(composer.task(false))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Invalid argument')
+                        assert.ok(error.message.startsWith('Invalid argument'))
                     }
                 })
 
@@ -164,7 +182,7 @@ describe('composer', function () {
                         invoke(composer.task(42))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Invalid argument')
+                        assert.ok(error.message.startsWith('Invalid argument'))
                     }
                 })
 
@@ -173,7 +191,7 @@ describe('composer', function () {
                         invoke(composer.task({ foo: 'bar' }))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Invalid argument')
+                        assert.ok(error.message.startsWith('Invalid argument'))
                     }
                 })
             })
@@ -183,7 +201,7 @@ describe('composer', function () {
                     invoke(composer.task('foo', 'bar'))
                     assert.fail()
                 } catch (error) {
-                    assert.equal(error, 'Error: Too many arguments')
+                    assert.ok(error.message.startsWith('Too many arguments'))
                 }
             })
         })
@@ -242,12 +260,12 @@ describe('composer', function () {
                         .then(activation => assert.deepEqual(activation.response.result, { value: false, else: true }))
                 })
 
-                it('invalid options argument', function () {
+                it('invalid options', function () {
                     try {
                         invoke(composer.if('isEven', 'DivideByTwo', 'TripleAndIncrement', 'TripleAndIncrement'))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Invalid argument')
+                        assert.ok(error.message.startsWith('Invalid options'))
                     }
                 })
 
@@ -256,7 +274,7 @@ describe('composer', function () {
                         invoke(composer.if('isEven', 'DivideByTwo', 'TripleAndIncrement', {}, 'TripleAndIncrement'))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Too many arguments')
+                        assert.ok(error.message.startsWith('Too many arguments'))
                     }
                 })
             })
@@ -277,12 +295,12 @@ describe('composer', function () {
                         .then(activation => assert.deepEqual(activation.response.result, { value: false, n: 1 }))
                 })
 
-                it('invalid options argument', function () {
+                it('invalid options', function () {
                     try {
                         invoke(composer.while('isNotOne', ({ n }) => ({ n: n - 1 }), ({ n }) => ({ n: n - 1 })), { n: 4 })
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Invalid argument')
+                        assert.ok(error.message.startsWith('Invalid options'))
                     }
                 })
 
@@ -291,7 +309,7 @@ describe('composer', function () {
                         invoke(composer.while('isNotOne', ({ n }) => ({ n: n - 1 }), {}, ({ n }) => ({ n: n - 1 })), { n: 4 })
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Too many arguments')
+                        assert.ok(error.message.startsWith('Too many arguments'))
                     }
                 })
             })
@@ -313,21 +331,30 @@ describe('composer', function () {
                 })
 
                 it('while must throw', function () {
-                    return invoke(composer.try(composer.while(composer.value(false)), error => ({ message: error.error })), { error: 'foo' })
+                    return invoke(composer.try(composer.while(composer.literal(false)), error => ({ message: error.error })), { error: 'foo' })
                         .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
                 })
 
                 it('if must throw', function () {
-                    return invoke(composer.try(composer.if(composer.value(false)), error => ({ message: error.error })), { error: 'foo' })
+                    return invoke(composer.try(composer.if(composer.literal(false)), error => ({ message: error.error })), { error: 'foo' })
                         .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
                 })
 
-                it('too many arguments', function () {
+                it('invalid options', function () {
                     try {
                         invoke(composer.try('isNotOne', 'isNotOne', 'isNotOne'))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Too many arguments')
+                        assert.ok(error.message.startsWith('Invalid options'))
+                    }
+                })
+
+                it('too many arguments', function () {
+                    try {
+                        invoke(composer.try('isNotOne', 'isNotOne', {}, 'isNotOne'))
+                        assert.fail()
+                    } catch (error) {
+                        assert.ok(error.message.startsWith('Too many arguments'))
                     }
                 })
             })
@@ -343,12 +370,21 @@ describe('composer', function () {
                         .then(activation => assert.deepEqual(activation.response.result, { params: { error: 'foo' } }))
                 })
 
-                it('too many arguments', function () {
+                it('invalid options', function () {
                     try {
                         invoke(composer.finally('isNotOne', 'isNotOne', 'isNotOne'))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Too many arguments')
+                        assert.ok(error.message.startsWith('Invalid options'))
+                    }
+                })
+
+                it('too many arguments', function () {
+                    try {
+                        invoke(composer.finally('isNotOne', 'isNotOne', {}, 'isNotOne'))
+                        assert.fail()
+                    } catch (error) {
+                        assert.ok(error.message.startsWith('Too many arguments'))
                     }
                 })
             })
@@ -377,6 +413,15 @@ describe('composer', function () {
                 it('scoping', function () {
                     return invoke(composer.let({ x: 42 }, composer.let({ x: 69 }, () => x), ({ value }) => value + x))
                         .then(activation => assert.deepEqual(activation.response.result, { value: 111 }))
+                })
+
+                it('invalid argument', function () {
+                    try {
+                        invoke(composer.let(invoke))
+                        assert.fail()
+                    } catch (error) {
+                        assert.ok(error.message.startsWith('Invalid argument'))
+                    }
                 })
             })
 
@@ -431,7 +476,7 @@ describe('composer', function () {
                         invoke(composer.retain('isNotOne', 'isNotOne'))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Invalid argument')
+                        assert.ok(error.message.startsWith('Invalid options'))
                     }
                 })
 
@@ -440,7 +485,7 @@ describe('composer', function () {
                         invoke(composer.retain('isNotOne', {}, 'isNotOne'))
                         assert.fail()
                     } catch (error) {
-                        assert.equal(error, 'Error: Too many arguments')
+                        assert.ok(error.message.startsWith('Too many arguments'))
                     }
                 })
             })
@@ -449,6 +494,15 @@ describe('composer', function () {
                 it('a few iterations', function () {
                     return invoke(composer.repeat(3, 'DivideByTwo'), { n: 8 })
                         .then(activation => assert.deepEqual(activation.response.result, { n: 1 }))
+                })
+
+                it('invalid argument', function () {
+                    try {
+                        invoke(composer.repeat('foo'))
+                        assert.fail()
+                    } catch (error) {
+                        assert.ok(error.message.startsWith('Invalid argument'))
+                    }
                 })
             })
 
@@ -461,6 +515,16 @@ describe('composer', function () {
                 it('failure', function () {
                     return invoke(composer.let({ x: 2 }, composer.retry(1, () => x-- > 0 ? { error: 'foo' } : 42)))
                         .then(() => assert.fail(), activation => assert.deepEqual(activation.error.response.result.error, 'foo'))
+
+                })
+
+                it('invalid argument', function () {
+                    try {
+                        invoke(composer.retry('foo'))
+                        assert.fail()
+                    } catch (error) {
+                        assert.ok(error.message.startsWith('Invalid argument'))
+                    }
                 })
             })
         })
