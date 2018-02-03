@@ -224,11 +224,11 @@ class Composer {
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
         const attempt = this.retain(this.seq(...Array.prototype.slice.call(arguments, 1)), { catch: true })
         return this.let({ count },
-            attempt,
-            this.while(
-                this.function(({ result }) => typeof result.error !== 'undefined' && count-- > 0, { helper: 'retry_1' }),
-                this.finally(this.function(({ params }) => params, { helper: 'retry_2' }), attempt)),
-            this.function(({ result }) => result, { helper: 'retry_3' }))
+            this.function(params => ({ params }), { helper: 'retry_1' }),
+            this.dowhile(
+                this.finally(this.function(({ params }) => params, { helper: 'retry_2' }), attempt),
+                this.function(({ result }) => typeof result.error !== 'undefined' && count-- > 0, { helper: 'retry_3' })),
+            this.function(({ result }) => result, { helper: 'retry_4' }))
     }
 }
 
