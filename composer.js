@@ -65,7 +65,7 @@ class Composition {
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         const actions = []
         if (this.actions && this.actions.findIndex(action => action.name === name) !== -1) throw new ComposerError('Duplicate action name', name)
-        const code = `${__eval__}${main}\nconst __composition__ = (${init})(${JSON.stringify(this.composition, null, 4)})\n`
+        const code = `const __eval__ = main => eval(main)\nconst main = (${conductor})(${JSON.stringify(this.composition, null, 4)})\n`
         actions.push(...this.actions || [], { name, action: { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: this.composition }] } })
         return new Composition({ type: 'action', name }, actions)
     }
@@ -140,13 +140,13 @@ class Composer {
 
     let(declarations) { // varargs, no options
         if (typeof declarations !== 'object' || declarations === null) throw new ComposerError('Invalid argument', declarations)
-        return new Composition({ type: 'let', declarations: JSON.parse(JSON.stringify(declarations)), body: this.seq(...Array.prototype.slice.call(arguments, 1)) })
+        return new Composition({ type: 'let', declarations, body: this.seq(...Array.prototype.slice.call(arguments, 1)) })
     }
 
     literal(value, options) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (typeof value === 'function') throw new ComposerError('Invalid argument', value)
-        return new Composition({ type: 'literal', value: typeof value === 'undefined' ? {} : JSON.parse(JSON.stringify(value)), options: validate(options) })
+        return new Composition({ type: 'literal', value: typeof value === 'undefined' ? {} : value, options: validate(options) })
     }
 
     function(exec, options) {
@@ -206,7 +206,7 @@ class Composer {
                 this.function(({ params, result }) => ({ params, result: result.result }), { helper: 'retain_2' }))
         }
         if (options && typeof options.field !== 'undefined' && typeof options.field !== 'string') throw new ComposerError('Invalid options', options)
-            // return new Composition({ params, result: body(params) } if no error, otherwise body(params)
+        // return new Composition({ params, result: body(params) } if no error, otherwise body(params)
         return new Composition({ type: 'retain', body: this.task(body), options: validate(options) })
     }
 
@@ -231,7 +231,7 @@ module.exports = options => new Composer(options)
 
 // conductor action
 
-function init(composition) {
+function conductor(composition) {
     function chain(front, back) {
         front.slice(-1)[0].next = 1
         front.push(...back)
@@ -298,12 +298,8 @@ function init(composition) {
         }
     }
 
-    return compile(composition)
-}
+    const fsm = compile(composition)
 
-function __eval__(main) { return eval(main) }
-
-function main(params) {
     const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
 
     // encode error object
@@ -316,8 +312,7 @@ function main(params) {
     const badRequest = error => Promise.reject({ code: 400, error })
     const internalError = error => Promise.reject(encodeError(error))
 
-    // catch all
-    return Promise.resolve().then(() => invoke(params)).catch(internalError)
+    return params => Promise.resolve().then(() => invoke(params)).catch(internalError)
 
     // do invocation
     function invoke(params) {
@@ -381,7 +376,7 @@ function main(params) {
             // process one state
             console.log(`Entering ${state}`)
 
-            const json = __composition__[state] // json definition for current state
+            const json = fsm[state] // json definition for current state
             const current = state
             state = typeof json.next === 'undefined' ? undefined : current + json.next // default next state
             console.log(json)
@@ -393,7 +388,7 @@ function main(params) {
                     stack.unshift({ catch: current + json.catch })
                     break
                 case 'let':
-                    stack.unshift({ let: json.let })
+                    stack.unshift({ let: JSON.parse(JSON.stringify(json.let)) })
                     break
                 case 'exit':
                     if (stack.length === 0) return internalError(`State ${current} attempted to pop from an empty stack`)
@@ -410,7 +405,7 @@ function main(params) {
                     return { action: json.name, params, state: { $resume: { state, stack } } } // invoke continuation
                     break
                 case 'literal':
-                    params = json.value
+                    params = JSON.parse(JSON.stringify(json.value))
                     inspect()
                     break
                 case 'function':
