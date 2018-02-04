@@ -23,6 +23,7 @@ const os = require('os')
 const path = require('path')
 const util = require('util')
 const openwhisk = require('openwhisk')
+const uglify = require('uglify-es')
 
 class ComposerError extends Error {
     constructor(message, argument) {
@@ -39,6 +40,12 @@ function validate(options) {
 }
 
 let wsk
+
+function encode({ name, action }) {
+    if (action.exec.kind !== 'composition') return { name, action }
+    const code = `${conductor}(${JSON.stringify(action.exec.composition)})\n`
+    return { name, action: { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: action.exec.composition }] } }
+}
 
 class Composition {
     constructor(composition, actions = []) {
@@ -65,8 +72,7 @@ class Composition {
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         const actions = []
         if (this.actions && this.actions.findIndex(action => action.name === name) !== -1) throw new ComposerError('Duplicate action name', name)
-        const code = `const __eval__ = main => eval(main)\nconst main = (${conductor})(${JSON.stringify(this.composition, null, 4)})\n`
-        actions.push(...this.actions || [], { name, action: { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: this.composition }] } })
+        actions.push(...this.actions || [], { name, action: { exec: { kind: 'composition', composition: this.composition } } })
         return new Composition({ type: 'action', name }, actions)
     }
 
@@ -75,7 +81,7 @@ class Composition {
         if (this.composition.type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
         let i = 0
         return this.actions.reduce((promise, action) =>
-            promise.then(() => wsk.actions.delete(action)).catch(() => { }).then(() => wsk.actions.update(action).then(() => i++, err => console.error(err))), Promise.resolve()).then(() => i)
+            promise.then(() => wsk.actions.delete(action)).catch(() => { }).then(() => wsk.actions.update(encode(action)).then(() => i++, err => console.error(err))), Promise.resolve()).then(() => i)
     }
 }
 
@@ -161,7 +167,7 @@ class Composer {
             if (exec.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', exec)
         }
         if (typeof exec === 'string') {
-            exec = { kind: 'nodejs:default', exec }
+            exec = { kind: 'nodejs:default', code: exec }
         }
         if (typeof exec !== 'object' || exec === null) throw new ComposerError('Invalid argument', exec)
         return new Composition({ type: 'function', exec, options: validate(options) })
@@ -236,7 +242,9 @@ module.exports = options => new Composer(options)
 
 // conductor action
 
-function conductor(composition) {
+const conductor = `const __eval__ = main => eval(main)\nconst main = (${uglify.minify(`${init}`).code})`
+
+function init(composition) {
     function chain(front, back) {
         front.slice(-1)[0].next = 1
         front.push(...back)
@@ -429,7 +437,7 @@ function conductor(composition) {
                 case 'function':
                     let result
                     try {
-                        result = run(json.exec.exec)
+                        result = run(json.exec.code)
                     } catch (error) {
                         console.error(error)
                         result = { error: `An exception was caught at state ${current} (see log for details)` }
