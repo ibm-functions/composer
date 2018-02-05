@@ -61,10 +61,9 @@ class Composition {
                 if (Array.isArray(component)) composition.push(...component); else composition.push(component)
                 return composition
             }, [])
-            if (composition.length === 1) composition = composition[0]
         }
         if (actions.length > 0) this.actions = actions
-        this.composition = composition
+        this.composition = Array.isArray(composition) ? composition : [composition]
     }
 
     named(name) {
@@ -78,7 +77,7 @@ class Composition {
 
     deploy() {
         if (arguments.length > 0) throw new ComposerError('Too many arguments')
-        if (this.composition.type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
+        if (this.composition.length !== 1 || this.composition[0].type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
         let i = 0
         return this.actions.reduce((promise, action) =>
             promise.then(() => wsk.actions.delete(action)).catch(() => { }).then(() => wsk.actions.update(encode(action)).then(() => i++, err => console.error(err))), Promise.resolve()).then(() => i)
