@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+
+const fs = require('fs')
+const composer = require('../composer')()
+
+if (process.argv.length !== 4) {
+    console.error('Usage: compose <composition> <composition.js>')
+} else {
+   eval(fs.readFileSync(process.argv[3], { encoding: 'utf8' })).named(process.argv[2]).deploy()
+}

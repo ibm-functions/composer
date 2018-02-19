@@ -7,6 +7,9 @@
   "scripts": {
     "test": "mocha"
   },
+  "bin": {
+    "compose": "./bin/compose"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/ibm-functions/composer.git"
