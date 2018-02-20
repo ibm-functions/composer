@@ -77,8 +77,7 @@ class Composition {
 
     encode() {
         if (arguments.length > 0) throw new ComposerError('Too many arguments')
-        this.actions = this.actions.map(encode)
-        return this
+        return new Composition(this.composition, this.actions.map(encode))
     }
 
     deploy() {
