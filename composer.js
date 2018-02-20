@@ -75,6 +75,12 @@ class Composition {
         return new Composition({ type: 'action', name }, actions)
     }
 
+    encode() {
+        if (arguments.length > 0) throw new ComposerError('Too many arguments')
+        this.actions = this.actions.map(encode)
+        return this
+    }
+
     deploy() {
         if (arguments.length > 0) throw new ComposerError('Too many arguments')
         if (this.composition.length !== 1 || this.composition[0].type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
