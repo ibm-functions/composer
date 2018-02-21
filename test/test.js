@@ -26,6 +26,39 @@ describe('composer', function () {
                 return invoke(composer.action('isNotOne'), { n: 1 }).then(activation => assert.deepEqual(activation.response.result, { value: false }))
             })
 
+            it('action name must parse to fully qualified', function() {
+                let combos = [
+                     { n: '',          s: false, e: 'Name is not specified' },
+                     { n: ' ',         s: false, e: 'Name is not specified' },
+                     { n: '/',         s: false, e: 'Name is not valid' },
+                     { n: '//',        s: false, e: 'Name is not valid' },
+                     { n: '/a',        s: false, e: 'Name is not valid' },
+                     { n: '/a/b/c/d',  s: false, e: 'Name is not valid' },
+                     { n: '/a/b/c/d/', s: false, e: 'Name is not valid' },
+                     { n: 'a/b/c/d',   s: false, e: 'Name is not valid' },
+                     { n: '/a/ /b',    s: false, e: 'Name is not valid' },
+                     { n: 'a',         e: false, s: '/_/a' },
+                     { n: 'a/b',       e: false, s: '/_/a/b' },
+                     { n: 'a/b/c',     e: false, s: '/a/b/c' },
+                     { n: '/a/b',      e: false, s: '/a/b' },
+                     { n: '/a/b/c',    e: false, s: '/a/b/c' }
+                ]
+                combos.forEach(({n, s, e}) => {
+                     if (s) {
+                         // good cases
+                         assert.ok(composer.action(n).composition[0].name, s)
+                     } else {
+                         // error cases
+                         try {
+                             composer.action(n)
+                             assert.fail()
+                         } catch (error) {
+                             assert.ok(error.message == e)
+                         }
+                     }
+                })
+            })
+
             it('invalid options', function () {
                 try {
                     invoke(composer.function('foo', 'bar'))

@@ -47,6 +47,33 @@ function encode({ name, action }) {
     return { name, action: { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: action.exec.composition }] } }
 }
 
+/**
+ * Parses a (possibly fully qualified) resource name and validates it. If it's not a fully qualified name,
+ * then attempts to qualify it.
+ *
+ * Examples string to namespace, [package/]action name
+ *   foo => /_/foo
+ *   pkg/foo => /_/pkg/foo
+ *   /ns/foo => /ns/foo
+ *   /ns/pkg/foo => /ns/pkg/foo
+ */
+function parseActionName(name) {
+    if (typeof name !== 'string' || name.trim().length == 0) throw new ComposerError('Name is not specified')
+    name = name.trim()
+    let delimiter = '/'
+    let parts = name.split(delimiter)
+    let n = parts.length
+    let leadingSlash = name[0] == delimiter
+    // no more than /ns/p/a                           
+    if (n < 1 || n > 4 || (leadingSlash && n == 2) || (!leadingSlash && n == 4)) throw new ComposerError('Name is not valid')
+    // skip leading slash, all parts must be non empty (could tighten this check to match EntityName regex)
+    parts.forEach(function (part, i) {  if (i > 0 && part.trim().length == 0) throw new ComposerError('Name is not valid') })
+    let newName = parts.join(delimiter)
+    if (leadingSlash) return newName
+    else if (n < 3) return `${delimiter}_${delimiter}${newName}`
+    else return `${delimiter}${newName}`
+}
+
 class Composition {
     constructor(composition, actions = []) {
         Object.keys(composition).forEach(key => {
@@ -179,7 +206,7 @@ class Composer {
 
     action(name, options) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
-        if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
+        name = parseActionName(name) // throws ComposerError if name is not valid
         let exec
         if (options && Array.isArray(options.sequence)) { // native sequence
             const components = options.sequence.map(a => a.indexOf('/') == -1 ? `/_/${a}` : a)
