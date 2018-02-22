@@ -22,7 +22,6 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const util = require('util')
-const openwhisk = require('openwhisk')
 const uglify = require('uglify-es')
 
 class ComposerError extends Error {
@@ -31,6 +30,9 @@ class ComposerError extends Error {
     }
 }
 
+/**
+ * Validates options and converts to JSON
+ */
 function validate(options) {
     if (typeof options === 'undefined') return
     if (typeof options !== 'object' || Array.isArray(options) || options === null) throw new ComposerError('Invalid options', options)
@@ -39,11 +41,17 @@ function validate(options) {
     return JSON.parse(options)
 }
 
+/**
+ * OpenWhisk client instance
+ */
 let wsk
 
+/**
+ * Encodes a composition as an action by injecting conductor code
+ */
 function encode({ name, action }) {
     if (action.exec.kind !== 'composition') return { name, action }
-    const code = `${conductor}(${JSON.stringify(action.exec.composition)})\n`
+    const code = `${conductor}(${JSON.stringify(action.exec.composition)})\n` // invoke conductor on composition
     return { name, action: { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: action.exec.composition }] } }
 }
 
@@ -67,7 +75,7 @@ function parseActionName(name) {
     // no more than /ns/p/a                           
     if (n < 1 || n > 4 || (leadingSlash && n == 2) || (!leadingSlash && n == 4)) throw new ComposerError('Name is not valid')
     // skip leading slash, all parts must be non empty (could tighten this check to match EntityName regex)
-    parts.forEach(function (part, i) {  if (i > 0 && part.trim().length == 0) throw new ComposerError('Name is not valid') })
+    parts.forEach(function (part, i) { if (i > 0 && part.trim().length == 0) throw new ComposerError('Name is not valid') })
     let newName = parts.join(delimiter)
     if (leadingSlash) return newName
     else if (n < 3) return `${delimiter}_${delimiter}${newName}`
@@ -76,6 +84,7 @@ function parseActionName(name) {
 
 class Composition {
     constructor(composition, actions = []) {
+        // collect actions defined in nested composition
         Object.keys(composition).forEach(key => {
             if (composition[key] instanceof Composition) {
                 // TODO: check for duplicate entries
@@ -83,22 +92,16 @@ class Composition {
                 composition[key] = composition[key].composition
             }
         })
-        if (Array.isArray(composition)) {
-            composition = composition.reduce((composition, component) => {
-                if (Array.isArray(component)) composition.push(...component); else composition.push(component)
-                return composition
-            }, [])
-        }
         if (actions.length > 0) this.actions = actions
-        this.composition = Array.isArray(composition) ? composition : [composition]
+        // flatten composition array
+        this.composition = Array.isArray(composition) ? [].concat(...composition) : [composition]
     }
 
     named(name) {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
-        const actions = []
         if (this.actions && this.actions.findIndex(action => action.name === name) !== -1) throw new ComposerError('Duplicate action name', name)
-        actions.push(...this.actions || [], { name, action: { exec: { kind: 'composition', composition: this.composition } } })
+        const actions = (this.actions || []).concat({ name, action: { exec: { kind: 'composition', composition: this.composition } } })
         return new Composition({ type: 'action', name }, actions)
     }
 
@@ -111,8 +114,7 @@ class Composition {
         if (arguments.length > 0) throw new ComposerError('Too many arguments')
         if (this.composition.length !== 1 || this.composition[0].type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
         let i = 0
-        return this.actions.reduce((promise, action) =>
-            promise.then(() => wsk.actions.delete(action)).catch(() => { }).then(() => wsk.actions.update(encode(action)).then(() => i++, err => console.error(err))), Promise.resolve()).then(() => i)
+        return this.actions.reduce((promise, action) => promise.then(() => wsk.actions.delete(action)).catch(() => { }).then(() => wsk.actions.update(encode(action)).then(() => i++, err => console.error(err))), Promise.resolve()).then(() => i)
     }
 }
 
@@ -142,14 +144,14 @@ class Composer {
                 }
             } catch (error) { }
 
-            this.wsk = wsk = openwhisk(Object.assign({ apihost, api_key, ignore_certs }, options))
+            this.wsk = wsk = require('openwhisk')(Object.assign({ apihost, api_key, ignore_certs }, options))
         }
 
         this.seq = this.sequence
     }
 
     /** Take a serialized Composition and returns a Composition instance */
-    deserialize({composition, actions}) {
+    deserialize({ composition, actions }) {
         return new Composition(composition, actions)
     }
 
