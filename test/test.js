@@ -3,7 +3,7 @@ const composer = require('../composer')()
 const name = 'TestAction'
 
 // compile, deploy, and blocking invoke
-const invoke = (task, params = {}, blocking = true) => task.named(name).deploy().then(() => composer.wsk.actions.invoke({ name, params, blocking }))
+const invoke = (task, params = {}, blocking = true) => task.deploy(name).then(() => composer.wsk.actions.invoke({ name, params, blocking }))
 
 describe('composer', function () {
     this.timeout(20000)
