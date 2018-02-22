@@ -10,6 +10,7 @@ describe('composer', function () {
 
     before('deploy test actions', function () {
         return Promise.all([
+            composer.action('echo', { action: 'const main = x=>x' }).deploy(),
             composer.action('DivideByTwo', { action: 'function main({n}) { return { n: n / 2 } }' }).deploy(),
             composer.action('TripleAndIncrement', { action: 'function main({n}) { return { n: n * 3 + 1 } }' }).deploy(),
             composer.action('isNotOne', { action: 'function main({n}) { return { value: n != 1 } }' }).deploy(),
@@ -174,6 +175,21 @@ describe('composer', function () {
                 } catch (error) {
                     assert.ok(error.message.startsWith('Too many arguments'))
                 }
+            })
+        })
+
+        describe('deserialize', function () {
+            it('should deserialize a serialized composition', function () {
+                const json = {
+                    "composition": [{
+                        "type": "action",
+                        "name": "echo"
+                    }, {
+                        "type": "action",
+                        "name": "echo"
+                    }]
+                }
+                return invoke(composer.deserialize(json), { message: 'hi' }).then(activation => assert.deepEqual(activation.response.result, { message: 'hi' }))
             })
         })
 

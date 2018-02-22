@@ -118,28 +118,39 @@ class Composition {
 
 class Composer {
     constructor(options = {}) {
-        // try to extract apihost and key from wskprops
-        let apihost
-        let api_key
+        if (!options.no_wsk) {
+            // try to extract apihost and key from wskprops
+            let apihost
+            let api_key
+            let ignore_certs
 
-        try {
-            const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
-            const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
+            try {
+                const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
+                const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
 
-            for (let line of lines) {
-                let parts = line.trim().split('=')
-                if (parts.length === 2) {
-                    if (parts[0] === 'APIHOST') {
-                        apihost = parts[1]
-                    } else if (parts[0] === 'AUTH') {
-                        api_key = parts[1]
+                for (let line of lines) {
+                    let parts = line.trim().split('=')
+                    if (parts.length === 2) {
+                        if (parts[0] === 'APIHOST') {
+                            apihost = parts[1]
+                        } else if (parts[0] === 'AUTH') {
+                            api_key = parts[1]
+                        } else if (parts[0] === 'INSECURE_SSL') {
+                            ignore_certs = parts[1] === 'true'
+                        }
                     }
                 }
-            }
-        } catch (error) { }
+            } catch (error) { }
 
-        this.wsk = wsk = openwhisk(Object.assign({ apihost, api_key }, options))
+            this.wsk = wsk = openwhisk(Object.assign({ apihost, api_key, ignore_certs }, options))
+        }
+
         this.seq = this.sequence
+    }
+
+    /** Take a serialized Composition and returns a Composition instance */
+    deserialize({composition, actions}) {
+        return new Composition(composition, actions)
     }
 
     task(obj) {
