@@ -152,9 +152,9 @@ class Composer {
         this.seq = this.sequence
     }
 
-    /** Take a serialized Composition and returns a Composition instance */
+    /** Takes a serialized Composition and returns a Composition instance */
     deserialize({ composition, actions }) {
-        return new Composition(composition, actions)
+        return new Composition(composition, null, actions)
     }
 
     task(obj) {
