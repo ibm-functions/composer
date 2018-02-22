@@ -47,7 +47,7 @@ function validate(options) {
 let wsk
 
 /**
- * Encodes a composition as an action by injecting conductor code
+ * Encodes a composition as an action by injecting the conductor code
  */
 function encode({ name, action }) {
     if (action.exec.kind !== 'composition') return { name, action }
@@ -99,6 +99,7 @@ class Composition {
         this.composition = Array.isArray(composition) ? [].concat(...composition) : [composition]
     }
 
+    /** Names the composition and returns a composition which invokes the named composition */
     named(name) {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
@@ -107,16 +108,24 @@ class Composition {
         return new Composition({ type: 'action', name }, null, actions)
     }
 
-    encode() {
-        if (arguments.length > 0) throw new ComposerError('Too many arguments')
-        return new Composition(this.composition, null, this.actions.map(encode))
+    /** Encodes all compositions as actions by injecting the conductor code in them */
+    encode(name) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        if (typeof name !== 'undefined' && typeof name !== 'string') throw new ComposerError('Invalid argument', name)
+        const obj = typeof name === 'string' ? this.named(name) : this
+        if (obj.composition.length !== 1 || obj.composition[0].type !== 'action') throw new ComposerError('Cannot encode anonymous composition')
+        return new Composition(obj.composition, null, obj.actions.map(encode))
     }
 
-    deploy() {
-        if (arguments.length > 0) throw new ComposerError('Too many arguments')
-        if (this.composition.length !== 1 || this.composition[0].type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
+    /** Encodes all compositions as actions and deploys all actions */
+    deploy(name) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        const obj = this.encode(name)
+        if (typeof wsk === 'undefined') return obj // no openwhisk client instance, stop
         let i = 0
-        return this.actions.reduce((promise, action) => promise.then(() => wsk.actions.delete(action)).catch(() => { }).then(() => wsk.actions.update(encode(action)).then(() => i++, err => console.error(err))), Promise.resolve()).then(() => i)
+        return obj.actions.reduce((promise, action) => promise.then(() => wsk.actions.delete(action)).catch(() => { })
+            .then(() => wsk.actions.update(action).then(() => i++, err => console.error(err))), Promise.resolve())
+            .then(() => i)
     }
 }
 
