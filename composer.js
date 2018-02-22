@@ -34,8 +34,8 @@ class ComposerError extends Error {
  * Validates options and converts to JSON
  */
 function validate(options) {
-    if (typeof options === 'undefined') return
-    if (typeof options !== 'object' || Array.isArray(options) || options === null) throw new ComposerError('Invalid options', options)
+    if (options == null) return
+    if (typeof options !== 'object' || Array.isArray(options)) throw new ComposerError('Invalid options', options)
     options = JSON.stringify(options)
     if (options === '{}') return
     return JSON.parse(options)
@@ -83,7 +83,7 @@ function parseActionName(name) {
 }
 
 class Composition {
-    constructor(composition, actions = []) {
+    constructor(composition, options, actions = []) {
         // collect actions defined in nested composition
         Object.keys(composition).forEach(key => {
             if (composition[key] instanceof Composition) {
@@ -93,6 +93,8 @@ class Composition {
             }
         })
         if (actions.length > 0) this.actions = actions
+        options = validate(options)
+        if (typeof options !== 'undefined') composition = Object.assign({ options }, composition)
         // flatten composition array
         this.composition = Array.isArray(composition) ? [].concat(...composition) : [composition]
     }
@@ -102,12 +104,12 @@ class Composition {
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         if (this.actions && this.actions.findIndex(action => action.name === name) !== -1) throw new ComposerError('Duplicate action name', name)
         const actions = (this.actions || []).concat({ name, action: { exec: { kind: 'composition', composition: this.composition } } })
-        return new Composition({ type: 'action', name }, actions)
+        return new Composition({ type: 'action', name }, null, actions)
     }
 
     encode() {
         if (arguments.length > 0) throw new ComposerError('Too many arguments')
-        return new Composition(this.composition, this.actions.map(encode))
+        return new Composition(this.composition, null, this.actions.map(encode))
     }
 
     deploy() {
@@ -170,27 +172,27 @@ class Composer {
 
     if(test, consequent, alternate, options) {
         if (arguments.length > 4) throw new ComposerError('Too many arguments')
-        return new Composition({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate), options: validate(options) })
+        return new Composition({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate) }, options)
     }
 
     while(test, body, options) {
         if (arguments.length > 3) throw new ComposerError('Too many arguments')
-        return new Composition({ type: 'while', test: this.task(test), body: this.task(body), options: validate(options) })
+        return new Composition({ type: 'while', test: this.task(test), body: this.task(body) }, options)
     }
 
     dowhile(body, test, options) {
         if (arguments.length > 3) throw new ComposerError('Too many arguments')
-        return new Composition({ type: 'dowhile', test: this.task(test), body: this.task(body), options: validate(options) })
+        return new Composition({ type: 'dowhile', test: this.task(test), body: this.task(body) }, options)
     }
 
     try(body, handler, options) {
         if (arguments.length > 3) throw new ComposerError('Too many arguments')
-        return new Composition({ type: 'try', body: this.task(body), handler: this.task(handler), options: validate(options) })
+        return new Composition({ type: 'try', body: this.task(body), handler: this.task(handler) }, options)
     }
 
     finally(body, finalizer, options) {
         if (arguments.length > 3) throw new ComposerError('Too many arguments')
-        return new Composition({ type: 'finally', body: this.task(body), finalizer: this.task(finalizer), options: validate(options) })
+        return new Composition({ type: 'finally', body: this.task(body), finalizer: this.task(finalizer) }, options)
     }
 
     let(declarations) { // varargs, no options
@@ -201,7 +203,7 @@ class Composer {
     literal(value, options) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (typeof value === 'function') throw new ComposerError('Invalid argument', value)
-        return new Composition({ type: 'literal', value: typeof value === 'undefined' ? {} : value, options: validate(options) })
+        return new Composition({ type: 'literal', value: typeof value === 'undefined' ? {} : value }, options)
     }
 
     function(exec, options) {
@@ -214,7 +216,7 @@ class Composer {
             exec = { kind: 'nodejs:default', code: exec }
         }
         if (typeof exec !== 'object' || exec === null) throw new ComposerError('Invalid argument', exec)
-        return new Composition({ type: 'function', exec, options: validate(options) })
+        return new Composition({ type: 'function', exec }, options)
     }
 
     action(name, options) {
@@ -241,7 +243,7 @@ class Composer {
             exec = options.action
             delete options.action
         }
-        return new Composition({ type: 'action', name, options: validate(options) }, exec ? [{ name, action: { exec } }] : [])
+        return new Composition({ type: 'action', name }, options, exec ? [{ name, action: { exec } }] : [])
     }
 
     retain(body, options) {
@@ -262,7 +264,7 @@ class Composer {
         }
         if (options && typeof options.field !== 'undefined' && typeof options.field !== 'string') throw new ComposerError('Invalid options', options)
         // return new Composition({ params, result: body(params) } if no error, otherwise body(params)
-        return new Composition({ type: 'retain', body: this.task(body), options: validate(options) })
+        return new Composition({ type: 'retain', body: this.task(body) }, options)
     }
 
     repeat(count) { // varargs, no options
