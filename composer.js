@@ -103,6 +103,7 @@ class Composition {
     named(name) {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
+        name = parseActionName(name)
         if (this.actions && this.actions.findIndex(action => action.name === name) !== -1) throw new ComposerError('Duplicate action name', name)
         const actions = (this.actions || []).concat({ name, action: { exec: { kind: 'composition', composition: this.composition } } })
         return new Composition({ type: 'action', name }, null, actions)
@@ -121,11 +122,10 @@ class Composition {
     deploy(name) {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
         const obj = this.encode(name)
-        if (typeof wsk === 'undefined') return obj // no openwhisk client instance, stop
-        let i = 0
-        return obj.actions.reduce((promise, action) => promise.then(() => wsk.actions.delete(action)).catch(() => { })
-            .then(() => wsk.actions.update(action).then(() => i++, err => console.error(err))), Promise.resolve())
-            .then(() => i)
+        if (typeof wsk === 'undefined') return Promise.resolve(obj) // no openwhisk client instance, stop
+        return obj.actions.reduce((promise, action) => promise.then(() => wsk.actions.delete(action).catch(() => { }))
+            .then(() => wsk.actions.update(action)), Promise.resolve())
+            .then(() => obj)
     }
 }
 
