@@ -1,9 +1,11 @@
 language: node_js
 node_js:
-  - "6"
-
+  - 6
+services:
+  - docker
 env:
   global:
-#    - __OW_API_HOST="OpenWhisk host"
-#    - __OW_API_KEY="OpenWhisk API key"
-#    - REDIS="Redis url"
+    - IGNORE_CERTS=true
+    - REDIS=redis://172.17.0.1:6379
+before_script:
+  - ./travis/setup.sh

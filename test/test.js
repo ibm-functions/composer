@@ -9,7 +9,7 @@ const invoke = (task, params, $blocking = true) => run(Object.assign({ $invoke: 
 let activationId
 
 describe('composer', function () {
-    this.timeout(20000)
+    this.timeout(60000)
 
     before('deploy conductor and sample actions', function () {
         return harness.deploy()
