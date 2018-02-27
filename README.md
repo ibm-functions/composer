@@ -16,7 +16,6 @@ flow and automatic state management.
 Composer helps express cloud-native apps that are serverless by
 construction: scale automatically, pay as you go and not for idle time.
 
-
 The [IBM Cloud functions shell](https://github.com/ibm-functions/shell)
 offers a CLI and graphical interface for fast, incremental, iterative,
 and local development of serverless apps. Some additional highlights
@@ -42,6 +41,8 @@ you to [join us on slack](http://ibm.biz/composer-users).
 This repository includes:
 
  * a [composer](composer.js) node.js module to author compositions using JavaScript,
- * a [tutorial](docs/README.md) for getting started with composer in the [docs](docs) folder,
+ * a [compose](bin/compose) shell script for deploying compositions,
+ * a [tutorial](docs/README.md),
+ * a [reference manual](docs/COMPOSER.md),
  * example compositions in the [samples](samples) folder,
  * tests in the [test](test) folder.
