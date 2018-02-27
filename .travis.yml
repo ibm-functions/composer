@@ -1,6 +1,10 @@
 language: node_js
 node_js:
   - "6"
+services:
+  - docker
+script:
+  - "./travis/setup.sh"
 
 env:
   global:
