@@ -1,6 +1,6 @@
 # Composer
 
-The [`composer`](../composer.js) Node.js module makes it possible define action [compositions](Compositions) using [combinators](Combinators).
+The [`composer`](../composer.js) Node.js module makes it possible define action [compositions](#compositions) using [combinators](#combinators).
 
 ## Installation
 
@@ -56,7 +56,7 @@ The entry with the earliest start time (`4f91f9ed0d874aaa91f9ed0d87baaa07`) summ
 
 Compositions are implemented by means of OpenWhisk conductor actions. The documentation of [conductor actions](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md) discusses activation records in greater details.
 
-## JSON format
+## Compositions
 
 The `compose` command when not invoked with the `--deploy` option returns the composition encoded as a JSON dictionary:
 ```
@@ -112,8 +112,8 @@ The `composer` module offers a number of combinators to define compositions:
 | [`action`](#composeractionname) | action | `composer.action('echo')` |
 | [`function`](#composerfunctionfun) | function | `composer.function(({ x, y }) => ({ product: x * y }))` |
 | [`literal` or `value`](#composerliteralvalue) | constant value | `composer.literal({ message: 'Hello, World!' })` |
-| [`sequence` or `seq`](#composersequencecomposition1-composition2) | sequence | `composer.sequence('foo', 'bar')` |
-| [`let`](#composerlet-name-value-composition1-composition2) | variable declarations | `composer.let({ count: 3, message: 'hello' }, ...)` |
+| [`sequence` or `seq`](#composersequencecomposition_1-composition_2) | sequence | `composer.sequence('foo', 'bar')` |
+| [`let`](#composerlet-name-value-composition_1-composition_2) | variable declarations | `composer.let({ count: 3, message: 'hello' }, ...)` |
 | [`if`](#composerifcondition-consequent-alternate) | conditional | `composer.if('authenticate', 'success', 'failure')` |
 | [`while`](#composerwhilecondition-composition) | loop | `composer.while('notEnough', 'doMore')` |
 | [`dowhile`](#TODO) | loop at least once | `composer.dowhile('fetchData', 'needMoreData')` |
