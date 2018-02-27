@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+
+'use strict'
+
+const fs = require('fs')
+const vm = require('vm')
+const minimist = require('minimist')
+const composer = require('../composer')
+
+const argv = minimist(process.argv.slice(2), { string: ['apihost', 'auth', 'deploy'], boolean: 'insecure', alias: { auth: 'u', insecure: 'i' } })
+
+if (argv._.length !== 1) {
+    console.error('Usage: compose <composition.js[on]> [--deploy <name>] [--apihost <host>] [--auth <key>] [--insecure]')
+    return
+}
+
+const filename = argv._[0]
+const source = fs.readFileSync(filename, { encoding: 'utf8' })
+const composition = filename.slice(filename.lastIndexOf('.')) === '.js' ? vm.runInNewContext(source, { composer, require, console, process }) : composer.deserialize(JSON.parse(source))
+if (argv.deploy) {
+    const options = { ignore_certs: argv.insecure }
+    if (argv.apihost) options.apihost = argv.apihost
+    if (argv.auth) options.api_key = argv.auth
+    composer.openwhisk(options).compositions.deploy(composition,argv.deploy).catch(console.error)
+} else {
+    console.log(JSON.stringify(composition, null, 4))
+}
