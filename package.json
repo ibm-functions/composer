@@ -7,6 +7,9 @@
   "scripts": {
     "test": "mocha"
   },
+  "bin": {
+    "compose": "./bin/compose"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/ibm-functions/composer.git"
@@ -20,12 +23,12 @@
     "openwhisk"
   ],
   "dependencies": {
-    "redis": "^2.8.0",
-    "clone": "^2.1.1"
+    "minimist": "^1.2.0",
+    "openwhisk": "^3.11.0",
+    "uglify-es": "^3.3.9"
   },
   "devDependencies": {
-    "mocha": "^3.5.0",
-    "openwhisk": "git://github.com/starpit/openwhisk-client-js.git#add_client_timeout"
+    "mocha": "^3.5.0"
   },
   "author": {
     "name": "Olivier Tardieu",
