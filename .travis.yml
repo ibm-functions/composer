@@ -1,8 +1,10 @@
 language: node_js
 node_js:
-  - "6"
+  - 6
 services:
   - docker
+env:
+  - global:
+    - IGNORE_CERTS=true
 before_script:
   - ./travis/setup.sh
-  - export IGNORE_CERTS=true
