@@ -131,10 +131,9 @@ class Compositions {
 
 class Composer {
     openwhisk(options) {
-        // try to extract apihost and key from wskprops
+        // try to extract apihost and key first from whisk property file file and then from process.env
         let apihost
         let api_key
-        let ignore_certs
 
         try {
             const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
@@ -147,14 +146,15 @@ class Composer {
                         apihost = parts[1]
                     } else if (parts[0] === 'AUTH') {
                         api_key = parts[1]
-                    } else if (parts[0] === 'INSECURE_SSL') {
-                        ignore_certs = parts[1] === 'true'
                     }
                 }
             }
         } catch (error) { }
 
-        const wsk = require('openwhisk')(Object.assign({ apihost, api_key, ignore_certs }, options))
+        if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
+        if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
+
+        const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
         wsk.compositions = new Compositions(wsk)
         return wsk
     }

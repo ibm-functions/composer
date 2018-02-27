@@ -4,4 +4,5 @@ node_js:
 services:
   - docker
 before_script:
-  - "./travis/setup.sh"
+  - ./travis/setup.sh
+  - export IGNORE_CERTS=true
