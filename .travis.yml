@@ -4,7 +4,7 @@ node_js:
 services:
   - docker
 env:
-  - global:
+  global:
     - IGNORE_CERTS=true
 before_script:
   - ./travis/setup.sh
