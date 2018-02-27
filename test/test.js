@@ -10,7 +10,7 @@ const define = action => wsk.actions.delete(action.name).catch(() => { }).then((
 const invoke = (task, params = {}, blocking = true) => wsk.compositions.deploy(task, name).then(() => wsk.actions.invoke({ name, params, blocking }))
 
 describe('composer', function () {
-    this.timeout(20000)
+    this.timeout(60000)
 
     before('deploy test actions', function () {
         return define({ name: 'echo', action: 'const main = x=>x' })

@@ -30,7 +30,10 @@ $ANSIBLE_CMD prereq.yml
 $ANSIBLE_CMD couchdb.yml
 $ANSIBLE_CMD initdb.yml
 $ANSIBLE_CMD wipe.yml
-$ANSIBLE_CMD openwhisk.yml -e cli_installation_mode=remote
+$ANSIBLE_CMD openwhisk.yml -e cli_installation_mode=remote -e limit_invocations_per_minute=600
+
+# Deploy Redis
+docker run -d -p 6379:6379 --name redis redis:3.2
 
 docker images
 docker ps
@@ -44,5 +47,5 @@ WHISK_APIHOST="172.17.0.1"
 WHISK_AUTH=`cat ${WHISKDIR}/ansible/files/auth.guest`
 WHISK_CLI="${WHISKDIR}/bin/wsk -i"
 
-${WHISK_CLI} property set --apihost ${WHISK_APIHOST} --auth ${WHISK_AUTH} 
+${WHISK_CLI} property set --apihost ${WHISK_APIHOST} --auth ${WHISK_AUTH}
 ${WHISK_CLI} property get
