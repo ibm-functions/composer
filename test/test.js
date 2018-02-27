@@ -1,20 +1,23 @@
 const assert = require('assert')
-const composer = require('../composer')()
+const composer = require('../composer')
 const name = 'TestAction'
+const wsk = composer.openwhisk()
 
-// compile, deploy, and blocking invoke
-const invoke = (task, params = {}, blocking = true) => task.deploy(name).then(() => composer.wsk.actions.invoke({ name, params, blocking }))
+// deploy action
+const define = action => wsk.actions.delete(action.name).catch(() => { }).then(() => wsk.actions.create(action))
+
+// deploy and invoke composition
+const invoke = (task, params = {}, blocking = true) => wsk.compositions.deploy(task, name).then(() => wsk.actions.invoke({ name, params, blocking }))
 
 describe('composer', function () {
     this.timeout(20000)
 
     before('deploy test actions', function () {
-        return Promise.all([
-            composer.action('echo', { action: 'const main = x=>x' }).deploy(),
-            composer.action('DivideByTwo', { action: 'function main({n}) { return { n: n / 2 } }' }).deploy(),
-            composer.action('TripleAndIncrement', { action: 'function main({n}) { return { n: n * 3 + 1 } }' }).deploy(),
-            composer.action('isNotOne', { action: 'function main({n}) { return { value: n != 1 } }' }).deploy(),
-            composer.action('isEven', { action: 'function main({n}) { return { value: n % 2 == 0 } }' }).deploy()])
+        return define({ name: 'echo', action: 'const main = x=>x' })
+            .then(() => define({ name: 'DivideByTwo', action: 'function main({n}) { return { n: n / 2 } }' }))
+            .then(() => define({ name: 'TripleAndIncrement', action: 'function main({n}) { return { n: n * 3 + 1 } }' }))
+            .then(() => define({ name: 'isNotOne', action: 'function main({n}) { return { value: n != 1 } }' }))
+            .then(() => define({ name: 'isEven', action: 'function main({n}) { return { value: n % 2 == 0 } }' }))
     })
 
     describe('blocking invocations', function () {
@@ -27,36 +30,36 @@ describe('composer', function () {
                 return invoke(composer.action('isNotOne'), { n: 1 }).then(activation => assert.deepEqual(activation.response.result, { value: false }))
             })
 
-            it('action name must parse to fully qualified', function() {
+            it('action name must parse to fully qualified', function () {
                 let combos = [
-                     { n: '',          s: false, e: 'Name is not specified' },
-                     { n: ' ',         s: false, e: 'Name is not specified' },
-                     { n: '/',         s: false, e: 'Name is not valid' },
-                     { n: '//',        s: false, e: 'Name is not valid' },
-                     { n: '/a',        s: false, e: 'Name is not valid' },
-                     { n: '/a/b/c/d',  s: false, e: 'Name is not valid' },
-                     { n: '/a/b/c/d/', s: false, e: 'Name is not valid' },
-                     { n: 'a/b/c/d',   s: false, e: 'Name is not valid' },
-                     { n: '/a/ /b',    s: false, e: 'Name is not valid' },
-                     { n: 'a',         e: false, s: '/_/a' },
-                     { n: 'a/b',       e: false, s: '/_/a/b' },
-                     { n: 'a/b/c',     e: false, s: '/a/b/c' },
-                     { n: '/a/b',      e: false, s: '/a/b' },
-                     { n: '/a/b/c',    e: false, s: '/a/b/c' }
+                    { n: '', s: false, e: 'Name is not specified' },
+                    { n: ' ', s: false, e: 'Name is not specified' },
+                    { n: '/', s: false, e: 'Name is not valid' },
+                    { n: '//', s: false, e: 'Name is not valid' },
+                    { n: '/a', s: false, e: 'Name is not valid' },
+                    { n: '/a/b/c/d', s: false, e: 'Name is not valid' },
+                    { n: '/a/b/c/d/', s: false, e: 'Name is not valid' },
+                    { n: 'a/b/c/d', s: false, e: 'Name is not valid' },
+                    { n: '/a/ /b', s: false, e: 'Name is not valid' },
+                    { n: 'a', e: false, s: '/_/a' },
+                    { n: 'a/b', e: false, s: '/_/a/b' },
+                    { n: 'a/b/c', e: false, s: '/a/b/c' },
+                    { n: '/a/b', e: false, s: '/a/b' },
+                    { n: '/a/b/c', e: false, s: '/a/b/c' }
                 ]
-                combos.forEach(({n, s, e}) => {
-                     if (s) {
-                         // good cases
-                         assert.ok(composer.action(n).composition[0].name, s)
-                     } else {
-                         // error cases
-                         try {
-                             composer.action(n)
-                             assert.fail()
-                         } catch (error) {
-                             assert.ok(error.message == e)
-                         }
-                     }
+                combos.forEach(({ n, s, e }) => {
+                    if (s) {
+                        // good cases
+                        assert.ok(composer.action(n).composition[0].name, s)
+                    } else {
+                        // error cases
+                        try {
+                            composer.action(n)
+                            assert.fail()
+                        } catch (error) {
+                            assert.ok(error.message == e)
+                        }
+                    }
                 })
             })
 

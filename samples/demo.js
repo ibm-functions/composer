@@ -14,12 +14,4 @@
  * limitations under the License.
  */
 
-'use strict'
-
-const composer = require('@ibm-functions/composer')
-
-// author action composition
-const app = composer.if('authenticate', /* then */ 'welcome', /* else */ 'login')
-
-// compile action composition
-composer.compile(app, 'demo.json')
+composer.if('authenticate', /* then */ 'success', /* else */ 'failure')

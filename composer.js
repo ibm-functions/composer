@@ -42,11 +42,6 @@ function validate(options) {
 }
 
 /**
- * OpenWhisk client instance
- */
-let wsk
-
-/**
  * Encodes a composition as an action by injecting the conductor code
  */
 function encode({ name, action }) {
@@ -117,48 +112,59 @@ class Composition {
         if (obj.composition.length !== 1 || obj.composition[0].type !== 'action') throw new ComposerError('Cannot encode anonymous composition')
         return new Composition(obj.composition, null, obj.actions.map(encode))
     }
+}
 
-    /** Encodes all compositions as actions and deploys all actions */
-    deploy(name) {
-        if (arguments.length > 1) throw new ComposerError('Too many arguments')
-        const obj = this.encode(name)
-        if (typeof wsk === 'undefined') return Promise.resolve(obj) // no openwhisk client instance, stop
-        return obj.actions.reduce((promise, action) => promise.then(() => wsk.actions.delete(action).catch(() => { }))
-            .then(() => wsk.actions.update(action)), Promise.resolve())
-            .then(() => obj)
+class Compositions {
+    constructor(wsk) {
+        this.actions = wsk.actions
+    }
+
+    deploy(composition, name) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+        const obj = composition.encode(name)
+        return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
+            .then(() => this.actions.update(action)), Promise.resolve())
+            .then(() => composition)
     }
 }
 
 class Composer {
-    constructor(options = {}) {
-        if (!options.no_wsk) {
-            // try to extract apihost and key from wskprops
-            let apihost
-            let api_key
-            let ignore_certs
+    openwhisk(options) {
+        // try to extract apihost and key from wskprops
+        let apihost
+        let api_key
+        let ignore_certs
 
-            try {
-                const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
-                const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
+        try {
+            const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
+            const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
 
-                for (let line of lines) {
-                    let parts = line.trim().split('=')
-                    if (parts.length === 2) {
-                        if (parts[0] === 'APIHOST') {
-                            apihost = parts[1]
-                        } else if (parts[0] === 'AUTH') {
-                            api_key = parts[1]
-                        } else if (parts[0] === 'INSECURE_SSL') {
-                            ignore_certs = parts[1] === 'true'
-                        }
+            for (let line of lines) {
+                let parts = line.trim().split('=')
+                if (parts.length === 2) {
+                    if (parts[0] === 'APIHOST') {
+                        apihost = parts[1]
+                    } else if (parts[0] === 'AUTH') {
+                        api_key = parts[1]
+                    } else if (parts[0] === 'INSECURE_SSL') {
+                        ignore_certs = parts[1] === 'true'
                     }
                 }
-            } catch (error) { }
+            }
+        } catch (error) { }
 
-            this.wsk = wsk = require('openwhisk')(Object.assign({ apihost, api_key, ignore_certs }, options))
-        }
+        const wsk = require('openwhisk')(Object.assign({ apihost, api_key, ignore_certs }, options))
+        wsk.compositions = new Compositions(wsk)
+        return wsk
+    }
 
-        this.seq = this.sequence
+    seq() {
+        return this.sequence(...arguments)
+    }
+
+    value() {
+        return this.literal(...arguments)
     }
 
     /** Takes a serialized Composition and returns a Composition instance */
@@ -215,17 +221,17 @@ class Composer {
         return new Composition({ type: 'literal', value: typeof value === 'undefined' ? {} : value }, options)
     }
 
-    function(exec, options) {
+    function(fun, options) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
-        if (typeof exec === 'function') {
-            exec = `${exec}`
-            if (exec.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', exec)
+        if (typeof fun === 'function') {
+            fun = `${fun}`
+            if (fun.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', fun)
         }
-        if (typeof exec === 'string') {
-            exec = { kind: 'nodejs:default', code: exec }
+        if (typeof fun === 'string') {
+            fun = { kind: 'nodejs:default', code: fun }
         }
-        if (typeof exec !== 'object' || exec === null) throw new ComposerError('Invalid argument', exec)
-        return new Composition({ type: 'function', exec }, options)
+        if (typeof fun !== 'object' || fun === null) throw new ComposerError('Invalid argument', fun)
+        return new Composition({ type: 'function', exec: fun }, options)
     }
 
     action(name, options) {
@@ -293,7 +299,7 @@ class Composer {
     }
 }
 
-module.exports = options => new Composer(options)
+module.exports = new Composer()
 
 // conductor action
 

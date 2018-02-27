@@ -42,6 +42,6 @@ you to [join us on slack](http://ibm.biz/composer-users).
 This repository includes:
 
  * a [composer](composer.js) node.js module to author compositions using JavaScript,
- * a [tutorial](docs) for getting started with composer in the [docs](docs) folder,
+ * a [tutorial](docs/README.md) for getting started with composer in the [docs](docs) folder,
  * example compositions in the [samples](samples) folder,
  * tests in the [test](test) folder.
