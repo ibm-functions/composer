@@ -1,5 +1,7 @@
 # Execution Model
 
+**This file has not been updated yet for v2.**
+
 Action compositions are invoked by means of a helper [conductor](../conductor.js) action. Results of completed action compositions, execution traces, and intermediate states of live action compositions are stored in a [Redis](https://redis.io/) instance. A Node.js [manager](../manager.js) library provides an interface to the Redis instance. One execution of an action composition is a session.
 
 ## Conductor Action
