@@ -21,7 +21,7 @@ if (argv.deploy) {
     const options = { ignore_certs: argv.insecure }
     if (argv.apihost) options.apihost = argv.apihost
     if (argv.auth) options.api_key = argv.auth
-    composer.openwhisk(options).compositions.deploy(composition,argv.deploy).catch(console.error)
+    composer.openwhisk(options).compositions.deploy(composition, argv.deploy).catch(console.error)
 } else {
     console.log(JSON.stringify(composition, null, 4))
 }
