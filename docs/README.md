@@ -1,7 +1,5 @@
 # Introduction to Serverless Composition
 
-**This file has not been updated yet for v2.**
-
 Composer is an [IBM Cloud Functions](https://ibm.biz/openwhisk)
 programming model for composing individual functions into larger
 applications. Compositions, informally named _apps_, run in the cloud
@@ -9,55 +7,57 @@ using automatically managed compute and memory resources. Composer is
 an extension of the function-as-a-service computing model, and enables
 stateful computation, control flow, and rich patterns of data flow.
 
-Composer has two parts. The first is a library for describing
-compositions, programmatically. The library is currently available in
-Node.js. The second is a runtime that executes the composition. We
-will explain these components in greater detail, but first, we will
-introduce you to the programming environment for compositions.
-
 Programming for the serverless cloud is a uniquely new experience. For
 this reason, we have developed a unified environment that offers the
 benefits and familiarity of a command line interface, with
 visualization and a graphical interface to assist in certain
-tasks. This environment is offered through a new tool called `fsh`:
-_the functions programming shell for the IBM Cloud_.
+tasks. This environment is offered through a new tool called 
+[IBM Cloud Shell](https://github.com/ibm-functions/shell), or just _Shell_.
 
-- [Programming shell quick start](#programming-shell-quick-start)
-  - [Installing the shell](#installing-the-shell)
-  - [Tour of the command line tool](#tour-of-the-programming-shell)
-  - [Getting setup to run compositions](#before-you-run-your-first-app)
+## Shell quick start
 
-- Your first composition
-  - [Create a composition](#your-first-composition)
-  - [Preview your composition](#previewing-a-composition)
-  - [Deploy and run](#running-your-first-app)
-  - [Visualize an execution](#visualizing-sessions)
-  - [Composing OpenWhisk actions](#composing-openwhisk-actions)
+Shell is a cross-platform desktop application powered by [Electron](https://electronjs.org/). 
 
-- [Compositions by example](#compositions-by-example)
-  - [if-then-else](#if-combinator)
-  - [try-catch](#try-combinator)
-  - [data forwarding](#nesting-and-forwarding)
-  - [scoped variables](#variables-and-scoping)
+### Before you run your first app
 
-- The Composer programming model
-  - [The composition library](COMPOSER.md)
-  - [The underlying composition model](FORMAT.md)
-  - [The execution model](CONDUCTOR.md)
+You must have a valid IBM Cloud (i.e., Bluemix)
+[account](https://ibm.biz/openwhisk), or deploy [Apache
+OpenWhisk](https://github.com/apache/incubator-openwhisk)
+locally. This is needed because Composer builds on and extends Apache
+OpenWhisk, which powers IBM Cloud Functions.
 
-## Programming shell quick start
+* Existing `wsk` CLI users: You can go directly to [Installing Shell](#installing-shell). 
 
-The programming shell for functions and compositions is a new
-developer experience with fluid migration between a conventional
-command line tool and a graphical interface. It is also the
-environment for developing and working with serverless compositions.
+* _New users using composer with IBM Cloud Functions:_ you need an IBM Cloud
+[account](https://ibm.biz/openwhisk), and the [IBM Cloud CLI](https://console.bluemix.net/docs/cli/reference/bluemix_cli/download_cli.html#download_install) (`bx`). You will also need to install the Cloud Function Plugin for bx: 
 
-### Installing the shell
+  ``` 
+  $ bx plugin install Cloud-Functions -r bluemix
+  ```
 
-The programming shell is currently distributed through the [Node
+  After installing `bx` and the Cloud Function plugin, use `bx login` to generate a access token for Cloud Function. 
+
+  ``` 
+  $ bx login -a api.ng.bluemix.net -o yourBluemixOrg -s yourBluemixSpace
+  ```
+
+  Run a test to generate credentials and verify your setup. Here, we perform a blocking (synchronous) invocation of echo, passing it "hello" as an argument. If you see the return message, you are good to go.  
+  ```
+  $ bx wsk action invoke /whisk.system/utils/echo -p message hello --result
+  {
+    "message": "hello"      
+  }
+  ```
+
+* _New users using composer with Apache OpenWhisk:_  you need a valid `$HOME/.wskprops` file and a locally deployed OpenWhisk instance.
+
+
+### Installing Shell
+
+Shell is currently distributed through the [Node
 package manager](https://www.npmjs.com/package/@ibm-functions/shell).
 
-```bash
+```
 $ npm install -g @ibm-functions/shell
 ```
 
@@ -75,214 +75,97 @@ shown earlier.  Consult the [troubleshooting
 guide](https://github.com/ibm-functions/shell/blob/master/npm.md) if
 your installation fails.
 
-### Tour of the programming shell
 
-At the end of the installation, you can run the programming shell form your terminal. It is
-typically installed in `/usr/local/bin/fsh`.
+### Starting Shell 
 
 ```
-$ fsh
-Welcome to the IBM Cloud Functions Shell
-
-Usage information:
-fsh about                                    [ Display version information ]
-fsh help                                     [ Show more detailed help, with tutorials ]
-fsh shell                                    [ Open graphical shell ]
-fsh run <script.fsh>                         [ Execute commands from a file ]
-
-fsh app init                                 [ Initialize state management ]
-fsh app preview <file.js|file.json>          [ Prototype a composition, with visualization help ]
-fsh app list                                 [ List deployed compositions ]
-fsh app create <name> <file.js|file.json>    [ Deploy a composition ]
-fsh app update <name> <file.js|file.json>    [ Update or deploy composition ]
-fsh app delete <name>                        [ Undeploy a composition ]
-fsh app invoke <name>                        [ Invoke a composition and wait for its response ]
-fsh app async <name>                         [ Asynchronously invoke a composition ]
-
-fsh session list                             [ List recent app invocations ]
-fsh session get <sessionId>                  [ Graphically display the result and flow of a session ]
-fsh session result <sessionId>               [ Print the return value of a session ]
-fsh session kill <sessionId>                 [ Kill a live session ]
-fsh session purge <sessionId>                [ Purge the state of a completed session ]
+$ fsh shell
 ```
 
-The commands above allow you to create/update/delete a composition,
-visualize the computation, invoke the app, inspect the result and
-the dynamic execution graph.
+You will see a window popping up. Welcome to Shell!
 
-### Before you run your first app
+_Tip:_ If you are using Mac, you can keep Shell in the dock by right-clicking on the blue Cloud Function Shell icon and choose `Options > Keep in Dock`. Next time you can click on the icon in the dock to launch Shell. 
 
-Composer allows you to orchestrate the execution of several cloud
-functions, and further, to describe the dataflow between them. Its
-model of computing automatically manages the state of the application
-as it executes, and determines which functions to execute at any given
-transition. This automatically managed state requires a backing
-store, and the current implementation of Composer uses
-[Redis](https://redis.io/) for this purpose.
 
-Before running an app, you must have a valid IBM Cloud (i.e., Bluemix)
-[account](https://ibm.biz/openwhisk), or deploy [Apache
-OpenWhisk](https://github.com/apache/incubator-openwhisk)
-locally. This is needed because Composer builds on and extends Apache
-OpenWhisk, which powers IBM Cloud Functions.
-
-* _Using composer with IBM Cloud Functions:_ you need an IBM Cloud
-[account](https://ibm.biz/openwhisk), and a valid access token which
-you can get using [`bx login`](https://console.bluemix.net/openwhisk/learn/cli).
-_Tip:_ you do not need to perform the login operations if you simply
-want to locally build and preview a composition. The setup described
-here is strictly required for actually deploying and running a
-composition in the IBM Cloud.
-
-```
-$ bx login -a api.ng.bluemix.net -o yourBluemixOrg -s yourBluemixSpace
-```
-
-* _Using composer with Apache OpenWhisk:_  you need a valid
-`$HOME/.wskprops` file and a locally deployed OpenWhisk instance.
-
-The shell initializes the backing store with `fsh app init`:
-
-```
-$ fsh app init --url redis://user:password@hostname:port
-Waiting for redis [Done]
-Successfully initialized the required services. You may now create compositions.
-```
-
-For Openwhisk, the actual command is shown below.
-
-```
-$ fsh app init --url redis://192.168.99.100:6379
-```
-
-For the IBM Cloud, you can provision a [Redis instance
-yourself](redis.md) and retrieve its service keys to initialize the
-shell in a similar way. Alternatively, you can use an _experimental_
-auto-provisioning feature via `fsh app init --auto`. Note that
-[charges will
-apply](https://console.bluemix.net/catalog/services/compose-for-redis)
-for the provisioned Redis instance.
-
-The initialization step creates a package in your namespace called
-`bluemix.redis` which includes useful administrative operations. Read
-more about Redis provisioning [here](redis.md).
-
-## Your first composition
+## Your first app
 
 Compositions are described using a [Node.js library](COMPOSER.md)
 which offers an SDK for describing control structures. We call these
-_combinators_.  The simplest combinator constructs a sequence. Here is
-a composition snippet to create your first app: it creates a sequence
-with just one function that is inlined for convenience. _You may user
-your favorite editor to compose apps._ When finished, save your code
-to a file with the extension `.js`.
+_combinators_.  The simplest combinator constructs a sequence. For example, here is
+a snippet for your first app: 
 
 ```javascript
 composer.sequence(args => ({msg: `hello ${args.name}!`}))
 ```
 
-You use the `composer` to construct an application, then _compile_ it
-into a [finite state machine (FSM)](FORMAT.md) representation, encoded
-as a JSON object. While you can author a composition directly as an
-FSM, it is far more convenient and natural to program at the level of
-the Node.js library instead. It is the FSM that is used to create the
-app in the IBM Cloud. [Later examples](#compositions-by-example) we will
-show how to create more elaborate compositions using `if-then-else`,
-`try-catch`, and `while` combinators to name a few.
+The code describes a sequence app with just one function that is inlined for convenience. 
 
-_Advanced Tip:_ It is possible to compile the FSM without using the
-shell, and instead using `node` directly. In this case, you must
-import the `composer` and `compile` the FSM explicitly as shown below.
+There are two ways to deploy a composition code snippet. One is using Shell to write the code and deploy it. The other is using any editor to write this code, save it as a local file, and deploy the file using a Shell command. We describe both here.  
 
-```javascript
-$ npm install @ibm-functions/composer
-$ node
-const composer = require('@ibm-functions/composer')
-const app = composer.sequence(args => ({msg: `hello ${args.name}!`}))
-composer.compile(app, 'hello.json')
-```
 
-## Previewing a composition
+### Write an app in Shell
 
-The programming shell offers a visual representation of a composition
-to quickly validate if the app represents the desired control flow
-structure, before actually deploying any assets to the cloud. This
-code snippet is bundled with the shell as
-[`@demos/hello.js`](https://github.com/ibm-functions/shell/blob/master/app/demos/hello.js).
+In Shell, enter 
 
 ```bash
-$ fsh app preview @demos/hello.js
+# enter in Shell
+> compose myApp 
 ```
 
-|<img src="hello-composition.png" width="50%" title="Hello app">|
+where `myApp` is the name of the app in the cloud. This command opens a built-in editor in a sidecar for writing code. Copy the `composer.sequence` code above and paste it into the editor. Hit "Deploy" at the bottom stripe to deploy it. After the app is successfully deployed, Shell will show a flow graph that represents the textual composition code at the bottom of the editor as a verification. 
+
+_Tip:_ Enter `edit myApp` to edit `myApp` after it is deployed. 
+
+|<img src="editor.png" width="50%" title="first app in shell">|
 |:--:|
-|Composition preview showing the control flow for the app.|
+|Your first app, composed in Shell.|
 
-You can view the actual JSON description of the FSM by clicking on the
-corresponding tab in the shell UI.
 
-_Tip:_ The shell watches the file you are editing and automatically
-updates the view as you compose. You can use this active preview mode
+### Write an app in an external editor
+
+You may also use your favorite editor to compose apps. When finished, save your code to a file on your machine with the extension `.js`. To view your local composition javascript file as a graph, enter
+
+```bash
+# enter in Shell
+> app preview path/to/file.js
+```
+
+Shell watches the file you are editing and automatically
+updates the graph as you compose. You can use this active preview mode
 to incrementally build your application, sanity checking your control
-flow as you go.
+flow as you go. 
+
+|<img src="preview.png" width="50%" title="preview app in shell">|
+|:--:|
+|Writing an app in my own editor, and previewing the code as a graph in Shell.|
+
+
+To deploy a local composition file to the cloud, enter this command:
+```bash
+# enter in Shell
+> app create myApp path/to/file.js
+```
+
+Again, `myApp` is the name of the app in the cloud. 
+
+_Tip_: If you have an action already named `myApp`, the shell will report a name conflict. Use a different name for your app, or use `app update` if you want to update an existing app. Apps are stored as OpenWhisk actions, and hence the naming restrictions for OpenWhisk apply.
+
 
 ## Running your first app
 
-You create and invoke apps in a manner similar to working with
-OpenWhisk actions.
+Run your first app using this command: 
  
 ```bash
-$ fsh app create hello @demos/hello.js
-$ fsh app invoke hello -p name composer
-{
-  msg: 'hello composer!'
-}
+# enter in Shell
+> app invoke myApp -p name composer
 ```
 
-_Tip:_ If you have an action already named `hello`, the shell will
-report a name conflict. Use a different name for your app. Apps are
-stored as OpenWhisk actions, and hence the naming restrictions for
-OpenWhisk apply.
+You will see the result in the sidecar. Click on different buttons in the sidecar bottom stripe to explore different views. 
 
-All app activations are asynchronous and non-blocking. The immediate
-result of an invocation is a _session id_, which you may use to query
-the app for its final output. For development convenience, the shell
-implements a client-side poll to provide the final output of the
-app, if it is ready within 30 seconds. Otherwise, you may use the
-session id to retrieve the output; in this way, working with a session
-id is similar to working with an activation id when invoking an
-action.
+_Tip #1:_ Enter `app invoke --help` to view the usage of the `app invoke` command. You can access the usage information of other commands in Shell in the same way using `--help`. 
 
-_Tip:_ You may disable the client-side poll by using `app async`
-instead of `app invoke`. The session id is returned immediately when
-it is available.
+_Tip #2:_ Enter `session list` to view a list of previous app executions. 
 
-```bash
-$ fsh session list        # lists all recent sessions
-$ fsh session result <id> # retrieves the JSON output of the app as text
-```
-
-_Note:_ Sessions only persist for up to 24 hours, and expire automatically.
-
-## Visualizing sessions
-
-The shell can also summarize the dynamic execution flow of an app, as
-described by the app session id.
-
-```bash
-$ fsh session get <id>
-```
-
-|<img src="hello-session.png" width="50%" title="Hello session">|
-|:--:|
-|An example session.|
-
-The session view uses a green color scheme for a successful
-activation, and red for a failed activation (i.e., the result of the
-function or app is an `error`.) The `Entry` and `Exit` nodes are the
-logical start and end states of the activation. Hovering over the
-nodes will typically show the result of the underlying function or
-app.
 
 ## Composing OpenWhisk actions
 
@@ -305,42 +188,31 @@ self-explanatory. An action is gray when it is not yet deployed, and
 blue otherwise.
 
 ```bash
-$ fsh app preview @demos/if.js
+# enter in Shell
+> app preview @demos/if.js  
 ```
 
 |<img src="if-preview.png" title="if combinator preview" width="50%">|
 |:--:|
 |Control flow graph for `if` combinator. An action that is not yet deployed is gray, and blue otherwise.|
 
-To create and deploy the actions, you may use the `wsk` CLI or the
-OpenWhisk API directly. For added convenience, `fsh` uses [`npm
-openwhisk`](https://github.com/openwhisk/openwhisk-client-js) and can create actions
-directly.  Its command structure for creating an action will be
-familiar to `wsk` users (but does not offer full parity).  You may
-find it convenient to use `fsh` directly instead for everything,
-including to create and update actions. Read more about [`fsh` vs
-`wsk`](https://github.com/ibm-functions/shell/blob/master/fsh.md).
+_Tip:_ Shell supports `wsk` CLI commands for deploying OpenWhisk actions. We will explain how to do so next. You can also read more about using `wsk` commands in Shell [here](https://github.com/ibm-functions/shell/blob/master/fsh.md). 
+
+
+### Composing inline functions vs. OpenWhisk actions
+
+The main difference between using an inline function verses a OpenWhisk action in a composition is that an inline function does not generate an activation like an OpenWhisk action. [Activations](https://github.com/apache/incubator-openwhisk/blob/master/docs/reference.md) record runtime data like the execution time and output. They are useful for debugging.
+
+When making a real app, we encourage you to create the main components as OpenWhisk actions, as OpenWhisk actions can be reused by different apps and are easier to debug. Inline functions can be used as a convenient way to connect different components together (such as renaming input and output, generating an error message) and are better kept short and simple. 
+
 
 ## Compositions by example
 
 You now have the basic tools to build a serverless composition, invoke
-it, and inspect its execution and result. This section will introduce
-you to more combinators for creating richer control and data flow.
+it, and inspect its execution and result. Currently, Composer offers [13 different combinators](COMPOSER.md#combinators) to support conditions, iterations, error handling, variable declarations and other common programming constructs for building various types of apps. 
 
-The following composition methods are currently supported. The rest of the document will show you example compositions using some of these combinators. The rest of the combinators are covered in the [reference manual](COMPOSER.md).
+This section will introduce you to some combinators for creating richer control and data flow, while other combinators are covered in the [reference manual](COMPOSER.md). All javascript code described below is [bundled in Shell](https://github.com/ibm-functions/shell/blob/master/app/demos) and can be accessed within Shell using the prefix `@demos/`. 
 
-| Composition | Description | Example |
-| --:| --- | --- |
-| [`task`](COMPOSER.md#composertasktask-options) | single task | `composer.task('sayHi', { input: 'userInfo' })` |
-| [`value`](COMPOSER.md#composervaluejson) | constant value | `composer.value({ message: 'Hello World!' })` |
-| [`sequence`](COMPOSER.md#composersequencetask_1-task_2-) | sequence | `composer.sequence('getLocation', 'getWeatherForLocation')` |
-| [`let`](COMPOSER.md#composerletname-value-task_1-task_2-) | variables | `composer.let('n', 42, ...)` |
-| [`if`](COMPOSER.md#composerifcondition-consequent-alternate) | conditional | `composer.if('authenticate', /* then */ 'welcome', /* else */ 'login')` |
-| [`while`](COMPOSER.md#composerwhilecondition-task) | loop | `composer.while('needMoreData', 'fetchMoreData')` |
-| [`try`](COMPOSER.md#composertrytask-handler) | error handling | `composer.try('DivideByN', /* catch */ 'NaN')` |
-| [`repeat`](COMPOSER.md#composerrepeatcount-task) | repetition | `composer.repeat(42, 'sayHi')` |
-| [`retry`](COMPOSER.md#composerretrycount-task) | error recovery | `composer.retry(3, 'connect')` |
-| [`retain`](COMPOSER.md#composerretaintask-flag) | parameter retention | `composer.retain('validateInput')` |
 
 ### `if` combinator
 
@@ -349,10 +221,10 @@ An `if` combinator allows you to describe a conditional flow with a
 short-circuiting a sequence for example, or taking data-dependent
 paths in the control flow.
 
-Here is a short example. Say you have a function `welcome` which
-generates an HTML page.
+Here is a short example. Say you have a function `welcome` which generates an HTML page.
 
 ```javascript
+// @demos/welcome.js
 let welcome = args => ({ html: `<html><body>welcome ${args.name}!</body></html>` })
 ```
 
@@ -361,6 +233,7 @@ modify the function itself to introduce authentication middleware. Or,
 we can compose it with an authentication function.
 
 ```javascript
+// @demos/authenticate.js
 let authenticate = args => ({ value: args.token === "secret" })
 ```
 
@@ -374,49 +247,59 @@ non-authenticated case and return a different HTML page, perhaps
 informing the client to try again with the proper secret.
 
 ```javascript
+// @demos/login.js
 let login = args => ({ html: `<html><body>please say the magic word.</body></html>` })
 ```
 
 The `if` combinator composes these three functions as you might
-expect. This example is bundled in the shell samples as
-[`@demos/if.js`](https://github.com/ibm-functions/shell/blob/master/app/demos/if.js).
+expect.
 
 ```javascript
+// @demos/if.js
 composer.if(
   /* cond */ 'authenticate',
   /* then */ 'welcome',
   /* else */ 'login')
 ```
 
+Now, enter the following in Shell to deploy and run the app.
+
 ```bash
+# enter in Shell
 # create required actions
-$ fsh action create authenticate @demos/authenticate.js
-$ fsh action create welcome @demos/welcome.js
-$ fsh action create login @demos/login.js
+> action create authenticate @demos/authenticate.js
+> action create welcome @demos/welcome.js
+> action create login @demos/login.js
 
 # create app
-$ fsh app create if @demos/if.js
+> app create if @demos/if.js
 
 # invoke app, with no secret parameter
-$ fsh app invoke if
+> app invoke if
 {
   html: "<html><body>please say the magic word.</body></html>"
 }
 
 # now invoke with secret parameter
-$ fsh app invoke if -p token secret -p name if-combinator
+> app invoke if -p token secret -p name if-combinator
 {
   html: "<html><body>welcome if-combinator!</body></html>"
 }
 ```
 
+_Tip:_ You can see the output data of an action node in the `Session Flow` graph by clicking on the node. This will bring you to the corresponding activation. _Note:_ An inline function node is not clickable as it does not generate an activation. 
+
 Each of the activations will have a different session id, which are reported by listing the available sessions.
+
 ```bash
-$ fsh session list
-sessionId                        app   start                 status
-339c82e5e1ad45cd9c82e5e1ada5cd24 if    10/6/2017, 6:53:28 PM done  
-9c361e9d06364064b61e9d0636e06482 if    10/6/2017, 6:53:21 PM done  
+# enter in Shell
+> session list 
 ```
+
+Clicking on a session id from the list will open that session in the sidecar. 
+
+_Tip:_ Clicking on a session id invokes the command `session get sessionId` to view the session info in the sidecar. 
+
 
 ### `try` combinator
 
@@ -431,6 +314,7 @@ encoded, and which throws an exception if the input is not valid. A
 one example, to suite the particular usage scenario in the app.
 
 ```javascript
+// @demos/try.js
 composer.try(
   /* try   */ 'validate',
   /* catch */ args => ({ ok: false }))
@@ -440,30 +324,32 @@ The `validate` action is available as [`@demos/validate.js`](https://github.com/
 composition as [`@demos/try.js`](https://github.com/ibm-functions/shell/blob/master/app/demos/try.js) for your convenience.
 
 ```bash
+# enter in Shell
 # create validate action
-$ fsh action create validate @demos/validate.js
+> action create validate @demos/validate.js
 
 # create app
-$ fsh app create try @demos/try.js
+> app create try @demos/try.js
 
 # invoke app with valid parameter
-$ fsh app invoke try -p str aGVsbG8gdHJ5IQ==
+> app invoke try -p str aGVsbG8gdHJ5IQ==
 {
   ok: true
 }
 
 # and now for the failing case
-$ fsh app invoke try -p str bogus
+> app invoke try -p str bogus
 {
   ok: false
 }
 ```
 
-It is worth looking at the execution of the second app invoke where
+It is worth looking at the session flow of the second app invoke where
 the catch handler is invoked.
 
-```
-$ fsh session get --last try
+```bash
+# enter in Shell
+> session get --last try
 ```
 
 |<img src="try-session.png" title="try session with exception" width="50%">|
@@ -495,6 +381,7 @@ is the composition showing the inner sequence with the data forwarding
 combinator `retain`.
 
 ```javascript
+// @demos/retain.js
 composer.try(
   composer.sequence(
     composer.retain('validate'),
@@ -510,7 +397,8 @@ shell as
 [`@demos/retain.js`](https://github.com/ibm-functions/shell/blob/master/app/demos/retain.js).
 
 ```bash
-$ fsh app preview @demos/retain.js
+# enter in Shell
+> app preview @demos/retain.js
 ```
 
 |<img src="retain.png" title="retain combinator and nesting" width="50%">|
@@ -520,17 +408,18 @@ $ fsh app preview @demos/retain.js
 The app will now produce the decoded text as its final output.
 
 ```bash
+# enter in Shell
 # create app
-$ fsh app create retain @demos/retain.js
+> app create retain @demos/retain.js
 
 # invoke app with valid parameter
-> fsh app invoke retain -p str aGVsbG8gdHJ5IQ==
+> app invoke retain -p str aGVsbG8gdHJ5IQ==
 {
   text: "hello try!"
 }
 
 # and now for the failing case
-> fsh app invoke retain -p str bogus
+> app invoke retain -p str bogus
 {
   ok: false
 }
@@ -546,6 +435,7 @@ using `let`. The example below illustrates how you might introduce a
 compositions or functions.
 
 ```javascript
+// @demos/let.js
 composer.sequence(
   composer.let({secret: 42},
     composer.task(_ => ({ ok: secret === 42 }))),
@@ -557,8 +447,9 @@ leaked to the final task in the composition, while the value is
 available inside the task nested within the `let`.
 
 ```bash
-$ fsh app create let @demos/let.js
-$ fsh app invoke let
+# enter in Shell
+> app create let @demos/let.js
+> app invoke let
 {
   ok: true
 }
@@ -570,3 +461,8 @@ The examples shown here illustrate the more common combinators you
 may use to create serverless compositions. There are more combinators
 available in the Composer library. Refer to the [Composer reference
 manual](COMPOSER.md) for more details.
+
+## Next step
+
+Try the second tutorial, [building a translation chatbot](tutorials/translateBot/README.md). 
+
