@@ -1,7 +1,5 @@
 # Introduction to Serverless Composition
 
-**This file has not been updated yet for v2.**
-
 Composer is an [IBM Cloud Functions](https://ibm.biz/openwhisk)
 programming model for composing individual functions into larger
 applications. Compositions, informally named _apps_, run in the cloud
@@ -28,7 +26,9 @@ OpenWhisk](https://github.com/apache/incubator-openwhisk)
 locally. This is needed because Composer builds on and extends Apache
 OpenWhisk, which powers IBM Cloud Functions.
 
-* _Using composer with IBM Cloud Functions:_ you need an IBM Cloud
+* Existing `wsk` CLI users: You can go directly to [Installing Shell](#installing-shell). 
+
+* _New users using composer with IBM Cloud Functions:_ you need an IBM Cloud
 [account](https://ibm.biz/openwhisk), and the [IBM Cloud CLI](https://console.bluemix.net/docs/cli/reference/bluemix_cli/download_cli.html#download_install) (`bx`). You will also need to install the Cloud Function Plugin for bx: 
 
   ``` 
@@ -41,7 +41,7 @@ OpenWhisk, which powers IBM Cloud Functions.
   $ bx login -a api.ng.bluemix.net -o yourBluemixOrg -s yourBluemixSpace
   ```
 
-  Verify your setup. Here, we perform a blocking (synchronous) invocation of echo, passing it "hello" as an argument. If you see the return message, you are good to go.  
+  Run a test to generate credentials and verify your setup. Here, we perform a blocking (synchronous) invocation of echo, passing it "hello" as an argument. If you see the return message, you are good to go.  
   ```
   $ bx wsk action invoke /whisk.system/utils/echo -p message hello --result
   {
@@ -49,7 +49,7 @@ OpenWhisk, which powers IBM Cloud Functions.
   }
   ```
 
-* _Using composer with Apache OpenWhisk:_  you need a valid `$HOME/.wskprops` file and a locally deployed OpenWhisk instance.
+* _New users using composer with Apache OpenWhisk:_  you need a valid `$HOME/.wskprops` file and a locally deployed OpenWhisk instance.
 
 
 ### Installing Shell
@@ -57,7 +57,7 @@ OpenWhisk, which powers IBM Cloud Functions.
 Shell is currently distributed through the [Node
 package manager](https://www.npmjs.com/package/@ibm-functions/shell).
 
-``` 
+```
 $ npm install -g @ibm-functions/shell
 ```
 
@@ -82,7 +82,7 @@ your installation fails.
 $ fsh shell
 ```
 
-You will see a window popping up. Welcome to Shell! 
+You will see a window popping up. Welcome to Shell!
 
 _Tip:_ If you are using Mac, you can keep Shell in the dock by right-clicking on the blue Cloud Function Shell icon and choose `Options > Keep in Dock`. Next time you can click on the icon in the dock to launch Shell. 
 
@@ -185,7 +185,7 @@ highlight any missing entities. As an example, preview the built-in
 composition, which is [described in the next
 section](#if-combinator). The control flow graph should be
 self-explanatory. An action is gray when it is not yet deployed, and
-blue otherwise. 
+blue otherwise.
 
 ```bash
 # enter in Shell
@@ -201,15 +201,15 @@ _Tip:_ Shell supports `wsk` CLI commands for deploying OpenWhisk actions. We wil
 
 ### Composing inline functions vs. OpenWhisk actions
 
-The biggest difference betwen using inline function code verses OpenWhisk actions in a composition is that inline function code does not generate any record about its execution, whereas OpenWhisk actions generate [activations](https://github.com/apache/incubator-openwhisk/blob/master/docs/reference.md) that record the runtime data like the execution time and output. 
+The main difference between using an inline function verses a OpenWhisk action in a composition is that an inline function does not generate an activation like an OpenWhisk action. [Activations](https://github.com/apache/incubator-openwhisk/blob/master/docs/reference.md) record runtime data like the execution time and output. They are useful for debugging.
 
-When making a real app, we encourage you to create the main components as OpenWhisk actions, as OpenWhisk actions can be reused by different apps and are easier to debug. Inline functions can be used as a convenient way to connect the main components together (such as renaming input and output, generating an error message) and are better to be kept short and simple. 
+When making a real app, we encourage you to create the main components as OpenWhisk actions, as OpenWhisk actions can be reused by different apps and are easier to debug. Inline functions can be used as a convenient way to connect different components together (such as renaming input and output, generating an error message) and are better kept short and simple. 
 
 
 ## Compositions by example
 
 You now have the basic tools to build a serverless composition, invoke
-it, and inspect its execution and result. Currently, Composer offers [13 different combinators](COMPOSER.md#combinators)  to support conditions, iterations, error handling, variable declarations and other common programming constructs for building various types of apps. 
+it, and inspect its execution and result. Currently, Composer offers [13 different combinators](COMPOSER.md#combinators) to support conditions, iterations, error handling, variable declarations and other common programming constructs for building various types of apps. 
 
 This section will introduce you to some combinators for creating richer control and data flow, while other combinators are covered in the [reference manual](COMPOSER.md). All javascript code described below is [bundled in Shell](https://github.com/ibm-functions/shell/blob/master/app/demos) and can be accessed within Shell using the prefix `@demos/`. 
 
@@ -219,7 +219,7 @@ This section will introduce you to some combinators for creating richer control 
 An `if` combinator allows you to describe a conditional flow with a
 `then` and optional `else` branch. This is convenient for
 short-circuiting a sequence for example, or taking data-dependent
-paths in the control flow. 
+paths in the control flow.
 
 Here is a short example. Say you have a function `welcome` which generates an HTML page.
 
@@ -287,7 +287,7 @@ Now, enter the following in Shell to deploy and run the app.
 }
 ```
 
-_Tip:_ You can see the output data of an action node in the `Session Flow` graph by clicking on the node. This will bring you to the corresponding activation. _Note:_ An inline function node is not clickable as it does not generate any record about its execution. 
+_Tip:_ You can see the output data of an action node in the `Session Flow` graph by clicking on the node. This will bring you to the corresponding activation. _Note:_ An inline function node is not clickable as it does not generate an activation. 
 
 Each of the activations will have a different session id, which are reported by listing the available sessions.
 
@@ -464,5 +464,5 @@ manual](COMPOSER.md) for more details.
 
 ## Next step
 
-Try the second tutorial, [building a translation chatbot](translateApp.md). 
+Try the second tutorial, [building a translation chatbot](tutorials/translateBot/README.md). 
 

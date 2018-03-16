@@ -10,12 +10,20 @@ With composer, developers can build even more serverless applications including 
 orchestration, conversation services, and devops automation, to name a
 few examples.
 
-Programming compositions for IBM Cloud Functions is done via a new developer tool called [IBM Cloud Shell](https://github.com/ibm-functions/shell), or just _Shell_. Shell offers a CLI and graphical interface for fast, incremental, iterative, and local development of serverless apps. Composer and shell are currently available as IBM Research previews. We are excited about both and are looking forward to what compositions you build and run using [IBM CloudFunctions](https://ibm.biz/openwhisk) or directly on [Apache
+Programming compositions for IBM Cloud Functions is done via a new developer tool called [IBM Cloud Shell](https://github.com/ibm-functions/shell), or just _Shell_. Shell offers a CLI and graphical interface for fast, incremental, iterative, and local development of serverless apps. Composer and shell are currently available as IBM Research previews. We are excited about both and are looking forward to the compositions you build and run using [IBM CloudFunctions](https://ibm.biz/openwhisk) or directly on [Apache
 OpenWhisk](https://github.com/apache/incubator-openwhisk).
+
+This repository includes:
+* a [composer](composer.js) node.js module to author compositions using JavaScript
+* a [compose](bin/compose) shell script for deploying compositions,
+* a [tutorial](docs/README.md) for getting started,
+* a [reference manual](docs/COMPOSER.md),
+* example compositions in the [samples](samples) folder,
+* tests in the [test](test) folder.
 
 ## Getting started 
 * [Introduction to Serverless Composition](docs/README.md): Setting up your programming environment and getting started with Shell and Composer 
-* [Building a Serverless Translate Bot with Composition](docs/translateApp.md): A more advanced tutorial that describes using Composition to build a serverless Slack chatbot that does language translation. 
+* [Building a Serverless Translate Bot with Composition](docs/tutorials/translateBot/README.md): A more advanced tutorial that describes using Composition to build a serverless Slack chatbot that does language translation. 
 * [Learning more about Composer](docs/COMPOSER.md), a Node.js module to author compositions using JavaScript
 
 ## Videos
