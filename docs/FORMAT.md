@@ -1,5 +1,7 @@
 # JSON Format
 
+**This file has not been updated yet for v2.**
+
 This document provides a specification of the JSON format for encoding action compositions and its semantics.
 
 __TODO__: document the `Let` and `End` states for variable declarations.

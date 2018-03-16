@@ -1,5 +1,7 @@
 # Introduction to Serverless Composition
 
+**This file has not been updated yet for v2.**
+
 Composer is an [IBM Cloud Functions](https://ibm.biz/openwhisk)
 programming model for composing individual functions into larger
 applications. Compositions, informally named _apps_, run in the cloud

@@ -1,33 +1,25 @@
 {
-    "Entry": "push_0",
-    "States": {
-        "push_0": {
-            "Type": "Push",
-            "Next": "action_1"
-        },
-        "action_1": {
-            "Type": "Task",
-            "Action": "authenticate",
-            "Next": "choice_0"
-        },
-        "choice_0": {
-            "Type": "Choice",
-            "Then": "action_2",
-            "Else": "action_3"
-        },
-        "action_2": {
-            "Type": "Task",
-            "Action": "welcome",
-            "Next": "pass_0"
-        },
-        "action_3": {
-            "Type": "Task",
-            "Action": "login",
-            "Next": "pass_0"
-        },
-        "pass_0": {
-            "Type": "Pass"
+    "composition": [
+        {
+            "type": "if",
+            "test": [
+                {
+                    "type": "action",
+                    "name": "/_/authenticate"
+                }
+            ],
+            "consequent": [
+                {
+                    "type": "action",
+                    "name": "/_/success"
+                }
+            ],
+            "alternate": [
+                {
+                    "type": "action",
+                    "name": "/_/failure"
+                }
+            ]
         }
-    },
-    "Exit": "pass_0"
+    ]
 }

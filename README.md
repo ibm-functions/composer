@@ -5,15 +5,12 @@
 Composer is a new programming model from [IBM
 Research](https://ibm.biz/serverless-research) for composing [IBM
 Cloud Functions](https://ibm.biz/openwhisk), built on [Apache
-OpenWhisk](https://github.com/apache/incubator-openwhisk).  Composer
-extends Functions with more powerful control flow and
-automatic state management. With it, developers can build even more
-serverless applications including using it for IoT, with workflow
+OpenWhisk](https://github.com/apache/incubator-openwhisk).
+With composer, developers can build even more serverless applications including using it for IoT, with workflow
 orchestration, conversation services, and devops automation, to name a
 few examples.
 
-Programming compositions for IBM Cloud Functions is done via a new developer tool called [IBM Cloud Shell](https://github.com/ibm-functions/shell), or just _Shell_. Shell offers a CLI and graphical interface for fast, incremental, iterative, and local development of serverless apps. Composer and shell are currently available as IBM Research previews. We are excited about both and are looking forward to what compositions you build and run using [IBM Cloud
-Functions](https://ibm.biz/openwhisk) or directly on [Apache
+Programming compositions for IBM Cloud Functions is done via a new developer tool called [IBM Cloud Shell](https://github.com/ibm-functions/shell), or just _Shell_. Shell offers a CLI and graphical interface for fast, incremental, iterative, and local development of serverless apps. Composer and shell are currently available as IBM Research previews. We are excited about both and are looking forward to what compositions you build and run using [IBM CloudFunctions](https://ibm.biz/openwhisk) or directly on [Apache
 OpenWhisk](https://github.com/apache/incubator-openwhisk).
 
 ## Getting started 
