@@ -46,7 +46,7 @@ function validate(options) {
  */
 function encode({ name, action }) {
     if (action.exec.kind !== 'composition') return { name, action }
-    const code = `${conductor}(${JSON.stringify(action.exec.composition)})\n` // invoke conductor on composition
+    const code = `${conductor}(eval,${JSON.stringify(action.exec.composition)})\n` // invoke conductor on composition
     return { name, action: { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: action.exec.composition }] } }
 }
 
@@ -303,9 +303,9 @@ module.exports = new Composer()
 
 // conductor action
 
-const conductor = `const __eval__ = main => eval(main)\nconst main = (${uglify.minify(`${init}`).code})`
+const conductor = `const main=(${uglify.minify(`${init}`).code})`
 
-function init(composition) {
+function init(__eval__, composition) {
     function chain(front, back) {
         front.slice(-1)[0].next = 1
         front.push(...back)
@@ -442,7 +442,7 @@ function init(composition) {
 
             // collapse stack for invocation
             const env = stack.reduceRight((acc, cur) => typeof cur.let === 'object' ? Object.assign(acc, cur.let) : acc, {})
-            let main = '(function main(){try{'
+            let main = '(function(){try{'
             for (const name in env) main += `var ${name}=arguments[1]['${name}'];`
             main += `return eval((${f}))(arguments[0])}finally{`
             for (const name in env) main += `arguments[1]['${name}']=${name};`
