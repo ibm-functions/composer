@@ -1,4 +1,4 @@
-# Composer
+# Composer Reference
 
 The [`composer`](../composer.js) Node.js module makes it possible define action [compositions](#compositions) using [combinators](#combinators).
 
@@ -8,29 +8,50 @@ To install the `composer` module use the Node Package Manager:
 ```
 npm -g install @ibm-functions/composer
 ```
-We recommend to install the module globally (with `-g` option) so the `compose` command is added to the path. Otherwise, it can be found in the `bin` folder of the module installation.
+We recommend to install the module globally (with `-g` option) so the `compose`
+command is added to the path. Otherwise, it can be found in the `bin` folder of
+the module installation.
 
 ## Example
 
-A composition is typically defined by means of a Javascript file as illustrated in [samples/demo.js](../samples/demo.js):
+A composition is typically defined by means of a Javascript file as illustrated
+in [samples/demo.js](samples/demo.js):
 ```javascript
-composer.if('authenticate', /* then */ 'success', /* else */ 'failure')
+composer.if(
+    composer.action('authenticate', { action: function main({ password }) { return { value: password === 'abc123' } } }),
+    composer.action('success', { action: funcßtion main() { return { message: 'success' } } }),
+    composer.action('failure', { action: function main() { return { message: 'failure' } } }))
 ```
-This example composition composes three actions named `authenticate`, `success`, and `failure` using the `composer.if` combinator.
+Composer offers traditional control-flow concepts as methods. These methods
+are called _combinators_. This example composition composes three actions named
+`authenticate`, `success`, and `failure` using the `composer.if` combinator,
+which implements the usual conditional construct. It take three actions (or
+compositions) as parameters. It invokes the first one and, depending on the
+result of this invocation, invokes either the second or third action.
+
+ This composition includes the definitions of the three composed actions. If the
+ actions are defined and deployed elsewhere, the composition code can be shorten
+ to:
+```javascript
+composer.if('authenticate', 'success', 'failure')
+```
 
 To deploy this composition use the `compose` command:
 ```
 compose demo.js --deploy demo
 ```
-This command creates an action named `demo` that implements the composition.
+The `compose` command synthesizes and deploy an action named `demo` that
+implements the composition. It also deploys the composed actions if definitions
+are provided for them.
 
-Assuming the composed actions are already deployed, this composition may be invoked like any action, for instance using the OpenWhisk CLI:
+The `demo` composition may be invoked like any action, for instance using the
+OpenWhisk CLI:
 ```
 wsk action invoke demo -r -p password passw0rd
 ```
 ```
 {
-    message: "Failure"
+    message: "failure"
 }
 ```
 An invocation of a composition creates a series of activation records:
@@ -64,6 +85,35 @@ compose demo.js
 ```
 ```
 {
+    "actions": [
+        {
+            "name": "/_/authenticate",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "function main({ password }) { return { value: password === 'abc123' } }"
+                }
+            }
+        },
+        {
+            "name": "/_/success",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "function main() { return { message: 'success' } }"
+                }
+            }
+        },
+        {
+            "name": "/_/failure",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "function main() { return { message: 'failure' } }"
+                }
+            }
+        }
+    ],
     "composition": [
         {
             "type": "if",

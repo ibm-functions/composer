@@ -14,4 +14,7 @@
  * limitations under the License.
  */
 
-composer.if('authenticate', /* then */ 'success', /* else */ 'failure')
+composer.if(
+    composer.action('authenticate', { action: function main({ password }) { return { value: password === 'abc123' } } }),
+    composer.action('success', { action: function main() { return { message: 'success' } } }),
+    composer.action('failure', { action: function main() { return { message: 'failure' } } }))
