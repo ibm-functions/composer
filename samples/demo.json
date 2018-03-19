@@ -1,4 +1,33 @@
 {
+    "actions": [
+        {
+            "name": "/_/authenticate",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "function main({ password }) { return { value: password === 'abc123' } }"
+                }
+            }
+        },
+        {
+            "name": "/_/success",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "function main() { return { message: 'success' } }"
+                }
+            }
+        },
+        {
+            "name": "/_/failure",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "function main() { return { message: 'failure' } }"
+                }
+            }
+        }
+    ],
     "composition": [
         {
             "type": "if",
