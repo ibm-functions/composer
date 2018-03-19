@@ -74,7 +74,6 @@ result of this invocation, invokes either the second or third action.
 ```javascript
 composer.if('authenticate', 'success', 'failure')
 ```
-
 To deploy this composition use the `compose` command:
 ```
 compose demo.js --deploy demo
@@ -88,7 +87,7 @@ OpenWhisk CLI:
 ```
 wsk action invoke demo -r -p password passw0rd
 ```
-```
+```json
 {
     "message": "failure"
 }
@@ -135,8 +134,8 @@ wsk action invoke demo -r -p password passw0rd
   email](https://medium.com/openwhisk/a-composition-story-using-ibm-cloud-functions-to-relay-sms-to-email-d67fc65d29c)
 
 ## Contributions
-We are looking forward your feedback and criticism. We encourage you to [join us
-on slack](http://ibm.biz/composer-users). File bugs and we will squash them.
+We are looking forward to your feedback and criticism. We encourage you to [join
+us on slack](http://ibm.biz/composer-users). File bugs and we will squash them.
 
 We welcome contributions to Composer and Shell. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
