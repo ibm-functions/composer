@@ -19,7 +19,7 @@ in [samples/demo.js](samples/demo.js):
 ```javascript
 composer.if(
     composer.action('authenticate', { action: function main({ password }) { return { value: password === 'abc123' } } }),
-    composer.action('success', { action: funcßtion main() { return { message: 'success' } } }),
+    composer.action('success', { action: function main() { return { message: 'success' } } }),
     composer.action('failure', { action: function main() { return { message: 'failure' } } }))
 ```
 Composer offers traditional control-flow concepts as methods. These methods
@@ -51,7 +51,7 @@ wsk action invoke demo -r -p password passw0rd
 ```
 ```
 {
-    message: "failure"
+    "message": "failure"
 }
 ```
 An invocation of a composition creates a series of activation records:
