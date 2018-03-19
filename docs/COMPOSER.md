@@ -1,4 +1,4 @@
-# Composer
+# Composer Reference
 
 The [`composer`](../composer.js) Node.js module makes it possible define action [compositions](#compositions) using [combinators](#combinators).
 
