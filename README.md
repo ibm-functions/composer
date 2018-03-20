@@ -94,13 +94,14 @@ wsk action invoke demo -r -p password passw0rd
 ```
 
 ## Getting started 
-* [Introduction to Serverless Composition](docs/README.md): Setting up your
-  programming environment and getting started with Shell and Composer.
+* [Introduction to Serverless Composition](docs/tutorials/introduction/README.md):
+  Setting up your programming environment and getting started with Shell and
+  Composer.
 * [Building a Translation Slack Bot with Serverless
   Composition](docs/tutorials/translateBot/README.md): A more advanced tutorial
   using Composition to build a serverless Slack chatbot that does language
   translation.
-* [Composer Reference](docs/COMPOSER.md): A comprehensive reference manual for
+* [Composer Reference](docs/README.md): A comprehensive reference manual for
   the Node.js programmer.
 
 ## Videos

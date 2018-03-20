@@ -1,6 +1,6 @@
 # Building a Translation Slack Bot with Serverless Composition 
 
-Let's do something fun with Composition: We will build a serverless chatbot that translates the user's message using the IBM Watson Language Translation services. This tutorial assumes you have finished the [introduction](../../README.md), which describes the basics about Composition and the instructions to setup the development environment ([Shell](https://github.com/ibm-functions/shell)). 
+Let's do something fun with Composition: We will build a serverless chatbot that translates the user's message using the IBM Watson Language Translation services. This tutorial assumes you have finished the [introduction](../introduction/README.md), which describes the basics about Composition and the instructions to setup the development environment ([Shell](https://github.com/ibm-functions/shell)). 
 
 Here's what our chatbot does. 
 * First, it identifies the language of the user's message. 
@@ -12,7 +12,7 @@ Let's get started.
 
 ## Composing the app
 
-Here is our composition code, using the [Composer NodeJs library](../../COMPOSER.md). 
+Here is our composition code, using the [Composer NodeJs library](../../README.md). 
 ```javascript
 composer.try(
     composer.sequence(
