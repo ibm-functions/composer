@@ -10,6 +10,13 @@
   "bin": {
     "compose": "./bin/compose"
   },
+  "files": [
+    "bin/",
+    "composer.js",
+    "docs/*.md",
+    "samples/",
+    "test/"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/ibm-functions/composer.git"
