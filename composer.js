@@ -342,7 +342,7 @@ function init(__eval__, composition) {
             case 'try':
                 var body = compile(json.body, path + '.body')
                 const handler = chain(compile(json.handler, path + '.handler'), [{ type: 'pass', path }])
-                var fsm = [[{ type: 'try', path }], body].reduce(chain)
+                var fsm = [[{ type: 'try', path }], body, [{ type: 'exit', path }]].reduce(chain)
                 fsm[0].catch = fsm.length
                 fsm.slice(-1)[0].next = handler.length
                 fsm.push(...handler)
