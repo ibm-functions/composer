@@ -13,7 +13,7 @@
   "files": [
     "bin/",
     "composer.js",
-    "docs/",
+    "docs/*.md",
     "samples/",
     "test/"
   ],

@@ -89,7 +89,7 @@ _Tip:_ If you are using Mac, you can keep Shell in the dock by right-clicking on
 
 ## Your first app
 
-Compositions are described using a [Node.js library](../../docs/COMPOSER.md)
+Compositions are described using a [Node.js library](../../README.md)
 which offers an SDK for describing control structures. We call these
 _combinators_.  The simplest combinator constructs a sequence. For example, here is
 a snippet for your first app: 
@@ -209,9 +209,9 @@ When making a real app, we encourage you to create the main components as OpenWh
 ## Compositions by example
 
 You now have the basic tools to build a serverless composition, invoke
-it, and inspect its execution and result. Currently, Composer offers [13 different combinators](../../docs/COMPOSER.md#combinators) to support conditions, iterations, error handling, variable declarations and other common programming constructs for building various types of apps. 
+it, and inspect its execution and result. Currently, Composer offers [13 different combinators](../../README.md#combinators) to support conditions, iterations, error handling, variable declarations and other common programming constructs for building various types of apps. 
 
-This section will introduce you to some combinators for creating richer control and data flow, while other combinators are covered in the [reference manual](../../docs/COMPOSER.md). All javascript code described below is [bundled in Shell](https://github.com/ibm-functions/shell/blob/master/app/demos) and can be accessed within Shell using the prefix `@demos/`. 
+This section will introduce you to some combinators for creating richer control and data flow, while other combinators are covered in the [reference manual](../../README.md). All javascript code described below is [bundled in Shell](https://github.com/ibm-functions/shell/blob/master/app/demos) and can be accessed within Shell using the prefix `@demos/`. 
 
 
 ### `if` combinator
@@ -460,7 +460,7 @@ available inside the task nested within the `let`.
 The examples shown here illustrate the more common combinators you
 may use to create serverless compositions. There are more combinators
 available in the Composer library. Refer to the [Composer reference
-manual](../../docs/COMPOSER.md) for more details.
+manual](../../README.md) for more details.
 
 ## Next step
 

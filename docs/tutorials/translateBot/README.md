@@ -12,7 +12,7 @@ Let's get started.
 
 ## Composing the app
 
-Here is our composition code, using the [Composer NodeJs library](../../docs/COMPOSER.md). 
+Here is our composition code, using the [Composer NodeJs library](../../README.md). 
 ```javascript
 composer.try(
     composer.sequence(
