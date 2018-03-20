@@ -427,6 +427,11 @@ describe('composer', function () {
                         .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
                 })
 
+                it('retain', function () {
+                    return invoke(composer.retain(composer.try(() => ({ p: 4 }))), { n: 3 })
+                        .then(activation => assert.deepEqual(activation.response.result, { params: { n: 3 }, result: { p: 4 } }))
+                })
+
                 it('invalid options', function () {
                     try {
                         invoke(composer.try('isNotOne', 'isNotOne', 'isNotOne'))
