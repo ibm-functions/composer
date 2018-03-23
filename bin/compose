@@ -9,7 +9,7 @@ const composer = require('../composer')
 
 const argv = minimist(process.argv.slice(2), { string: ['apihost', 'auth', 'deploy'], boolean: ['insecure', 'encode'], alias: { auth: 'u', insecure: 'i' } })
 
-if (argv._.length !== 1) {
+if (argv._.length !== 1 || argv.deploy === '') {
     console.error('Usage: compose <composition.js[on]> [--deploy <name> | --encode] [--apihost <host>] [--auth <key>] [--insecure]')
     return
 }
@@ -21,7 +21,12 @@ if (argv.deploy) {
     const options = { ignore_certs: argv.insecure }
     if (argv.apihost) options.apihost = argv.apihost
     if (argv.auth) options.api_key = argv.auth
-    composer.openwhisk(options).compositions.deploy(composition, argv.deploy).catch(console.error)
+    const obj = composition.named(argv.deploy)
+    composer.openwhisk(options).compositions.deploy(obj)
+        .then(() => {
+            const names = obj.actions.map(action => action.name)
+            console.log(`ok: created action${names.length > 1 ? 's' : ''} ${names}`)
+        }, console.error)
 } else if (argv.encode) {
     console.log(composition.encode('anonymous').actions.slice(-1)[0].action.exec.code)
 } else {
