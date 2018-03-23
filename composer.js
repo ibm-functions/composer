@@ -125,7 +125,6 @@ class Compositions {
         const obj = composition.encode(name)
         return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
             .then(() => this.actions.update(action)), Promise.resolve())
-            .then(() => composition)
     }
 }
 
