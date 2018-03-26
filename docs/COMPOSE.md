@@ -132,7 +132,7 @@ The default path for the whisk property file is `$HOME/.wskprops`. It can be alt
 ## Code generation
 
 The `compose` command returns the code of the conductor action for the composition (Javascript or JSON) when invoked with the `--encode` option.
-For instance, the conductor code for the [demo.js](../samples/demo.js) action is [demo-conductor.js](../samples/demo-conductor.js):
+For instance, the conductor action code for the [demo.js](../samples/demo.js) composition is [demo-conductor.js](../samples/demo-conductor.js):
 ```
 compose demo.js --encode > demo-conductor.js
 ```
