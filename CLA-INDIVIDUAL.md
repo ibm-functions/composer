@@ -7,9 +7,9 @@ Thank you for your interest in the Composer project ("the Project").
 
 In order to clarify the intellectual property license granted with Contributions from any person or entity, IBM must have a Contributor License Agreement ("CLA") on file that has been signed by each Contributor, indicating agreement to the license terms below. This license is for your protection as a Contributor as well as the protection of IBM and its customers; it does not change your rights to use your own Contributions for any other purpose.
 
-If you have not already done so, please complete and sign, then scan and email a pdf file of this Agreement to rabbah@us.ibm.com. If necessary, send an original signed agreement to:
+If you have not already done so, please complete and sign, then scan and email a pdf file of this Agreement to tardieu@us.ibm.com. If necessary, send an original signed agreement to:
 
-    IBM Corporation, 1101 Kitchawan Rd Route 134 / PO Box 218 Yorktown Heights, NY 10598 Attn: Rodric Rabbah
+    IBM Corporation, 1101 Kitchawan Rd Route 134 / PO Box 218 Yorktown Heights, NY 10598 Attn: Olivier Tardieu
 
 Please read this document carefully before signing and keep a copy for your records.
 
