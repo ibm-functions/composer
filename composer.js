@@ -247,7 +247,7 @@ class Composer {
             delete options.filename
         }
         if (options && typeof options.action === 'function') {
-            options.action = `${options.action}`
+            options.action = `const main = ${options.action}`
             if (options.action.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', options.action)
         }
         if (options && typeof options.action === 'string') {
