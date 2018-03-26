@@ -9,9 +9,9 @@ In order to clarify the intellectual property license granted with Contributions
 
 This version of the Agreement allows an entity (the "Corporation") to submit Contributions to the Project, to authorize Contributions submitted by its designated employees to the Project, and to grant copyright and patent licenses thereto.
 
-If you have not already done so, please complete and sign, then scan and email a pdf file of this Agreement to rabbah@us.ibm.com. If necessary, send an original signed agreement to:
+If you have not already done so, please complete and sign, then scan and email a pdf file of this Agreement to tardieu@us.ibm.com. If necessary, send an original signed agreement to:
 
-    IBM Corporation, 1101 Kitchawan Rd Route 134 / PO Box 218 Yorktown Heights, NY 10598 Attn: Rodric Rabbah 
+    IBM Corporation, 1101 Kitchawan Rd Route 134 / PO Box 218 Yorktown Heights, NY 10598 Attn: Olivier Tardieu
 
 Please read this document carefully before signing and keep a copy for your records.
 
