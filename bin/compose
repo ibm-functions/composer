@@ -7,10 +7,28 @@ const vm = require('vm')
 const minimist = require('minimist')
 const composer = require('../composer')
 
-const argv = minimist(process.argv.slice(2), { string: ['apihost', 'auth', 'deploy'], boolean: ['insecure', 'encode'], alias: { auth: 'u', insecure: 'i' } })
+const argv = minimist(process.argv.slice(2), {
+    string: ['apihost', 'auth', 'deploy'],
+    boolean: ['insecure', 'encode', 'json'],
+    alias: { auth: 'u', insecure: 'i' }
+})
 
-if (argv._.length !== 1 || argv.deploy === '') {
-    console.error('Usage: compose <composition.js[on]> [--deploy <name> | --encode] [--apihost <host>] [--auth <key>] [--insecure]')
+let count = 0
+if (argv.json) count++
+if (argv.encode) count++
+if (typeof argv.deploy !== 'undefined') count++
+
+if (argv._.length !== 1 || count > 1 || argv.deploy === '') {
+    console.error('Usage:')
+    console.error('  compose composition.js[on] command [flags]')
+    console.error('Commands:')
+    console.error('  --json                 output the json representation for the composition (default command)')
+    console.error('  --deploy NAME          deploy the composition with name NAME')
+    console.error('  --encode               output the conductor action code for the composition')
+    console.error('Flags:')
+    console.error('  --apihost HOST         API HOST')
+    console.error('  -u, --auth KEY         authorization KEY')
+    console.error('  -i, --insecure         bypass certificate checking')
     return
 }
 
