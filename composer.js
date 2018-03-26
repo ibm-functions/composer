@@ -46,7 +46,7 @@ function validate(options) {
  */
 function encode({ name, action }) {
     if (action.exec.kind !== 'composition') return { name, action }
-    const code = `${conductor}(eval,${JSON.stringify(action.exec.composition)})\n` // invoke conductor on composition
+    const code = `${conductor}(eval,${JSON.stringify(action.exec.composition)})` // invoke conductor on composition
     return { name, action: { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: action.exec.composition }] } }
 }
 
