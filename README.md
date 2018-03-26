@@ -86,7 +86,7 @@ One way to deploy a composition is to use the `compose` command:
 compose demo.js --deploy demo
 ```
 ```
-ok: created /_/authenticate,/_/success,/_/failure,/_/demo
+ok: created actions /_/authenticate,/_/success,/_/failure,/_/demo
 ```
 The `compose` command synthesizes and deploys an action named `demo` that
 implements the composition. It also deploys the composed actions if definitions
