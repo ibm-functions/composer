@@ -109,7 +109,6 @@ class Composition {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof name !== 'undefined' && typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         const obj = typeof name === 'string' ? this.named(name) : this
-        if (obj.composition.length !== 1 || obj.composition[0].type !== 'action') throw new ComposerError('Cannot encode anonymous composition')
         return new Composition(obj.composition, null, obj.actions.map(encode))
     }
 }
@@ -123,6 +122,7 @@ class Compositions {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
         const obj = composition.encode(name)
+        if (obj.composition.length !== 1 || obj.composition[0].type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
         return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
             .then(() => this.actions.update(action)), Promise.resolve())
     }
