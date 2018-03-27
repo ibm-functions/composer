@@ -5,7 +5,7 @@
             "action": {
                 "exec": {
                     "kind": "nodejs:default",
-                    "code": "function main({ password }) { return { value: password === 'abc123' } }"
+                    "code": "const main = function ({ password }) { return { value: password === 'abc123' } }"
                 }
             }
         },
@@ -14,7 +14,7 @@
             "action": {
                 "exec": {
                     "kind": "nodejs:default",
-                    "code": "function main() { return { message: 'success' } }"
+                    "code": "const main = function () { return { message: 'success' } }"
                 }
             }
         },
@@ -23,7 +23,7 @@
             "action": {
                 "exec": {
                     "kind": "nodejs:default",
-                    "code": "function main() { return { message: 'failure' } }"
+                    "code": "const main = function () { return { message: 'failure' } }"
                 }
             }
         }

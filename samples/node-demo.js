@@ -14,7 +14,18 @@
  * limitations under the License.
  */
 
-composer.if(
+// require the composer module
+const composer = require('@ibm-functions/composer')
+
+// define the composition
+const composition = composer.if(
     composer.action('authenticate', { action: function ({ password }) { return { value: password === 'abc123' } } }),
     composer.action('success', { action: function () { return { message: 'success' } } }),
     composer.action('failure', { action: function () { return { message: 'failure' } } }))
+
+// instantiate OpenWhisk client
+const wsk = composer.openwhisk({ ignore_certs: true })
+
+wsk.compositions.deploy(composition, 'demo') // deploy composition
+    .then(() => wsk.actions.invoke({ name: 'demo', params: { password: 'abc123' }, blocking: true })) // invoke composition
+    .then(({ response }) => console.log(JSON.stringify(response.result, null, 4)), console.error)

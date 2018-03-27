@@ -1,6 +1,11 @@
 # Compose Command
 
-The `compose` command makes it possible to encode and deploy compositions.
+The `compose` command makes it possible to deploy compositions from the command line.
+
+The `compose` command is intended as a minimal complement to the OpenWhisk CLI. The OpenWhisk CLI already has the capability to configure, invoke, and delete compositions (since these are just OpenWhisk actions) but lacks the capability to create composition actions. The `compose` command bridges this gap. It makes it possible to deploy compositions as part of the development cycle or in shell scripts. It is not a replacement for the OpenWhisk CLI however as it does not duplicate existing OpenWhisk CLI capabilities. Moreover, for a much richer developer experience, we recommend using [Shell](https://github.com/ibm-functions/shell).
+
+## Usage
+
 ```
 compose
 ```
@@ -20,12 +25,12 @@ The `compose` command requires either a Javascript file that evaluates to a comp
 
 The `compose` command has three mode of operation:
 - By default or when the `--json` option is specified, the command returns the composition encoded as a JSON dictionary.
-- When the `--deploy` option is specified, the command deploys the composition with the desired name.
+- When the `--deploy` option is specified, the command deploys the composition given the desired name for the composition.
 - When the `--encode` option is specified, the command returns the Javascript code for the [conductor action](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md) for the composition.
 
-## Encoding
+## JSON format
 
-By default, the `compose` command returns the composition encoded as a JSON dictionary:
+By default, the `compose` command evaluates the composition code and outputs the resulting JSON dictionary:
 ```
 compose demo.js
 ```
@@ -37,7 +42,7 @@ compose demo.js
             "action": {
                 "exec": {
                     "kind": "nodejs:default",
-                    "code": "function main({ password }) { return { value: password === 'abc123' } }"
+                    "code": "const main = function ({ password }) { return { value: password === 'abc123' } }"
                 }
             }
         },
@@ -46,7 +51,7 @@ compose demo.js
             "action": {
                 "exec": {
                     "kind": "nodejs:default",
-                    "code": "function main() { return { message: 'success' } }"
+                    "code": "const main = function () { return { message: 'success' } }"
                 }
             }
         },
@@ -55,7 +60,7 @@ compose demo.js
             "action": {
                 "exec": {
                     "kind": "nodejs:default",
-                    "code": "function main() { return { message: 'failure' } }"
+                    "code": "const main = function () { return { message: 'failure' } }"
                 }
             }
         }
@@ -85,10 +90,11 @@ compose demo.js
     ]
 }
 ```
-The evaluation context for the Javascript code includes the `composer` object implicitly defined as:
+The evaluation context includes the `composer` object implicitly defined as:
 ```javascript
 composer = require('@ibm-functions/composer')
 ```
+In other words, there is no need to require the `composer` module explicitly in the composition code.
 
 ## Deployment
 
@@ -108,8 +114,8 @@ compose demo.json --deploy demo
 ok: created actions /_/authenticate,/_/success,/_/failure,/_/demo
 ```
 The `compose` command synthesizes and deploys a conductor action that implements the
-composition with the given name. It also deploys the composed actions if
-definitions are provided for them as part of the composition.
+composition with the given name. It also deploys the composed actions for which
+definitions are provided as part of the composition.
 
 The `compose` command outputs the list of deployed actions or an error result. If an error occurs during deployment, the state of the various actions is unknown.
 
@@ -123,9 +129,9 @@ Like the OpenWhisk CLI, the `compose` command supports the following flags for s
   -u, --auth KEY        authorization KEY
   -i, --insecure        bypass certificate checking
 ```
-If the `--apihost` flag is absent, the environment variable `__OW_API_HOST` is used in its place. If neither is available, the `compose` command attempts to obtain the api host from the whisk property file for the current user.
+If the `--apihost` flag is absent, the environment variable `__OW_API_HOST` is used in its place. If neither is available, the `compose` command extracts the `APIHOST` key from the whisk property file for the current user.
 
-If the `--auth` flag is absent, the environment variable `__OW_API_KEY` is used in its place. If neither is available, the `compose` command attempts to obtain the authorization key information from the whisk property file for the current user.
+If the `--auth` flag is absent, the environment variable `__OW_API_KEY` is used in its place. If neither is available, the `compose` command extracts the `AUTH` key from the whisk property file for the current user.
 
 The default path for the whisk property file is `$HOME/.wskprops`. It can be altered by setting the `WSK_CONFIG_FILE` environment variable.
 
