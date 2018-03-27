@@ -18,7 +18,7 @@ The `composer` module offers a number of combinators to define compositions:
 | [`retry`](#retry) | error recovery | `composer.retry(3, 'connect')` |
 | [`retain`](#retain) | persistence | `composer.retain('validateInput')` |
 
-The `action`, `function`, and `literal` combinators and their synonymous construct compositions respectively from actions, functions, and constant values. The other combinators combine existing compositions to produce new compositions.
+The `action`, `function`, and `literal` combinators construct compositions respectively from actions, functions, and constant values. The other combinators combine existing compositions to produce new compositions.
 
 ## Shorthands
 

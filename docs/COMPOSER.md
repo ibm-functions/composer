@@ -2,17 +2,13 @@
 
 The [`composer`](../composer.js) Node.js module makes it possible define, deploy, and invoke compositions.
 
-- [Installation](#installation)
-- [Example](#example)
-- [Combinators](#combinator-methods)
-- [Deployment](#deployment)
-
 ## Installation
 
 To install the `composer` module, use the Node Package Manager:
 ```
 npm install @ibm-functions/composer
 ```
+To take advantage of the `compose` command, it may be useful to install the module globally as well (`-g` option).
 
 ## Example
 
@@ -23,9 +19,9 @@ const composer = require('@ibm-functions/composer')
 
 // define the composition
 const composition = composer.if(
-    composer.action('authenticate', { action: function main({ password }) { return { value: password === 'abc123' } } }),
-    composer.action('success', { action: function main() { return { message: 'success' } } }),
-    composer.action('failure', { action: function main() { return { message: 'failure' } } }))
+    composer.action('authenticate', { action: function ({ password }) { return { value: password === 'abc123' } } }),
+    composer.action('success', { action: function () { return { message: 'success' } } }),
+    composer.action('failure', { action: function () { return { message: 'failure' } } }))
 
 // instantiate OpenWhisk client
 const wsk = composer.openwhisk({ ignore_certs: true })
@@ -54,18 +50,18 @@ The `composer` object offers an extension to the [OpenWhisk Client for Javascrip
 
 ## OpenWhisk method
 
-A client instance is obtained by invoking `composer.openwhisk(options)`, for instance with:
+A client instance is obtained by invoking `composer.openwhisk([options])`, for instance with:
 ```javascript
 const wsk = composer.openwhisk({ ignore_certs: true })
 
 ```
-The specific OpenWhisk deployment to use may be specified via options, environment variables, or the OpenWhisk property file. Options have priority over environment variables, which have priority over the OpenWhisk property file. Options and environment variables are documented [here](https://github.com/apache/incubator-openwhisk-client-js#constructor-options). The default path for the whisk property file is `$HOME/.wskprops`. It can be altered by setting the `WSK_CONFIG_FILE` environment variable.
+The specific OpenWhisk deployment to use may be specified via the optional `options` argument, environment variables, or the OpenWhisk property file. Options have priority over environment variables, which have priority over the OpenWhisk property file. Options and environment variables are documented [here](https://github.com/apache/incubator-openwhisk-client-js#constructor-options). The default path for the whisk property file is `$HOME/.wskprops`. It can be altered by setting the `WSK_CONFIG_FILE` environment variable.
 
 The `composer` module adds to the OpenWhisk client instance a new top-level category named `compositions` with a method named `deploy`.
 
 ## Deploy method
 
-`wsk.deploy(composition, [name])` deploys the composition `composition` with name `name`. More precisely, it successively deploys all the actions and compositions defined in `composition` as well as `composition` itself.
+`wsk.deploy(composition, [name])` deploys the composition `composition`, giving name `name` to the corresponding conductor action. More precisely, it successively deploys all the actions and compositions defined in `composition` as well as `composition` itself.
 
 The compositions are encoded into conductor actions prior to deployment. In other words, the `deploy` method deploys one or several actions.
 
@@ -75,9 +71,9 @@ The `deploy` method deletes the deployed actions before recreating them if neces
 
 The `name` argument may be omitted if the `composition` consists of a single action invocation. In this case, `deploy` method only deploys the actions and compositions whose definitions are nested inside `composition`.
 
-## Invoke, Update, Delete
+## Invoke, Update, and Delete methods
 
-Since compositions are deployed as conductor actions, other management tasks for compositions can be implemented by invoking methods of `wsk.actions`, for instance:
+Since compositions are deployed as conductor actions, other management tasks for compositions can be achieved by invoking methods of `wsk.actions`, for instance:
 ```javascript
 wsk.actions.delete('demo')
 ```

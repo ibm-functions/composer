@@ -18,7 +18,7 @@ tool called [IBM Cloud Shell](https://github.com/ibm-functions/shell), or just
 _Shell_. Shell offers a CLI and graphical interface for fast, incremental,
 iterative, and local development of serverless applications. While we recommend
 using Shell, Shell is not required to work with compositions. Compositions may
-be managed using a combination of the Composer [compose](bin/compose) command
+be managed using a combination of the Composer [compose](docs/COMPOSE.md) command
 (for deployment) and the [OpenWhisk
 CLI](https://console.bluemix.net/openwhisk/learn/cli) (for configuration,
 invocation, and life-cycle management).
@@ -31,9 +31,9 @@ of an action (e.g., default parameters, limits, blocking invocation, web
 export).
 
 This repository includes:
-* the [composer](composer.js) Node.js module for authoring compositions using
+* the [composer](docs/COMPOSER.md) Node.js module for authoring compositions using
   JavaScript,
-* the [compose](bin/compose) command for deploying compositions,
+* the [compose](docs/COMPOSE.md) command for deploying compositions,
 * [documentation](docs), [examples](samples), and [tests](test).
 
 Composer and Shell are currently available as _IBM Research previews_. As
@@ -81,7 +81,7 @@ composer.if('authenticate', 'success', 'failure')
 
 ## Deploying a composition
 
-One way to deploy a composition is to use the `compose` command:
+One way to deploy a composition is to use the [compose](docs/COMPOSE.md) command:
 ```
 compose demo.js --deploy demo
 ```
