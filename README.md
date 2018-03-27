@@ -60,9 +60,9 @@ A composition is typically defined by means of a Javascript expression as
 illustrated in [samples/demo.js](samples/demo.js):
 ```javascript
 composer.if(
-    composer.action('authenticate', { action: function main({ password }) { return { value: password === 'abc123' } } }),
-    composer.action('success', { action: function main() { return { message: 'success' } } }),
-    composer.action('failure', { action: function main() { return { message: 'failure' } } }))
+    composer.action('authenticate', { action: function ({ password }) { return { value: password === 'abc123' } } }),
+    composer.action('success', { action: function () { return { message: 'success' } } }),
+    composer.action('failure', { action: function () { return { message: 'failure' } } }))
 ```
 Compositions compose actions using _combinator_ methods. These methods
 implement the typical control-flow constructs of a sequential imperative
