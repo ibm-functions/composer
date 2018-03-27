@@ -14,8 +14,8 @@ Combinators are described in [COMBINATORS.md](COMBINATORS.md).
 ## Composition objects
 
 Combinators return composition objects. Compositions object offer several helper methods described below:
-- `composition.named(name)`
-- `composition.encode([name])`
+- [`composition.named(name)`](#nested-declarations) to nest one composition definition inside another,
+- [`composition.encode([name])`](#conductor-actions) to synthesize conductor actions for compositions.
 
 ## Parameter objects and error objects
 
@@ -27,15 +27,20 @@ Error objects play a specific role as they interrupt the normal flow of executio
 
 ## Data flow
 
-The invocation of a composition triggers a series of computations (possibly empty, e.g., for the empty sequence) obtained by chaining the components of the composition along the path of execution. The input parameter object for the composition is the input parameter object of the first component in the chain. The output parameter object of a component in the chain is the input parameter object for the next component if any or the output parameter object for the composition if this is the final component in the chain.
+The invocation of a composition triggers a series of computations (possibly empty, e.g., for the empty sequence) obtained by chaining the components of the composition along the path of execution. The input parameter object for the composition is the input parameter object of the first component in the chain. The output parameter object of a component in the chain is typically the input parameter object for the next component if any or the output parameter object for the composition if this is the final component in the chain.
 
 For example, the composition `composer.sequence('triple', 'increment')` invokes the `increment` action on the output of the `triple` action.
+
+Some combinators however are designed to alter the default flow of data. For instance, the `composer.retain(myAction)` composition returns a combination of the input parameter object and the output parameter object of `myAction`.
 
 ## Components
 
 Components of a compositions can be actions, Javascript functions, or compositions.
 
-Javascript functions can be viewed as simple, anonymous actions that do not need to be deployed and managed separately from the composition they belong to. Functions are typically used to alter a parameter object between two actions that expect different schemas.
+Javascript functions can be viewed as simple, anonymous actions that do not need to be deployed and managed separately from the composition they belong to. Functions are typically used to alter a parameter object between two actions that expect different schemas, as in:
+```javascript
+composer.if('getUserNameAndPassword', params => ({ key = btoa(params.user + ':' + params.password) }), 'authenticate')
+```
 
 Compositions may be nested inside compositions in two ways. First, combinators can be nested, e.g.,
 ```javascript
@@ -69,4 +74,11 @@ In this example, the `composer.sequence('triple', 'increment')` composition is g
 
 ## Serialization and deserialization
 
- Compositions objects can be serialized to JSON objects by invoking `JSON.stringify` on them. Serialized compositions can be deserialized to composition objects using the `composer.deserialize(serializedComposition)` method. The JSON format is documented in [FORMAT.md](FORMAT.md).
+ Compositions objects can be serialized to JSON dictionaries by invoking `JSON.stringify` on them. Serialized compositions can be deserialized to composition objects using the `composer.deserialize(serializedComposition)` method. The JSON format is documented in [FORMAT.md](FORMAT.md).
+ In short, the JSON dictionary for a composition contains a representation of the syntax tree for this composition as well as the definition of all the actions and compositions embedded inside the composition.
+
+## Conductor actions
+
+Compositions are implemented by means of OpenWhisk [conductor actions](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md). The conductor actions are implicitly synthesized when compositions are deployed using the `compose` command or the `composer` module. The `encode` method on compositions may also be used to generate the conductor actions for compositions.
+- `composition.encode()` replaces all the compositions nested inside `composition` with conductor actions. It does not alter the composition itself, only its components.
+- `composition.encode(name)` is a shorthand for `composition.named(name).encode()`. It encode the composition and all its components into conductor actions, replacing the composition with an invocation of the action named `name` bound to the conductor action for `composition`.
