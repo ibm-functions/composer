@@ -89,9 +89,9 @@ class Composition {
         })
         if (actions.length > 0) this.actions = actions
         options = validate(options)
+        if (Array.isArray(composition)) composition = { type: 'sequence', components: composition }
         if (typeof options !== 'undefined') composition = Object.assign({ options }, composition)
-        // flatten composition array
-        this.composition = Array.isArray(composition) ? [].concat(...composition) : [composition]
+        this.composition = composition
     }
 
     /** Names the composition and returns a composition which invokes the named composition */
@@ -122,7 +122,7 @@ class Compositions {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
         const obj = composition.encode(name)
-        if (obj.composition.length !== 1 || obj.composition[0].type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
+        if (obj.composition.type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
         return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
             .then(() => this.actions.update(action)), Promise.resolve())
     }
@@ -312,12 +312,11 @@ function init(__eval__, composition) {
     }
 
     function compile(json, path = '') {
-        if (Array.isArray(json)) {
-            if (json.length === 0) return [{ type: 'pass', path }]
-            return json.map((json, index) => compile(json, path + '[' + index + ']')).reduce(chain)
-        }
         const options = json.options || {}
         switch (json.type) {
+            case 'sequence':
+                if (json.components.length === 0) return [{ type: 'pass', path }]
+                return json.components.map((json, index) => compile(json, path + '[' + index + ']')).reduce(chain)
             case 'action':
                 return [{ type: 'action', name: json.name, path }]
             case 'function':

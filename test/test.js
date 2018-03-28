@@ -50,7 +50,7 @@ describe('composer', function () {
                 combos.forEach(({ n, s, e }) => {
                     if (s) {
                         // good cases
-                        assert.ok(composer.action(n).composition[0].name, s)
+                        assert.ok(composer.action(n).composition.name, s)
                     } else {
                         // error cases
                         try {
