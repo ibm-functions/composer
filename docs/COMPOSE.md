@@ -23,7 +23,7 @@ Flags:
 ```
 The `compose` command requires either a Javascript file that evaluates to a composition (for example [demo.js](../samples/demo.js)) or a JSON file that encodes a composition (for example [demo.json](../samples/demo.json)). The JSON format is documented in [FORMAT.md](FORMAT.md).
 
-The `compose` command has three mode of operation:
+The `compose` command has three modes of operation:
 - By default or when the `--json` option is specified, the command returns the composition encoded as a JSON dictionary.
 - When the `--deploy` option is specified, the command deploys the composition given the desired name for the composition.
 - When the `--encode` option is specified, the command returns the Javascript code for the [conductor action](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md) for the composition.
