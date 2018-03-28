@@ -77,6 +77,16 @@ function parseActionName(name) {
     else return `${delimiter}${newName}`
 }
 
+function disambiguate() {
+    if (arguments.length > 0) {
+        const options = Array.prototype.slice.call(arguments, -1)[0]
+        if (typeof options === 'object' && options !== null && !(options instanceof Composition)) {
+            return { args: Array.prototype.slice.call(arguments, 0, -1), options }
+        }
+    }
+    return { args: Array.prototype.slice.call(arguments) }
+}
+
 class Composition {
     constructor(composition, options, actions = []) {
         // collect actions defined in nested composition
@@ -95,20 +105,20 @@ class Composition {
     }
 
     /** Names the composition and returns a composition which invokes the named composition */
-    named(name) {
-        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+    named(name, options) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         name = parseActionName(name)
         if (this.actions && this.actions.findIndex(action => action.name === name) !== -1) throw new ComposerError('Duplicate action name', name)
         const actions = (this.actions || []).concat({ name, action: { exec: { kind: 'composition', composition: this.composition } } })
-        return new Composition({ type: 'action', name }, null, actions)
+        return new Composition({ type: 'action', name }, options, actions)
     }
 
     /** Encodes all compositions as actions by injecting the conductor code in them */
-    encode(name) {
-        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+    encode(name, options) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (typeof name !== 'undefined' && typeof name !== 'string') throw new ComposerError('Invalid argument', name)
-        const obj = typeof name === 'string' ? this.named(name) : this
+        const obj = typeof name === 'string' ? this.named(name, options) : this
         return new Composition(obj.composition, null, obj.actions.map(encode))
     }
 }
@@ -180,8 +190,9 @@ class Composer {
         throw new ComposerError('Invalid argument', obj)
     }
 
-    sequence() { // varargs, no options
-        return new Composition(Array.prototype.map.call(arguments, obj => this.task(obj), this))
+    sequence(/* ...components, options */) {
+        const { args, options } = disambiguate(...arguments)
+        return new Composition(args.map(obj => this.task(obj)), options)
     }
 
     if(test, consequent, alternate, options) {
@@ -209,9 +220,10 @@ class Composer {
         return new Composition({ type: 'finally', body: this.task(body), finalizer: this.task(finalizer) }, options)
     }
 
-    let(declarations) { // varargs, no options
+    let(declarations /* , ...components, options */) {
         if (typeof declarations !== 'object' || declarations === null) throw new ComposerError('Invalid argument', declarations)
-        return new Composition({ type: 'let', declarations, body: this.seq(...Array.prototype.slice.call(arguments, 1)) })
+        const { args, options } = disambiguate(...arguments)
+        return new Composition({ type: 'let', declarations, body: this.seq(...args.slice(1)) }, options)
     }
 
     literal(value, options) {
@@ -236,6 +248,7 @@ class Composer {
     action(name, options) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         name = parseActionName(name) // throws ComposerError if name is not valid
+        if (typeof options === 'object') options = Object.assign({}, options)
         let exec
         if (options && Array.isArray(options.sequence)) { // native sequence
             const components = options.sequence.map(a => a.indexOf('/') == -1 ? `/_/${a}` : a)
@@ -262,6 +275,7 @@ class Composer {
 
     retain(body, options) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        if (typeof options === 'object') options = Object.assign({}, options)
         if (options && typeof options.filter === 'function') {
             // return { params: filter(params), result: body(params) }
             const filter = options.filter
@@ -281,20 +295,22 @@ class Composer {
         return new Composition({ type: 'retain', body: this.task(body) }, options)
     }
 
-    repeat(count) { // varargs, no options
+    repeat(count /* , ...components, options */) {
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
-        return this.let({ count }, this.while(this.function(() => count-- > 0, { helper: 'repeat_1' }), this.seq(...Array.prototype.slice.call(arguments, 1))))
+        const { args, options } = disambiguate(...arguments)
+        return this.let({ count }, this.while(this.function(() => count-- > 0, { helper: 'repeat_1' }), this.seq(...args.slice(1))), options)
     }
 
-    retry(count) { // varargs, no options
+    retry(count /* , ...components, options */) {
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
-        const attempt = this.retain(this.seq(...Array.prototype.slice.call(arguments, 1)), { catch: true })
+        const { args, options } = disambiguate(...arguments)
+        const attempt = this.retain(this.seq(...args.slice(1)), { catch: true })
         return this.let({ count },
             this.function(params => ({ params }), { helper: 'retry_1' }),
             this.dowhile(
                 this.finally(this.function(({ params }) => params, { helper: 'retry_2' }), attempt),
                 this.function(({ result }) => typeof result.error !== 'undefined' && count-- > 0, { helper: 'retry_3' })),
-            this.function(({ result }) => result, { helper: 'retry_4' }))
+            this.function(({ result }) => result, { helper: 'retry_4' }), options)
     }
 }
 
