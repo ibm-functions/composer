@@ -65,7 +65,7 @@ describe('composer', function () {
 
             it('invalid options', function () {
                 try {
-                    invoke(composer.function('foo', 'bar'))
+                    invoke(composer.function('foo', 'foo'))
                     assert.fail()
                 } catch (error) {
                     assert.ok(error.message.startsWith('Invalid options'))
@@ -83,7 +83,7 @@ describe('composer', function () {
 
             it('too many arguments', function () {
                 try {
-                    invoke(composer.function('foo', {}, 'bar'))
+                    invoke(composer.function('foo', {}, 'foo'))
                     assert.fail()
                 } catch (error) {
                     assert.ok(error.message.startsWith('Too many arguments'))
@@ -102,7 +102,7 @@ describe('composer', function () {
 
             it('invalid options', function () {
                 try {
-                    invoke(composer.literal('foo', 'bar'))
+                    invoke(composer.literal('foo', 'foo'))
                     assert.fail()
                 } catch (error) {
                     assert.ok(error.message.startsWith('Invalid options'))
@@ -120,7 +120,7 @@ describe('composer', function () {
 
             it('too many arguments', function () {
                 try {
-                    invoke(composer.literal('foo', {}, 'bar'))
+                    invoke(composer.literal('foo', {}, 'foo'))
                     assert.fail()
                 } catch (error) {
                     assert.ok(error.message.startsWith('Too many arguments'))
@@ -146,7 +146,7 @@ describe('composer', function () {
             })
 
             it('function must mutate params', function () {
-                return invoke(composer.function(params => { params.foo = 'foo' }), { bar: 42 }).then(activation => assert.deepEqual(activation.response.result, { foo: 'foo', bar: 42 }))
+                return invoke(composer.function(params => { params.foo = 'foo' }), { n: 42 }).then(activation => assert.deepEqual(activation.response.result, { foo: 'foo', n: 42 }))
             })
 
             it('function as string', function () {
@@ -211,11 +211,11 @@ describe('composer', function () {
 
             describe('null task', function () {
                 it('null task must return input', function () {
-                    return invoke(composer.task(), { foo: 'bar' }).then(activation => assert.deepEqual(activation.response.result, { foo: 'bar' }))
+                    return invoke(composer.task(), { foo: 'foo' }).then(activation => assert.deepEqual(activation.response.result, { foo: 'foo' }))
                 })
 
                 it('null task must fail on error input', function () {
-                    return invoke(composer.task(), { error: 'bar' }).then(() => assert.fail(), activation => assert.deepEqual(activation.error.response.result, { error: 'bar' }))
+                    return invoke(composer.task(), { error: 'foo' }).then(() => assert.fail(), activation => assert.deepEqual(activation.error.response.result, { error: 'foo' }))
                 })
             })
 
@@ -240,7 +240,7 @@ describe('composer', function () {
 
                 it('a dictionary is not a valid task', function () {
                     try {
-                        invoke(composer.task({ foo: 'bar' }))
+                        invoke(composer.task({ foo: 'foo' }))
                         assert.fail()
                     } catch (error) {
                         assert.ok(error.message.startsWith('Invalid argument'))
@@ -250,7 +250,7 @@ describe('composer', function () {
 
             it('too many arguments', function () {
                 try {
-                    invoke(composer.task('foo', 'bar'))
+                    invoke(composer.task('foo', 'foo'))
                     assert.fail()
                 } catch (error) {
                     assert.ok(error.message.startsWith('Too many arguments'))
