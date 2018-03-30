@@ -184,13 +184,16 @@ describe('composer', function () {
         describe('deserialize', function () {
             it('should deserialize a serialized composition', function () {
                 const json = {
-                    "composition": [{
-                        "type": "action",
-                        "name": "echo"
-                    }, {
-                        "type": "action",
-                        "name": "echo"
-                    }]
+                    "composition": {
+                        "type": "sequence",
+                        "components": [{
+                            "type": "action",
+                            "name": "echo"
+                        }, {
+                            "type": "action",
+                            "name": "echo"
+                        }]
+                    }
                 }
                 return invoke(composer.deserialize(json), { message: 'hi' }).then(activation => assert.deepEqual(activation.response.result, { message: 'hi' }))
             })
