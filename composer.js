@@ -318,13 +318,7 @@ class Composer {
     retry(count /* , ...components, options */) {
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
         const { args, options } = disambiguate(arguments, 1)
-        const attempt = this.retain(...args, { catch: true })
-        return this.let({ count },
-            this.function(params => ({ params }), { helper: 'retry_1' }),
-            this.dowhile(
-                this.finally(this.function(({ params }) => params, { helper: 'retry_2' }), attempt),
-                this.function(({ result }) => typeof result.error !== 'undefined' && count-- > 0, { helper: 'retry_3' })),
-            this.function(({ result }) => result, { helper: 'retry_4' }), options)
+        return compose({ type: 'retry', count, components: args.map(obj => this.task(obj)) }, options)
     }
 }
 
@@ -426,6 +420,38 @@ function init(__eval__, composition) {
                         body: { type: 'sequence', components: json.components }
                     }]
                 }, path + '.repeat')
+            case 'retry':
+                return compile({
+                    type: "let",
+                    declarations: { count: json.count },
+                    components: [{
+                        type: 'function',
+                        exec: { kind: 'nodejs:default', code: 'params => ({ params })' }
+                    }, {
+                        type: 'dowhile',
+                        test: { type: 'function', exec: { kind: 'nodejs:default', code: "({ result }) => typeof result.error !== 'undefined' && count-- > 0" } },
+                        body: {
+                            type: 'finally',
+                            body: { type: 'function', exec: { kind: 'nodejs:default', code: '({ params }) => params' } },
+                            finalizer: {
+                                type: 'sequence',
+                                components: [{
+                                    type: 'retain',
+                                    components: [{
+                                        type: 'finally',
+                                        body: { type: 'sequence', components: json.components },
+                                        finalizer: { type: 'function', exec: { kind: 'nodejs:default', code: 'result => ({ result })' } }
+                                    }]
+                                }, {
+                                    type: 'function', exec: { kind: 'nodejs:default', code: '({ params, result }) => ({ params, result: result.result })' }
+                                }]
+                            }
+                        }
+                    }, {
+                        type: 'function', exec: { kind: 'nodejs:default', code: '({ result }) => result' }
+                    }]
+                }, path + '.retry')
+
         }
     }
 
