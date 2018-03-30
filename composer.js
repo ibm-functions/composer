@@ -312,7 +312,7 @@ class Composer {
     repeat(count /* , ...components, options */) {
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
         const { args, options } = disambiguate(arguments, 1)
-        return this.let({ count }, this.while(this.function(() => count-- > 0, { helper: 'repeat_1' }), this.seq(...args)), options)
+        return compose({ type: 'repeat', count, components: args.map(obj => this.task(obj)) }, options)
     }
 
     retry(count /* , ...components, options */) {
@@ -416,6 +416,16 @@ function init(__eval__, composition) {
                 if (!options.nosave) alternate = chain([{ type: 'pop', path }], alternate)
                 fsm.push(...alternate)
                 return fsm
+            case 'repeat':
+                return compile({
+                    type: 'let',
+                    declarations: { count: json.count },
+                    components: [{
+                        type: 'while',
+                        test: { type: 'function', exec: { kind: 'nodejs:default', code: '() => count-- > 0' } },
+                        body: { type: 'sequence', components: json.components }
+                    }]
+                }, path + '.repeat')
         }
     }
 
