@@ -278,7 +278,6 @@ class Composer {
     }
 
     retain(/* ...components */) {
-        if (arguments.length > 1) throw new ComposerError('Too many arguments')
         const args = Array.prototype.slice.call(arguments)
         return compose({ type: 'retain', components: args.map(obj => this.task(obj)) })
     }
@@ -293,6 +292,11 @@ class Composer {
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
         const args = Array.prototype.slice.call(arguments, 1)
         return compose({ type: 'retry', count, components: args.map(obj => this.task(obj)) })
+    }
+
+    unlet(/* ...components */) {
+        const args = Array.prototype.slice.call(arguments)
+        return compose({ type: 'unlet', components: args.map(obj => this.task(obj)) })
     }
 }
 
@@ -333,6 +337,9 @@ function init(__eval__, composition) {
             case 'let':
                 var body = sequence(json.components, path)
                 return [[{ type: 'let', let: json.declarations, path }], body, [{ type: 'exit', path }]].reduce(chain)
+            case 'unlet':
+                var body = sequence(json.components, path)
+                return [[{ type: 'unlet', path }], body, [{ type: 'exit', path }]].reduce(chain)
             case 'retain':
                 var body = sequence(json.components, path)
                 return [[{ type: 'push', path }], body, [{ type: 'pop', collect: true, path }]].reduce(chain)
@@ -473,14 +480,29 @@ function init(__eval__, composition) {
 
         // run function f on current stack
         function run(f) {
+            // handle let/unlet pairs
+            const s = []
+            let n = 0
+            for (let i in stack) {
+                if (typeof stack[i].unlet !== 'undefined') {
+                    n++
+                } else if (typeof stack[i].let !== 'undefined') {
+                    if (n === 0) {
+                        s.push(stack[i])
+                    } else {
+                        n--
+                    }
+                }
+            }
+
             // update value of topmost matching symbol on stack if any
             function set(symbol, value) {
-                const element = stack.find(element => typeof element.let !== 'undefined' && typeof element.let[symbol] !== 'undefined')
+                const element = s.find(element => typeof element.let !== 'undefined' && typeof element.let[symbol] !== 'undefined')
                 if (typeof element !== 'undefined') element.let[symbol] = JSON.parse(JSON.stringify(value))
             }
 
             // collapse stack for invocation
-            const env = stack.reduceRight((acc, cur) => typeof cur.let === 'object' ? Object.assign(acc, cur.let) : acc, {})
+            const env = s.reduceRight((acc, cur) => typeof cur.let === 'object' ? Object.assign(acc, cur.let) : acc, {})
             let main = '(function(){try{'
             for (const name in env) main += `var ${name}=arguments[1]['${name}'];`
             main += `return eval((${f}))(arguments[0])}finally{`
@@ -515,6 +537,9 @@ function init(__eval__, composition) {
                     break
                 case 'let':
                     stack.unshift({ let: JSON.parse(JSON.stringify(json.let)) })
+                    break
+                case 'unlet':
+                    stack.unshift({ unlet: true })
                     break
                 case 'exit':
                     if (stack.length === 0) return internalError(`State ${current} attempted to pop from an empty stack`)

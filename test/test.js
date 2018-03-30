@@ -458,24 +458,6 @@ describe('composer', function () {
                     return invoke(composer.retain(() => ({ error: 'foo' })), { n: 3 })
                         .then(() => assert.fail(), activation => assert.deepEqual(activation.error.response.result, { error: 'foo' }))
                 })
-
-                it('invalid argument', function () {
-                    try {
-                        invoke(composer.let(invoke))
-                        assert.fail()
-                    } catch (error) {
-                        assert.ok(error.message.startsWith('Invalid argument'))
-                    }
-                })
-
-                it('too many arguments', function () {
-                    try {
-                        invoke(composer.retain('isNotOne', 'isNotOne'))
-                        assert.fail()
-                    } catch (error) {
-                        assert.ok(error.message.startsWith('Too many arguments'))
-                    }
-                })
             })
 
             describe('repeat', function () {
