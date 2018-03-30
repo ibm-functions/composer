@@ -31,17 +31,6 @@ class ComposerError extends Error {
 }
 
 /**
- * Validates options and converts to JSON
- */
-function validate(options) {
-    if (options == null) return
-    if (typeof options !== 'object' || Array.isArray(options)) throw new ComposerError('Invalid options', options)
-    options = JSON.stringify(options)
-    if (options === '{}') return
-    return JSON.parse(options)
-}
-
-/**
  * Encodes a composition as an action by injecting the conductor code
  */
 function encode({ name, action }) {
@@ -77,19 +66,7 @@ function parseActionName(name) {
     else return `${delimiter}${newName}`
 }
 
-function disambiguate(args, skip) {
-    if (arguments.length > 0) {
-        const options = Array.prototype.slice.call(args, -1)[0]
-        if (typeof options === 'object' && options !== null && !(options instanceof Composition)) {
-            return { args: Array.prototype.slice.call(args, skip, -1), options }
-        } else if (typeof options === 'undefined') {
-            return { args: Array.prototype.slice.call(args, skip, -1) }
-        }
-    }
-    return { args: Array.prototype.slice.call(args, skip) }
-}
-
-function compose(composition, options, actions = []) {
+function compose(composition, actions = []) {
     // collect actions defined in nested composition
     Object.keys(composition).forEach(key => {
         if (composition[key] instanceof Composition) {
@@ -107,8 +84,6 @@ function compose(composition, options, actions = []) {
         })
         composition = Object.assign({}, composition, { components })
     }
-    options = validate(options)
-    if (typeof options !== 'undefined') composition = Object.assign({ options }, composition)
     return new Composition(composition, actions)
 }
 
@@ -119,21 +94,21 @@ class Composition {
     }
 
     /** Names the composition and returns a composition which invokes the named composition */
-    named(name, options) {
-        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+    named(name) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         name = parseActionName(name)
         if (this.actions && this.actions.findIndex(action => action.name === name) !== -1) throw new ComposerError('Duplicate action name', name)
         const actions = (this.actions || []).concat({ name, action: { exec: { kind: 'composition', composition: this.composition } } })
-        return compose({ type: 'action', name }, options, actions)
+        return compose({ type: 'action', name }, actions)
     }
 
     /** Encodes all compositions as actions by injecting the conductor code in them */
-    encode(name, options) {
-        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+    encode(name) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof name !== 'undefined' && typeof name !== 'string') throw new ComposerError('Invalid argument', name)
-        const obj = typeof name === 'string' ? this.named(name, options) : this
-        return compose(obj.composition, null, obj.actions.map(encode))
+        const obj = typeof name === 'string' ? this.named(name) : this
+        return compose(obj.composition, obj.actions.map(encode))
     }
 }
 
@@ -177,7 +152,7 @@ class Composer {
         if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
         if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
 
-        const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
+        const wsk = require('openwhisk')(Object.assign({ apihost, api_key }))
         wsk.compositions = new Compositions(wsk)
         return wsk
     }
@@ -204,50 +179,65 @@ class Composer {
         throw new ComposerError('Invalid argument', obj)
     }
 
-    sequence(/* ...components, options */) {
-        const { args, options } = disambiguate(arguments)
-        return compose({ type: 'sequence', components: args.map(obj => this.task(obj)) }, options)
+    sequence(/* ...components */) {
+        const args = Array.prototype.slice.call(arguments)
+        return compose({ type: 'sequence', components: args.map(obj => this.task(obj)) })
     }
 
-    if(test, consequent, alternate, options) {
-        if (arguments.length > 4) throw new ComposerError('Too many arguments')
-        return compose({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null) }, options)
-    }
-
-    while(test, body, options) {
+    if(test, consequent, alternate) {
         if (arguments.length > 3) throw new ComposerError('Too many arguments')
-        return compose({ type: 'while', test: this.task(test), body: this.task(body) }, options)
+        return compose({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null) })
     }
 
-    dowhile(body, test, options) {
+    if_nosave(test, consequent, alternate) {
         if (arguments.length > 3) throw new ComposerError('Too many arguments')
-        return compose({ type: 'dowhile', test: this.task(test), body: this.task(body) }, options)
+        return compose({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null), nosave: true })
     }
 
-    try(body, handler, options) {
-        if (arguments.length > 3) throw new ComposerError('Too many arguments')
-        return compose({ type: 'try', body: this.task(body), handler: this.task(handler) }, options)
+    while(test, body) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        return compose({ type: 'while', test: this.task(test), body: this.task(body) })
     }
 
-    finally(body, finalizer, options) {
-        if (arguments.length > 3) throw new ComposerError('Too many arguments')
-        return compose({ type: 'finally', body: this.task(body), finalizer: this.task(finalizer) }, options)
+    while_nosave(test, body) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        return compose({ type: 'while', test: this.task(test), body: this.task(body), nosave: true })
     }
 
-    let(declarations /* , ...components, options */) {
+    dowhile(body, test) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        return compose({ type: 'dowhile', test: this.task(test), body: this.task(body) })
+    }
+
+    dowhile_nosave(body, test) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        return compose({ type: 'dowhile', test: this.task(test), body: this.task(body), nosave: true })
+    }
+
+    try(body, handler) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        return compose({ type: 'try', body: this.task(body), handler: this.task(handler) })
+    }
+
+    finally(body, finalizer) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        return compose({ type: 'finally', body: this.task(body), finalizer: this.task(finalizer) })
+    }
+
+    let(declarations /* , ...components */) {
         if (typeof declarations !== 'object' || declarations === null) throw new ComposerError('Invalid argument', declarations)
-        const { args, options } = disambiguate(arguments, 1)
-        return compose({ type: 'let', declarations, components: args.map(obj => this.task(obj)) }, options)
+        const args = Array.prototype.slice.call(arguments, 1)
+        return compose({ type: 'let', declarations, components: args.map(obj => this.task(obj), this) })
     }
 
-    literal(value, options) {
-        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+    literal(value) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof value === 'function') throw new ComposerError('Invalid argument', value)
-        return compose({ type: 'literal', value: typeof value === 'undefined' ? {} : value }, options)
+        return compose({ type: 'literal', value: typeof value === 'undefined' ? {} : value })
     }
 
-    function(fun, options) {
-        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+    function(fun) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (typeof fun === 'function') {
             fun = `${fun}`
             if (fun.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', fun)
@@ -256,13 +246,13 @@ class Composer {
             fun = { kind: 'nodejs:default', code: fun }
         }
         if (typeof fun !== 'object' || fun === null) throw new ComposerError('Invalid argument', fun)
-        return compose({ type: 'function', exec: fun }, options)
+        return compose({ type: 'function', exec: fun })
     }
 
-    action(name, options) {
+    action(name, options = {}) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         name = parseActionName(name) // throws ComposerError if name is not valid
-        if (typeof options === 'object') options = Object.assign({}, options)
+        if (typeof options === 'object') options = Object.assign({})
         let exec
         if (options && Array.isArray(options.sequence)) { // native sequence
             const components = options.sequence.map(a => a.indexOf('/') == -1 ? `/_/${a}` : a)
@@ -275,7 +265,7 @@ class Composer {
         }
         if (options && typeof options.action === 'function') {
             options.action = `const main = ${options.action}`
-            if (options.action.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', options.action)
+            if (options.action.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function'.action)
         }
         if (options && typeof options.action === 'string') {
             options.action = { kind: 'nodejs:default', code: options.action }
@@ -284,41 +274,25 @@ class Composer {
             exec = options.action
             delete options.action
         }
-        return compose({ type: 'action', name }, options, exec ? [{ name, action: { exec } }] : [])
+        return compose({ type: 'action', name }, exec ? [{ name, action: { exec } }] : [])
     }
 
-    retain(/* components, options */) {
-        let { args, options } = disambiguate(arguments)
-        if (typeof options === 'object') options = Object.assign({}, options)
-        if (options && typeof options.filter === 'function') {
-            // return { params: filter(params), result: body(params) }
-            const filter = options.filter
-            delete options.filter
-            options.field = 'result'
-            return this.seq(this.retain(filter), this.retain(this.finally(this.function(({ params }) => params, { helper: 'retain_3' }), this.seq(...args)), options))
-        }
-        if (options && typeof options.catch === 'boolean' && options.catch) {
-            // return { params, result: body(params) } even if result is an error
-            delete options.catch
-            return this.seq(
-                this.retain(this.finally(this.seq(...args), this.function(result => ({ result }), { helper: 'retain_1' })), options),
-                this.function(({ params, result }) => ({ params, result: result.result }), { helper: 'retain_2' }))
-        }
-        if (options && typeof options.field !== 'undefined' && typeof options.field !== 'string') throw new ComposerError('Invalid options', options)
-        // return new Composition({ params, result: body(params) } if no error, otherwise body(params)
-        return compose({ type: 'retain', components: args.map(obj => this.task(obj)) }, options)
+    retain(/* ...components */) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        const args = Array.prototype.slice.call(arguments)
+        return compose({ type: 'retain', components: args.map(obj => this.task(obj)) })
     }
 
-    repeat(count /* , ...components, options */) {
+    repeat(count /* , ...components */) {
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
-        const { args, options } = disambiguate(arguments, 1)
-        return compose({ type: 'repeat', count, components: args.map(obj => this.task(obj)) }, options)
+        const args = Array.prototype.slice.call(arguments, 1)
+        return compose({ type: 'repeat', count, components: args.map(obj => this.task(obj)) })
     }
 
-    retry(count /* , ...components, options */) {
+    retry(count /* , ...components */) {
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
-        const { args, options } = disambiguate(arguments, 1)
-        return compose({ type: 'retry', count, components: args.map(obj => this.task(obj)) }, options)
+        const args = Array.prototype.slice.call(arguments, 1)
+        return compose({ type: 'retry', count, components: args.map(obj => this.task(obj)) })
     }
 }
 
@@ -341,7 +315,6 @@ function init(__eval__, composition) {
     }
 
     function compile(json, path = '') {
-        const options = json.options || {}
         switch (json.type) {
             case 'sequence':
                 return sequence(json.components, path)
@@ -362,9 +335,7 @@ function init(__eval__, composition) {
                 return [[{ type: 'let', let: json.declarations, path }], body, [{ type: 'exit', path }]].reduce(chain)
             case 'retain':
                 var body = sequence(json.components, path)
-                var fsm = [[{ type: 'push', path }], body, [{ type: 'pop', collect: true, path }]].reduce(chain)
-                if (options.field) fsm[0].field = options.field
-                return fsm
+                return [[{ type: 'push', path }], body, [{ type: 'pop', collect: true, path }]].reduce(chain)
             case 'try':
                 var body = compile(json.body, path + '.body')
                 const handler = chain(compile(json.handler, path + '.handler'), [{ type: 'pass', path }])
@@ -376,10 +347,10 @@ function init(__eval__, composition) {
             case 'if':
                 var consequent = compile(json.consequent, path + '.consequent')
                 var alternate = chain(compile(json.alternate, path + '.alternate'), [{ type: 'pass', path }])
-                if (!options.nosave) consequent = chain([{ type: 'pop', path }], consequent)
-                if (!options.nosave) alternate = chain([{ type: 'pop', path }], alternate)
+                if (!json.nosave) consequent = chain([{ type: 'pop', path }], consequent)
+                if (!json.nosave) alternate = chain([{ type: 'pop', path }], alternate)
                 var fsm = chain(compile(json.test, path + '.test'), [{ type: 'choice', then: 1, else: consequent.length + 1, path }])
-                if (!options.nosave) fsm = chain([{ type: 'push', path }], fsm)
+                if (!json.nosave) fsm = chain([{ type: 'push', path }], fsm)
                 consequent.slice(-1)[0].next = alternate.length
                 fsm.push(...consequent)
                 fsm.push(...alternate)
@@ -387,19 +358,19 @@ function init(__eval__, composition) {
             case 'while':
                 var consequent = compile(json.body, path + '.body')
                 var alternate = [{ type: 'pass', path }]
-                if (!options.nosave) consequent = chain([{ type: 'pop', path }], consequent)
-                if (!options.nosave) alternate = chain([{ type: 'pop', path }], alternate)
+                if (!json.nosave) consequent = chain([{ type: 'pop', path }], consequent)
+                if (!json.nosave) alternate = chain([{ type: 'pop', path }], alternate)
                 var fsm = chain(compile(json.test, path + '.test'), [{ type: 'choice', then: 1, else: consequent.length + 1, path }])
-                if (!options.nosave) fsm = chain([{ type: 'push', path }], fsm)
+                if (!json.nosave) fsm = chain([{ type: 'push', path }], fsm)
                 consequent.slice(-1)[0].next = 1 - fsm.length - consequent.length
                 fsm.push(...consequent)
                 fsm.push(...alternate)
                 return fsm
             case 'dowhile':
                 var test = compile(json.test, path + '.test')
-                if (!options.nosave) test = chain([{ type: 'push', path }], test)
+                if (!json.nosave) test = chain([{ type: 'push', path }], test)
                 var fsm = [compile(json.body, path + '.body'), test, [{ type: 'choice', then: 1, else: 2, path }]].reduce(chain)
-                if (options.nosave) {
+                if (json.nosave) {
                     fsm.slice(-1)[0].then = 1 - fsm.length
                     fsm.slice(-1)[0].else = 1
                 } else {
@@ -407,7 +378,7 @@ function init(__eval__, composition) {
                     fsm.slice(-1)[0].next = 1 - fsm.length
                 }
                 var alternate = [{ type: 'pass', path }]
-                if (!options.nosave) alternate = chain([{ type: 'pop', path }], alternate)
+                if (!json.nosave) alternate = chain([{ type: 'pop', path }], alternate)
                 fsm.push(...alternate)
                 return fsm
             case 'repeat':
@@ -550,7 +521,7 @@ function init(__eval__, composition) {
                     stack.shift()
                     break
                 case 'push':
-                    stack.unshift(JSON.parse(JSON.stringify({ params: json.field ? params[json.field] : params })))
+                    stack.unshift(JSON.parse(JSON.stringify({ params })))
                     break
                 case 'pop':
                     if (stack.length === 0) return internalError(`State ${current} attempted to pop from an empty stack`)
