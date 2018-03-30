@@ -79,9 +79,11 @@ function parseActionName(name) {
 
 function disambiguate(args, skip) {
     if (arguments.length > 0) {
-        const options = Array.prototype.slice.call(args, skip, -1)[0]
+        const options = Array.prototype.slice.call(args, -1)[0]
         if (typeof options === 'object' && options !== null && !(options instanceof Composition)) {
             return { args: Array.prototype.slice.call(args, skip, -1), options }
+        } else if (typeof options === 'undefined') {
+            return { args: Array.prototype.slice.call(args, skip, -1) }
         }
     }
     return { args: Array.prototype.slice.call(args, skip) }
@@ -285,26 +287,26 @@ class Composer {
         return compose({ type: 'action', name }, options, exec ? [{ name, action: { exec } }] : [])
     }
 
-    retain(body, options) {
-        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+    retain(/* components, options */) {
+        let { args, options } = disambiguate(arguments)
         if (typeof options === 'object') options = Object.assign({}, options)
         if (options && typeof options.filter === 'function') {
             // return { params: filter(params), result: body(params) }
             const filter = options.filter
             delete options.filter
             options.field = 'result'
-            return this.seq(this.retain(filter), this.retain(this.finally(this.function(({ params }) => params, { helper: 'retain_3' }), body), options))
+            return this.seq(this.retain(filter), this.retain(this.finally(this.function(({ params }) => params, { helper: 'retain_3' }), this.seq(...args)), options))
         }
         if (options && typeof options.catch === 'boolean' && options.catch) {
             // return { params, result: body(params) } even if result is an error
             delete options.catch
             return this.seq(
-                this.retain(this.finally(body, this.function(result => ({ result }), { helper: 'retain_1' })), options),
+                this.retain(this.finally(this.seq(...args), this.function(result => ({ result }), { helper: 'retain_1' })), options),
                 this.function(({ params, result }) => ({ params, result: result.result }), { helper: 'retain_2' }))
         }
         if (options && typeof options.field !== 'undefined' && typeof options.field !== 'string') throw new ComposerError('Invalid options', options)
         // return new Composition({ params, result: body(params) } if no error, otherwise body(params)
-        return compose({ type: 'retain', body: this.task(body) }, options)
+        return compose({ type: 'retain', components: args.map(obj => this.task(obj)) }, options)
     }
 
     repeat(count /* , ...components, options */) {
@@ -316,7 +318,7 @@ class Composer {
     retry(count /* , ...components, options */) {
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
         const { args, options } = disambiguate(arguments, 1)
-        const attempt = this.retain(this.seq(...args), { catch: true })
+        const attempt = this.retain(...args, { catch: true })
         return this.let({ count },
             this.function(params => ({ params }), { helper: 'retry_1' }),
             this.dowhile(
@@ -339,12 +341,16 @@ function init(__eval__, composition) {
         return front
     }
 
+    function sequence(components, path) {
+        if (components.length === 0) return [{ type: 'pass', path }]
+        return components.map((json, index) => compile(json, path + '[' + index + ']')).reduce(chain)
+    }
+
     function compile(json, path = '') {
         const options = json.options || {}
         switch (json.type) {
             case 'sequence':
-                if (json.components.length === 0) return [{ type: 'pass', path }]
-                return json.components.map((json, index) => compile(json, path + '[' + index + ']')).reduce(chain)
+                return sequence(json.components, path)
             case 'action':
                 return [{ type: 'action', name: json.name, path }]
             case 'function':
@@ -358,10 +364,10 @@ function init(__eval__, composition) {
                 fsm[0].catch = fsm.length - finalizer.length
                 return fsm
             case 'let':
-                var body = json.components.map((json, index) => compile(json, path + '[' + index + ']')).reduce(chain)
+                var body = sequence(json.components, path)
                 return [[{ type: 'let', let: json.declarations, path }], body, [{ type: 'exit', path }]].reduce(chain)
             case 'retain':
-                var body = compile(json.body, path + '.body')
+                var body = sequence(json.components, path)
                 var fsm = [[{ type: 'push', path }], body, [{ type: 'pop', collect: true, path }]].reduce(chain)
                 if (options.field) fsm[0].field = options.field
                 return fsm

@@ -566,21 +566,12 @@ describe('composer', function () {
                         .then(activation => assert.deepEqual(activation.response.result, { params: { n: - 3 }, result: { error: 'foo' } }))
                 })
 
-                it('invalid options', function () {
+                it('invalid argument', function () {
                     try {
-                        invoke(composer.retain('isNotOne', 'isNotOne'))
+                        invoke(composer.let(invoke))
                         assert.fail()
                     } catch (error) {
-                        assert.ok(error.message.startsWith('Invalid options'))
-                    }
-                })
-
-                it('too many arguments', function () {
-                    try {
-                        invoke(composer.retain('isNotOne', {}, 'isNotOne'))
-                        assert.fail()
-                    } catch (error) {
-                        assert.ok(error.message.startsWith('Too many arguments'))
+                        assert.ok(error.message.startsWith('Invalid argument'))
                     }
                 })
             })
