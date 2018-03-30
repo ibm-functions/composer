@@ -197,7 +197,7 @@ class Composer {
 
     task(obj) {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
-        if (obj == null) return this.seq()
+        if (obj === null) return this.seq()
         if (obj instanceof Composition) return obj
         if (typeof obj === 'function') return this.function(obj)
         if (typeof obj === 'string') return this.action(obj)
@@ -211,7 +211,7 @@ class Composer {
 
     if(test, consequent, alternate, options) {
         if (arguments.length > 4) throw new ComposerError('Too many arguments')
-        return compose({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate) }, options)
+        return compose({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null) }, options)
     }
 
     while(test, body, options) {

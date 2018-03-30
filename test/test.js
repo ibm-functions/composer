@@ -214,11 +214,11 @@ describe('composer', function () {
 
             describe('null task', function () {
                 it('null task must return input', function () {
-                    return invoke(composer.task(), { foo: 'foo' }).then(activation => assert.deepEqual(activation.response.result, { foo: 'foo' }))
+                    return invoke(composer.task(null), { foo: 'foo' }).then(activation => assert.deepEqual(activation.response.result, { foo: 'foo' }))
                 })
 
                 it('null task must fail on error input', function () {
-                    return invoke(composer.task(), { error: 'foo' }).then(() => assert.fail(), activation => assert.deepEqual(activation.error.response.result, { error: 'foo' }))
+                    return invoke(composer.task(null), { error: 'foo' }).then(() => assert.fail(), activation => assert.deepEqual(activation.error.response.result, { error: 'foo' }))
                 })
             })
 
@@ -416,22 +416,22 @@ describe('composer', function () {
                 })
 
                 it('try must throw', function () {
-                    return invoke(composer.try(composer.try(), error => ({ message: error.error })), { error: 'foo' })
+                    return invoke(composer.try(composer.task(null), error => ({ message: error.error })), { error: 'foo' })
                         .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
                 })
 
                 it('while must throw', function () {
-                    return invoke(composer.try(composer.while(composer.literal(false)), error => ({ message: error.error })), { error: 'foo' })
+                    return invoke(composer.try(composer.while(composer.literal(false), null), error => ({ message: error.error })), { error: 'foo' })
                         .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
                 })
 
                 it('if must throw', function () {
-                    return invoke(composer.try(composer.if(composer.literal(false)), error => ({ message: error.error })), { error: 'foo' })
+                    return invoke(composer.try(composer.if(composer.literal(false), null), error => ({ message: error.error })), { error: 'foo' })
                         .then(activation => assert.deepEqual(activation.response.result, { message: 'foo' }))
                 })
 
                 it('retain', function () {
-                    return invoke(composer.retain(composer.try(() => ({ p: 4 }))), { n: 3 })
+                    return invoke(composer.retain(composer.try(() => ({ p: 4 }), null)), { n: 3 })
                         .then(activation => assert.deepEqual(activation.response.result, { params: { n: 3 }, result: { p: 4 } }))
                 })
 
