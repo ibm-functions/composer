@@ -125,6 +125,10 @@ composer.sequence(
     composer.action('log', { action: params => ({ message: 'Composition time: ' + params.value }) }))
 ```
 
+JSON values cannot represent functions. Applying `composer.literal` to a value of type `'function'` will result in an error. Functions embedded in a `value` of type `'object'`, e.g., `{ f: p => p, n: 42 }` will be silently omitted from the JSON dictionary. In other words, `composer.literal({ f: p => p, n: 42 })` will output `{ n: 42 }`.
+
+In general, a function can be embedded in a composition either by using the `composer.function` combinator, or by embedding the source code for the function as a string and later using `eval` to evaluate the function code.
+
 ## Sequence
 
 `composer.sequence(composition_1, composition_2, ...)` chains a series of compositions (possibly empty).
@@ -138,6 +142,8 @@ An empty sequence behaves as a sequence with a single function `params => params
 ## Let
 
 `composer.let({ name_1: value_1, name_2: value_2, ... }, composition_1_, _composition_2_, ...)` declares one or more variables with the given names and initial values, and runs a sequence of compositions in the scope of these declarations.
+
+The initial values must be valid JSON values. In particular, `composer.let({ foo: undefined })` is incorrect as `undefined` is not representable by a JSON value. On the other hand, `composer.let({ foo: null })` is correct. For the same reason, initial values cannot be functions, e.g., `composer.let({ foo: params => params })` is incorrect.
 
 Variables declared with `composer.let` may be accessed and mutated by functions __running__ as part of the following sequence (irrespective of their place of definition). In other words, name resolution is [dynamic](https://en.wikipedia.org/wiki/Name_resolution_(programming_languages)#Static_versus_dynamic). If a variable declaration is nested inside a declaration of a variable with the same name, the innermost declaration masks the earlier declarations.
 
