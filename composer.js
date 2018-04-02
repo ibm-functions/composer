@@ -402,7 +402,7 @@ function conductor(__eval__, composer, composition) {
                         { count: json.count },
                         composer.while(
                             () => count-- > 0,
-                            composer.seq(...json.components.map(composition => composer.deserialize({ composition }))))).composition)
+                            composer.unlet(composer.seq(...json.components.map(composition => composer.deserialize({ composition })))))).composition)
             case 'retry':
                 return compile({
                     type: "let",
