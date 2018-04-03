@@ -157,7 +157,7 @@ function composer(composerCode, conductorCode) {
             if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
             if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
 
-            const wsk = require('openwhisk')(Object.assign({ apihost, api_key }))
+            const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
             wsk.compositions = new Compositions(wsk)
             return wsk
         }
