@@ -299,9 +299,9 @@ function composer(composerCode, conductorCode) {
             return compose({ type: 'retry', count, components: args.map(obj => this.task(obj)) })
         }
 
-        unlet(/* ...components */) {
+        mask(/* ...components */) {
             const args = Array.prototype.slice.call(arguments)
-            return compose({ type: 'unlet', components: args.map(obj => this.task(obj)) })
+            return compose({ type: 'mask', components: args.map(obj => this.task(obj)) })
         }
     }
 
@@ -341,15 +341,15 @@ function conductor(__eval__, composer, composition) {
             case 'let':
                 var body = sequence(json.components, path)
                 return [[{ type: 'let', let: json.declarations, path }], body, [{ type: 'exit', path }]].reduce(chain)
-            case 'unlet':
+            case 'mask':
                 var body = sequence(json.components, path)
-                return [[{ type: 'unlet', path }], body, [{ type: 'exit', path }]].reduce(chain)
+                return [[{ type: 'mask', path }], body, [{ type: 'exit', path }]].reduce(chain)
             case 'retain':
                 return compile(
                     composer.let(
                         { params: null },
                         args => { params = args },
-                        composer.unlet(...json.components.map(composition => composer.deserialize({ composition }))),
+                        composer.mask(...json.components.map(composition => composer.deserialize({ composition }))),
                         result => ({ params, result })).composition)
             case 'try':
                 var body = compile(json.body, path + '.body')
@@ -402,7 +402,7 @@ function conductor(__eval__, composer, composition) {
                         { count: json.count },
                         composer.while(
                             () => count-- > 0,
-                            composer.unlet(composer.seq(...json.components.map(composition => composer.deserialize({ composition })))))).composition)
+                            composer.mask(composer.seq(...json.components.map(composition => composer.deserialize({ composition })))))).composition)
             case 'retry':
                 return compile({
                     type: "let",
@@ -485,11 +485,11 @@ function conductor(__eval__, composer, composition) {
 
         // run function f on current stack
         function run(f) {
-            // handle let/unlet pairs
+            // handle let/mask pairs
             const s = []
             let n = 0
             for (let i in stack) {
-                if (typeof stack[i].unlet !== 'undefined') {
+                if (typeof stack[i].mask !== 'undefined') {
                     n++
                 } else if (typeof stack[i].let !== 'undefined') {
                     if (n === 0) {
@@ -543,8 +543,8 @@ function conductor(__eval__, composer, composition) {
                 case 'let':
                     stack.unshift({ let: JSON.parse(JSON.stringify(json.let)) })
                     break
-                case 'unlet':
-                    stack.unshift({ unlet: true })
+                case 'mask':
+                    stack.unshift({ mask: true })
                     break
                 case 'exit':
                     if (stack.length === 0) return internalError(`State ${current} attempted to pop from an empty stack`)
