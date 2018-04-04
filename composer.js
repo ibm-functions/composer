@@ -257,7 +257,7 @@ function composer(composerCode, conductorCode) {
         action(name, options = {}) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             name = parseActionName(name) // throws ComposerError if name is not valid
-            if (typeof options === 'object') options = Object.assign({})
+            if (typeof options === 'object') options = Object.assign({}, options)
             let exec
             if (options && Array.isArray(options.sequence)) { // native sequence
                 const components = options.sequence.map(a => a.indexOf('/') == -1 ? `/_/${a}` : a)
