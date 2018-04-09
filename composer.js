@@ -187,7 +187,7 @@ function composer(composerCode, conductorCode) {
 
         if_nosave(test, consequent, alternate) {
             if (arguments.length > 3) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null), nosave: true })
+            return new Composition({ type: 'if_nosave', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null) })
         }
 
         while(test, body) {
@@ -197,7 +197,7 @@ function composer(composerCode, conductorCode) {
 
         while_nosave(test, body) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'while', test: this.task(test), body: this.task(body), nosave: true })
+            return new Composition({ type: 'while_nosave', test: this.task(test), body: this.task(body) })
         }
 
         dowhile(body, test) {
@@ -207,7 +207,7 @@ function composer(composerCode, conductorCode) {
 
         dowhile_nosave(body, test) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'dowhile', test: this.task(test), body: this.task(body), nosave: true })
+            return new Composition({ type: 'dowhile_nosave', test: this.task(test), body: this.task(body) })
         }
 
         try(body, handler) {
@@ -353,40 +353,54 @@ function conductor(__eval__, composer, composition) {
                 fsm.push(...handler)
                 return fsm
             case 'if':
+                return compile(
+                    composer.let(
+                        { params: null },
+                        args => { params = args },
+                        composer.if_nosave(
+                            composer.mask(composer.deserialize(json.test)),
+                            composer.seq(() => params, composer.mask(composer.deserialize(json.consequent))),
+                            composer.seq(() => params, composer.mask(composer.deserialize(json.alternate))))))
+            case 'if_nosave':
                 var consequent = compile(json.consequent, path + '.consequent')
                 var alternate = chain(compile(json.alternate, path + '.alternate'), [{ type: 'pass', path }])
-                if (!json.nosave) consequent = chain([{ type: 'pop', path }], consequent)
-                if (!json.nosave) alternate = chain([{ type: 'pop', path }], alternate)
                 var fsm = chain(compile(json.test, path + '.test'), [{ type: 'choice', then: 1, else: consequent.length + 1, path }])
-                if (!json.nosave) fsm = chain([{ type: 'push', path }], fsm)
                 consequent.slice(-1)[0].next = alternate.length
                 fsm.push(...consequent)
                 fsm.push(...alternate)
                 return fsm
             case 'while':
+                return compile(
+                    composer.let(
+                        { params: null },
+                        args => { params = args },
+                        composer.while_nosave(
+                            composer.mask(composer.deserialize(json.test)),
+                            composer.seq(() => params, composer.mask(composer.deserialize(json.body)), args => { params = args })),
+                        () => params))
+            case 'while_nosave':
                 var consequent = compile(json.body, path + '.body')
                 var alternate = [{ type: 'pass', path }]
-                if (!json.nosave) consequent = chain([{ type: 'pop', path }], consequent)
-                if (!json.nosave) alternate = chain([{ type: 'pop', path }], alternate)
                 var fsm = chain(compile(json.test, path + '.test'), [{ type: 'choice', then: 1, else: consequent.length + 1, path }])
-                if (!json.nosave) fsm = chain([{ type: 'push', path }], fsm)
                 consequent.slice(-1)[0].next = 1 - fsm.length - consequent.length
                 fsm.push(...consequent)
                 fsm.push(...alternate)
                 return fsm
             case 'dowhile':
+                return compile(
+                    composer.let(
+                        { params: null },
+                        args => { params = args },
+                        composer.dowhile_nosave(
+                            composer.seq(() => params, composer.mask(composer.deserialize(json.body)), args => { params = args }),
+                            composer.mask(composer.deserialize(json.test))),
+                        () => params))
+            case 'dowhile_nosave':
                 var test = compile(json.test, path + '.test')
-                if (!json.nosave) test = chain([{ type: 'push', path }], test)
                 var fsm = [compile(json.body, path + '.body'), test, [{ type: 'choice', then: 1, else: 2, path }]].reduce(chain)
-                if (json.nosave) {
-                    fsm.slice(-1)[0].then = 1 - fsm.length
-                    fsm.slice(-1)[0].else = 1
-                } else {
-                    fsm.push({ type: 'pop', path })
-                    fsm.slice(-1)[0].next = 1 - fsm.length
-                }
+                fsm.slice(-1)[0].then = 1 - fsm.length
+                fsm.slice(-1)[0].else = 1
                 var alternate = [{ type: 'pass', path }]
-                if (!json.nosave) alternate = chain([{ type: 'pop', path }], alternate)
                 fsm.push(...alternate)
                 return fsm
             case 'repeat':
@@ -542,13 +556,6 @@ function conductor(__eval__, composer, composition) {
                 case 'exit':
                     if (stack.length === 0) return internalError(`State ${current} attempted to pop from an empty stack`)
                     stack.shift()
-                    break
-                case 'push':
-                    stack.unshift(JSON.parse(JSON.stringify({ params })))
-                    break
-                case 'pop':
-                    if (stack.length === 0) return internalError(`State ${current} attempted to pop from an empty stack`)
-                    params = stack.shift().params
                     break
                 case 'action':
                     return { action: json.name, params, state: { $resume: { state, stack } } } // invoke continuation
