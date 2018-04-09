@@ -36,15 +36,6 @@ function composer(composerCode, conductorCode) {
     }
 
     /**
-     * Encodes a composition as an action by injecting the conductor code
-     */
-    function encode({ name, action }) {
-        if (action.exec.kind !== 'composition') return { name, action }
-        const code = `const main=(${conductorCode})(eval,(${composerCode})(),${JSON.stringify(action.exec.composition)})` // invoke conductor on composition
-        return { name, action: { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: action.exec.composition }] } }
-    }
-
-    /**
      * Parses a (possibly fully qualified) resource name and validates it. If it's not a fully qualified name,
      * then attempts to qualify it.
      *
@@ -71,31 +62,31 @@ function composer(composerCode, conductorCode) {
         else return `${delimiter}${newName}`
     }
 
-    function compose(composition, actions = []) {
-        // collect actions defined in nested composition
+    function encode(composition, actions) {
+        const obj = Object.assign({}, composition)
         Object.keys(composition).forEach(key => {
             if (composition[key] instanceof Composition) {
-                // TODO: check for duplicate entries
-                actions.push(...composition[key].actions || [])
-                composition[key] = composition[key].composition
+                obj[key] = encode(composition[key], actions)
             }
         })
         if (Array.isArray(composition.components)) {
-            const components = []
-            composition.components.forEach(component => {
-                // TODO: check for duplicate entries
-                actions.push(...component.actions || [])
-                components.push(component.composition)
-            })
-            composition = Object.assign({}, composition, { components })
+            obj.components = composition.components.map(composition => encode(composition, actions))
         }
-        return new Composition(composition, actions)
+        if (composition.type === 'action' && composition.exec) {
+            if (composition.exec.kind === 'composition') {
+                const code = `const main=(${conductorCode})(eval,(${composerCode})(),${JSON.stringify(encode(composition.exec.composition, actions))})` // invoke conductor on composition
+                actions.push({ name: composition.name, action: { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition.exec.composition }] } })
+            } else {
+                actions.push({ name: composition.name, action: { exec: composition.exec } })
+            }
+            delete obj.exec
+        }
+        return obj
     }
 
     class Composition {
-        constructor(composition, actions = []) {
-            this.composition = composition
-            if (actions.length > 0) this.actions = actions
+        constructor(composition) {
+            Object.assign(this, composition)
         }
 
         /** Names the composition and returns a composition which invokes the named composition */
@@ -103,17 +94,16 @@ function composer(composerCode, conductorCode) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
             if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
             name = parseActionName(name)
-            if (this.actions && this.actions.findIndex(action => action.name === name) !== -1) throw new ComposerError('Duplicate action name', name)
-            const actions = (this.actions || []).concat({ name, action: { exec: { kind: 'composition', composition: this.composition } } })
-            return compose({ type: 'action', name }, actions)
+            return new Composition({ type: 'action', name, exec: { kind: 'composition', composition: this } })
         }
 
         /** Encodes all compositions as actions by injecting the conductor code in them */
         encode(name) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
             if (typeof name !== 'undefined' && typeof name !== 'string') throw new ComposerError('Invalid argument', name)
-            const obj = typeof name === 'string' ? this.named(name) : this
-            return compose(obj.composition, obj.actions.map(encode))
+            const actions = []
+            const composition = encode(typeof name === 'string' ? this.named(name) : this, actions)
+            return { composition, actions }
         }
     }
 
@@ -129,6 +119,7 @@ function composer(composerCode, conductorCode) {
             if (obj.composition.type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
             return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
                 .then(() => this.actions.update(action)), Promise.resolve())
+                .then(() => obj)
         }
     }
 
@@ -171,8 +162,8 @@ function composer(composerCode, conductorCode) {
         }
 
         /** Takes a serialized Composition and returns a Composition instance */
-        deserialize({ composition, actions }) {
-            return new Composition(composition, actions)
+        deserialize(composition) {
+            return new Composition(composition)
         }
 
         task(obj) {
@@ -186,59 +177,59 @@ function composer(composerCode, conductorCode) {
 
         sequence(/* ...components */) {
             const args = Array.prototype.slice.call(arguments)
-            return compose({ type: 'sequence', components: args.map(obj => this.task(obj)) })
+            return new Composition({ type: 'sequence', components: args.map(obj => this.task(obj)) })
         }
 
         if(test, consequent, alternate) {
             if (arguments.length > 3) throw new ComposerError('Too many arguments')
-            return compose({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null) })
+            return new Composition({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null) })
         }
 
         if_nosave(test, consequent, alternate) {
             if (arguments.length > 3) throw new ComposerError('Too many arguments')
-            return compose({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null), nosave: true })
+            return new Composition({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null), nosave: true })
         }
 
         while(test, body) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return compose({ type: 'while', test: this.task(test), body: this.task(body) })
+            return new Composition({ type: 'while', test: this.task(test), body: this.task(body) })
         }
 
         while_nosave(test, body) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return compose({ type: 'while', test: this.task(test), body: this.task(body), nosave: true })
+            return new Composition({ type: 'while', test: this.task(test), body: this.task(body), nosave: true })
         }
 
         dowhile(body, test) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return compose({ type: 'dowhile', test: this.task(test), body: this.task(body) })
+            return new Composition({ type: 'dowhile', test: this.task(test), body: this.task(body) })
         }
 
         dowhile_nosave(body, test) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return compose({ type: 'dowhile', test: this.task(test), body: this.task(body), nosave: true })
+            return new Composition({ type: 'dowhile', test: this.task(test), body: this.task(body), nosave: true })
         }
 
         try(body, handler) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return compose({ type: 'try', body: this.task(body), handler: this.task(handler) })
+            return new Composition({ type: 'try', body: this.task(body), handler: this.task(handler) })
         }
 
         finally(body, finalizer) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return compose({ type: 'finally', body: this.task(body), finalizer: this.task(finalizer) })
+            return new Composition({ type: 'finally', body: this.task(body), finalizer: this.task(finalizer) })
         }
 
         let(declarations /* , ...components */) {
             if (typeof declarations !== 'object' || declarations === null) throw new ComposerError('Invalid argument', declarations)
             const args = Array.prototype.slice.call(arguments, 1)
-            return compose({ type: 'let', declarations, components: args.map(obj => this.task(obj), this) })
+            return new Composition({ type: 'let', declarations, components: args.map(obj => this.task(obj), this) })
         }
 
         literal(value) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
             if (typeof value === 'function') throw new ComposerError('Invalid argument', value)
-            return compose({ type: 'literal', value: typeof value === 'undefined' ? {} : value })
+            return new Composition({ type: 'literal', value: typeof value === 'undefined' ? {} : value })
         }
 
         function(fun) {
@@ -251,7 +242,7 @@ function composer(composerCode, conductorCode) {
                 fun = { kind: 'nodejs:default', code: fun }
             }
             if (typeof fun !== 'object' || fun === null) throw new ComposerError('Invalid argument', fun)
-            return compose({ type: 'function', exec: fun })
+            return new Composition({ type: 'function', exec: fun })
         }
 
         action(name, options = {}) {
@@ -279,29 +270,31 @@ function composer(composerCode, conductorCode) {
                 exec = options.action
                 delete options.action
             }
-            return compose({ type: 'action', name }, exec ? [{ name, action: { exec } }] : [])
+            const composition = { type: 'action', name }
+            if (exec) composition.exec = exec
+            return new Composition(composition)
         }
 
         retain(/* ...components */) {
             const args = Array.prototype.slice.call(arguments)
-            return compose({ type: 'retain', components: args.map(obj => this.task(obj)) })
+            return new Composition({ type: 'retain', components: args.map(obj => this.task(obj)) })
         }
 
         repeat(count /* , ...components */) {
             if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
             const args = Array.prototype.slice.call(arguments, 1)
-            return compose({ type: 'repeat', count, components: args.map(obj => this.task(obj)) })
+            return new Composition({ type: 'repeat', count, components: args.map(obj => this.task(obj)) })
         }
 
         retry(count /* , ...components */) {
             if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
             const args = Array.prototype.slice.call(arguments, 1)
-            return compose({ type: 'retry', count, components: args.map(obj => this.task(obj)) })
+            return new Composition({ type: 'retry', count, components: args.map(obj => this.task(obj)) })
         }
 
         mask(/* ...components */) {
             const args = Array.prototype.slice.call(arguments)
-            return compose({ type: 'mask', components: args.map(obj => this.task(obj)) })
+            return new Composition({ type: 'mask', components: args.map(obj => this.task(obj)) })
         }
     }
 
@@ -349,8 +342,8 @@ function conductor(__eval__, composer, composition) {
                     composer.let(
                         { params: null },
                         args => { params = args },
-                        composer.mask(...json.components.map(composition => composer.deserialize({ composition }))),
-                        result => ({ params, result })).composition)
+                        composer.mask(...json.components.map(composer.deserialize)),
+                        result => ({ params, result })))
             case 'try':
                 var body = compile(json.body, path + '.body')
                 const handler = chain(compile(json.handler, path + '.handler'), [{ type: 'pass', path }])
@@ -402,7 +395,7 @@ function conductor(__eval__, composer, composition) {
                         { count: json.count },
                         composer.while(
                             () => count-- > 0,
-                            composer.mask(composer.seq(...json.components.map(composition => composer.deserialize({ composition })))))).composition)
+                            composer.mask(composer.seq(...json.components.map(composer.deserialize))))))
             case 'retry':
                 return compile({
                     type: "let",

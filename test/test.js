@@ -50,7 +50,7 @@ describe('composer', function () {
                 combos.forEach(({ n, s, e }) => {
                     if (s) {
                         // good cases
-                        assert.ok(composer.action(n).composition.name, s)
+                        assert.ok(composer.action(n).name, s)
                     } else {
                         // error cases
                         try {
@@ -157,16 +157,14 @@ describe('composer', function () {
         describe('deserialize', function () {
             it('should deserialize a serialized composition', function () {
                 const json = {
-                    "composition": {
-                        "type": "sequence",
-                        "components": [{
-                            "type": "action",
-                            "name": "echo"
-                        }, {
-                            "type": "action",
-                            "name": "echo"
-                        }]
-                    }
+                    "type": "sequence",
+                    "components": [{
+                        "type": "action",
+                        "name": "echo"
+                    }, {
+                        "type": "action",
+                        "name": "echo"
+                    }]
                 }
                 return invoke(composer.deserialize(json), { message: 'hi' }).then(activation => assert.deepEqual(activation.response.result, { message: 'hi' }))
             })

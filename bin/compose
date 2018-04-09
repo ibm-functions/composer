@@ -39,9 +39,8 @@ if (argv.deploy) {
     const options = { ignore_certs: argv.insecure }
     if (argv.apihost) options.apihost = argv.apihost
     if (argv.auth) options.api_key = argv.auth
-    const obj = composition.named(argv.deploy)
-    composer.openwhisk(options).compositions.deploy(obj)
-        .then(() => {
+    composer.openwhisk(options).compositions.deploy(composition, argv.deploy)
+        .then(obj => {
             const names = obj.actions.map(action => action.name)
             console.log(`ok: created action${names.length > 1 ? 's' : ''} ${names}`)
         }, console.error)
