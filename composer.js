@@ -280,6 +280,11 @@ function composer(composerCode, conductorCode) {
             return new Composition({ type: 'retain', components: args.map(obj => this.task(obj)) })
         }
 
+        retain_catch(/* ...components */) {
+            const args = Array.prototype.slice.call(arguments)
+            return new Composition({ type: 'retain_catch', components: args.map(obj => this.task(obj)) })
+        }
+
         repeat(count /* , ...components */) {
             if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
             const args = Array.prototype.slice.call(arguments, 1)
@@ -344,6 +349,14 @@ function conductor(__eval__, composer, composition) {
                         args => { params = args },
                         composer.mask(...json.components.map(composer.deserialize)),
                         result => ({ params, result })))
+            case 'retain_catch':
+                return compile(
+                    composer.seq(
+                        composer.retain(
+                            composer.finally(
+                                composer.seq(...json.components.map(composer.deserialize)),
+                                result => ({ result }))),
+                        ({ params, result }) => ({ params, result: result.result })))
             case 'try':
                 var body = compile(json.body, path + '.body')
                 const handler = chain(compile(json.handler, path + '.handler'), [{ type: 'pass', path }])
@@ -411,37 +424,14 @@ function conductor(__eval__, composer, composition) {
                             () => count-- > 0,
                             composer.mask(composer.seq(...json.components.map(composer.deserialize))))))
             case 'retry':
-                return compile({
-                    type: "let",
-                    declarations: { count: json.count },
-                    components: [{
-                        type: 'function',
-                        exec: { kind: 'nodejs:default', code: 'params => ({ params })' }
-                    }, {
-                        type: 'dowhile',
-                        test: { type: 'function', exec: { kind: 'nodejs:default', code: "({ result }) => typeof result.error !== 'undefined' && count-- > 0" } },
-                        body: {
-                            type: 'finally',
-                            body: { type: 'function', exec: { kind: 'nodejs:default', code: '({ params }) => params' } },
-                            finalizer: {
-                                type: 'sequence',
-                                components: [{
-                                    type: 'retain',
-                                    components: [{
-                                        type: 'finally',
-                                        body: { type: 'sequence', components: json.components },
-                                        finalizer: { type: 'function', exec: { kind: 'nodejs:default', code: 'result => ({ result })' } }
-                                    }]
-                                }, {
-                                    type: 'function', exec: { kind: 'nodejs:default', code: '({ params, result }) => ({ params, result: result.result })' }
-                                }]
-                            }
-                        }
-                    }, {
-                        type: 'function', exec: { kind: 'nodejs:default', code: '({ result }) => result' }
-                    }]
-                }, path + '.retry')
-
+                return compile(
+                    composer.let(
+                        { count: json.count },
+                        params => ({ params }),
+                        composer.dowhile(
+                            composer.finally(({ params }) => params, composer.mask(composer.retain_catch(...json.components.map(composer.deserialize)))),
+                            ({ result }) => typeof result.error !== 'undefined' && count-- > 0),
+                        ({ result }) => result))
         }
     }
 

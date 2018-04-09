@@ -20,6 +20,7 @@ describe('composer', function () {
             .then(() => define({ name: 'isEven', action: 'function main({n}) { return { value: n % 2 == 0 } }' }))
     })
 
+
     describe('blocking invocations', function () {
         describe('actions', function () {
             it('action must return true', function () {
@@ -455,6 +456,11 @@ describe('composer', function () {
                 it('throw error', function () {
                     return invoke(composer.retain(() => ({ error: 'foo' })), { n: 3 })
                         .then(() => assert.fail(), activation => assert.deepEqual(activation.error.response.result, { error: 'foo' }))
+                })
+
+                it('catch error', function () {
+                    return invoke(composer.retain_catch(() => ({ error: 'foo' })), { n: 3 })
+                        .then(activation => assert.deepEqual(activation.response.result, { params: { n: 3 }, result: { error: 'foo' } }))
                 })
             })
 
