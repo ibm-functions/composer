@@ -283,7 +283,7 @@ class Composer {
 
     repeat(count) { // varargs, no options
         if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
-        return this.let({ count }, this.while(this.function(() => count-- > 0, { helper: 'repeat_1' }), this.seq(...Array.prototype.slice.call(arguments, 1))))
+        return this.let({ count }, this.while(this.function(() => count-- > 0, { helper: 'repeat_1' }), this.mask(this.seq(...Array.prototype.slice.call(arguments, 1)))))
     }
 
     retry(count) { // varargs, no options
@@ -292,9 +292,14 @@ class Composer {
         return this.let({ count },
             this.function(params => ({ params }), { helper: 'retry_1' }),
             this.dowhile(
-                this.finally(this.function(({ params }) => params, { helper: 'retry_2' }), attempt),
+                this.finally(this.function(({ params }) => params, { helper: 'retry_2' }), this.mask(attempt)),
                 this.function(({ result }) => typeof result.error !== 'undefined' && count-- > 0, { helper: 'retry_3' })),
             this.function(({ result }) => result, { helper: 'retry_4' }))
+    }
+
+    mask(body, options) {
+        if (arguments.length > 2) throw new ComposerError('Too many arguments')
+        return new Composition({ type: 'mask', body: this.task(body) }, options)
     }
 }
 
@@ -333,6 +338,9 @@ function init(__eval__, composition) {
             case 'let':
                 var body = compile(json.body, path + '.body')
                 return [[{ type: 'let', let: json.declarations, path }], body, [{ type: 'exit', path }]].reduce(chain)
+            case 'mask':
+                var body = compile(json.body, path + '.body')
+                return [[{ type: 'mask', path }], body, [{ type: 'exit', path }]].reduce(chain)
             case 'retain':
                 var body = compile(json.body, path + '.body')
                 var fsm = [[{ type: 'push', path }], body, [{ type: 'pop', collect: true, path }]].reduce(chain)
@@ -433,14 +441,29 @@ function init(__eval__, composition) {
 
         // run function f on current stack
         function run(f) {
+            // handle let/mask pairs
+            const view = []
+            let n = 0
+            for (let i in stack) {
+                if (typeof stack[i].mask !== 'undefined') {
+                    n++
+                } else if (typeof stack[i].let !== 'undefined') {
+                    if (n === 0) {
+                        view.push(stack[i])
+                    } else {
+                        n--
+                    }
+                }
+            }
+
             // update value of topmost matching symbol on stack if any
             function set(symbol, value) {
-                const element = stack.find(element => typeof element.let !== 'undefined' && typeof element.let[symbol] !== 'undefined')
+                const element = view.find(element => typeof element.let !== 'undefined' && typeof element.let[symbol] !== 'undefined')
                 if (typeof element !== 'undefined') element.let[symbol] = JSON.parse(JSON.stringify(value))
             }
 
             // collapse stack for invocation
-            const env = stack.reduceRight((acc, cur) => typeof cur.let === 'object' ? Object.assign(acc, cur.let) : acc, {})
+            const env = view.reduceRight((acc, cur) => typeof cur.let === 'object' ? Object.assign(acc, cur.let) : acc, {})
             let main = '(function(){try{'
             for (const name in env) main += `var ${name}=arguments[1]['${name}'];`
             main += `return eval((${f}))(arguments[0])}finally{`
@@ -475,6 +498,9 @@ function init(__eval__, composition) {
                     break
                 case 'let':
                     stack.unshift({ let: JSON.parse(JSON.stringify(json.let)) })
+                    break
+                case 'mask':
+                    stack.unshift({ mask: true })
                     break
                 case 'exit':
                     if (stack.length === 0) return internalError(`State ${current} attempted to pop from an empty stack`)

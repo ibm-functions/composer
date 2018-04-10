@@ -517,6 +517,42 @@ describe('composer', function () {
                 })
             })
 
+            describe('mask', function () {
+                it('let/let/mask', function () {
+                    return invoke(composer.let({ x: 42 }, composer.let({ x: 69 }, composer.mask(() => x))))
+                        .then(activation => assert.deepEqual(activation.response.result, { value: 42 }))
+                })
+
+                it('let/mask/let', function () {
+                    return invoke(composer.let({ x: 42 }, composer.mask(composer.let({ x: 69 }, () => x))))
+                        .then(activation => assert.deepEqual(activation.response.result, { value: 69 }))
+                })
+
+                it('let/let/try/mask', function () {
+                    return invoke(composer.let({ x: 42 }, composer.let({ x: 69 },
+                        composer.try(composer.mask(() => x)), () => { })))
+                        .then(activation => assert.deepEqual(activation.response.result, { value: 42 }))
+                })
+
+                it('let/let/let/mask', function () {
+                    return invoke(composer.let({ x: 42 }, composer.let({ x: 69 },
+                        composer.let({ x: -1 }, composer.mask(() => x)))))
+                        .then(activation => assert.deepEqual(activation.response.result, { value: 69 }))
+                })
+
+                it('let/let/let/mask/mask', function () {
+                    return invoke(composer.let({ x: 42 }, composer.let({ x: 69 },
+                        composer.let({ x: -1 }, composer.mask(composer.mask(() => x))))))
+                        .then(activation => assert.deepEqual(activation.response.result, { value: 42 }))
+                })
+
+                it('let/let/mask/let/mask', function () {
+                    return invoke(composer.let({ x: 42 }, composer.let({ x: 69 },
+                        composer.mask(composer.let({ x: -1 }, composer.mask(() => x))))))
+                        .then(activation => assert.deepEqual(activation.response.result, { value: 42 }))
+                })
+            })
+
             describe('retain', function () {
                 it('base case', function () {
                     return invoke(composer.retain('TripleAndIncrement'), { n: 3 })
