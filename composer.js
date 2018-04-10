@@ -483,14 +483,14 @@ function conductor(__eval__, composer, composition) {
         // run function f on current stack
         function run(f) {
             // handle let/mask pairs
-            const s = []
+            const view = []
             let n = 0
             for (let i in stack) {
                 if (typeof stack[i].mask !== 'undefined') {
                     n++
                 } else if (typeof stack[i].let !== 'undefined') {
                     if (n === 0) {
-                        s.push(stack[i])
+                        view.push(stack[i])
                     } else {
                         n--
                     }
@@ -499,12 +499,12 @@ function conductor(__eval__, composer, composition) {
 
             // update value of topmost matching symbol on stack if any
             function set(symbol, value) {
-                const element = s.find(element => typeof element.let !== 'undefined' && typeof element.let[symbol] !== 'undefined')
+                const element = view.find(element => typeof element.let !== 'undefined' && typeof element.let[symbol] !== 'undefined')
                 if (typeof element !== 'undefined') element.let[symbol] = JSON.parse(JSON.stringify(value))
             }
 
             // collapse stack for invocation
-            const env = s.reduceRight((acc, cur) => typeof cur.let === 'object' ? Object.assign(acc, cur.let) : acc, {})
+            const env = view.reduceRight((acc, cur) => typeof cur.let === 'object' ? Object.assign(acc, cur.let) : acc, {})
             let main = '(function(){try{'
             for (const name in env) main += `var ${name}=arguments[1]['${name}'];`
             main += `return eval((${f}))(arguments[0])}finally{`
