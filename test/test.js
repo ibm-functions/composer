@@ -530,7 +530,7 @@ describe('composer', function () {
 
                 it('let/let/try/mask', function () {
                     return invoke(composer.let({ x: 42 }, composer.let({ x: 69 },
-                        composer.try(composer.mask(() => x)), () => { })))
+                        composer.try(composer.mask(() => x), () => { }))))
                         .then(activation => assert.deepEqual(activation.response.result, { value: 42 }))
                 })
 
