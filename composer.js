@@ -300,7 +300,7 @@ function composer(composerCode, conductorCode) {
 
         mask(/* ...components */) {
             const args = Array.prototype.slice.call(arguments)
-            return new Composition({ type: 'mask', components: args.map(obj => this.task(obj)) })
+            return new Composition({ type: 'let', declarations: null, components: args.map(obj => this.task(obj)) })
         }
     }
 
@@ -340,9 +340,6 @@ function conductor(__eval__, composer, composition) {
             case 'let':
                 var body = sequence(json.components, path)
                 return [[{ type: 'let', let: json.declarations, path }], body, [{ type: 'exit', path }]].reduce(chain)
-            case 'mask':
-                var body = sequence(json.components, path)
-                return [[{ type: 'mask', path }], body, [{ type: 'exit', path }]].reduce(chain)
             case 'retain':
                 return compile(
                     composer.let(
@@ -487,7 +484,7 @@ function conductor(__eval__, composer, composition) {
             const view = []
             let n = 0
             for (let i in stack) {
-                if (typeof stack[i].mask !== 'undefined') {
+                if (stack[i].let === null) {
                     n++
                 } else if (typeof stack[i].let !== 'undefined') {
                     if (n === 0) {
@@ -540,9 +537,6 @@ function conductor(__eval__, composer, composition) {
                     break
                 case 'let':
                     stack.unshift({ let: JSON.parse(JSON.stringify(json.let)) })
-                    break
-                case 'mask':
-                    stack.unshift({ mask: true })
                     break
                 case 'exit':
                     if (stack.length === 0) return internalError(`State ${current} attempted to pop from an empty stack`)
