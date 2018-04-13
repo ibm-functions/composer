@@ -330,7 +330,7 @@ function conductor(__eval__, composer, composition) {
             case 'function':
                 return [{ type: 'function', exec: json.exec, path }]
             case 'literal':
-                return [{ type: 'literal', value: json.value, path }]
+                return compile(composer.let({ value: json.value }, () => value))
             case 'finally':
                 var body = compile(json.body, path + '.body')
                 const finalizer = compile(json.finalizer, path + '.finalizer')
@@ -550,10 +550,6 @@ function conductor(__eval__, composer, composition) {
                     break
                 case 'action':
                     return { action: json.name, params, state: { $resume: { state, stack } } } // invoke continuation
-                    break
-                case 'literal':
-                    params = JSON.parse(JSON.stringify(json.value))
-                    inspect()
                     break
                 case 'function':
                     let result
