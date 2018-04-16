@@ -67,7 +67,7 @@ class Compiler {
     // standard combinators
     static get combinators() {
         return {
-            seq: { components: true },
+            seq: { components: true, lowered: true },
             sequence: { components: true },
             if: { args: [{ name: 'test', type: 'composition' }, { name: 'consequent', type: 'composition' }, { name: 'alternate', type: 'composition', optional: true }], lowered: true },
             if_nosave: { args: [{ name: 'test', type: 'composition' }, { name: 'consequent', type: 'composition' }, { name: 'alternate', type: 'composition', optional: true }] },
@@ -140,8 +140,11 @@ class Compiler {
 
         // keep lowering root combinator
         while (true) {
-            if (omitting.indexOf(composition.type) < 0) {
+            if (Compiler.combinators[composition.type].lowered && omitting.indexOf(composition.type) < 0) {
                 switch (composition.type) {
+                    case 'seq':
+                        composition = this.sequence(...composition.components.map(this.deserialize))
+                        continue
                     case 'value':
                     case 'literal':
                         composition = this.let({ value: composition.value }, () => value)
@@ -421,7 +424,6 @@ function conductor() {
 
     function compile(json, path = '') {
         switch (json.type) {
-            case 'seq':
             case 'sequence':
                 return sequence(json.components, path)
             case 'action':
