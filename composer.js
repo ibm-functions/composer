@@ -174,7 +174,7 @@ function encode(composition, actions) {
         composition.type = 'action'
     }
     if (composition.type === 'action' && composition.action) {
-        actions.push(Object.assign({ name: composition.name }, { action: composition.action }))
+        actions.push({ name: composition.name, action: composition.action })
         delete composition.action
     }
     return composition
