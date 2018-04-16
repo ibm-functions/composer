@@ -54,41 +54,43 @@ class Compiler {
         return this.deserialize({ type: 'function', function: { exec: fun } })
     }
 
-    static init() {
-        const constructs = [
-            { name: 'seq', components: true },
-            { name: 'sequence', components: true },
-            { name: 'if', args: [{ name: 'test', kind: 'composition' }, { name: 'consequent', kind: 'composition' }, { name: 'alternate', kind: 'composition', optional: true }] },
-            { name: 'if_nosave', args: [{ name: 'test', kind: 'composition' }, { name: 'consequent', kind: 'composition' }, { name: 'alternate', kind: 'composition', optional: true }] },
-            { name: 'while', args: [{ name: 'test', kind: 'composition' }, { name: 'body', kind: 'composition' }] },
-            { name: 'while_nosave', args: [{ name: 'test', kind: 'composition' }, { name: 'body', kind: 'composition' }] },
-            { name: 'dowhile', args: [{ name: 'body', kind: 'composition' }, { name: 'test', kind: 'composition' }] },
-            { name: 'dowhile_nosave', args: [{ name: 'body', kind: 'composition' }, { name: 'test', kind: 'composition' }] },
-            { name: 'try', args: [{ name: 'body', kind: 'composition' }, { name: 'handler', kind: 'composition' }] },
-            { name: 'finally', args: [{ name: 'body', kind: 'composition' }, { name: 'finalizer', kind: 'composition' }] },
-            { name: 'retain', components: true },
-            { name: 'retain_catch', components: true },
-            { name: 'let', args: [{ name: 'declarations', kind: 'object' }], components: true },
-            { name: 'mask', components: true },
-            { name: 'repeat', args: [{ name: 'count', kind: 'number' }], components: true },
-            { name: 'retry', args: [{ name: 'count', kind: 'number' }], components: true },
-            { name: 'value', args: [{ name: 'value', kind: 'value' }] },
-            { name: 'literal', args: [{ name: 'value', kind: 'value' }] },
-            { name: 'action', args: [{ name: 'name', kind: 'string' }] }
-        ]
+    static combinators() {
+        return {
+            seq: { components: true },
+            sequence: { components: true },
+            if: { args: [{ name: 'test', kind: 'composition' }, { name: 'consequent', kind: 'composition' }, { name: 'alternate', kind: 'composition', optional: true }] },
+            if_nosave: { args: [{ name: 'test', kind: 'composition' }, { name: 'consequent', kind: 'composition' }, { name: 'alternate', kind: 'composition', optional: true }] },
+            while: { args: [{ name: 'test', kind: 'composition' }, { name: 'body', kind: 'composition' }] },
+            while_nosave: { args: [{ name: 'test', kind: 'composition' }, { name: 'body', kind: 'composition' }] },
+            dowhile: { args: [{ name: 'body', kind: 'composition' }, { name: 'test', kind: 'composition' }] },
+            dowhile_nosave: { args: [{ name: 'body', kind: 'composition' }, { name: 'test', kind: 'composition' }] },
+            try: { args: [{ name: 'body', kind: 'composition' }, { name: 'handler', kind: 'composition' }] },
+            finally: { args: [{ name: 'body', kind: 'composition' }, { name: 'finalizer', kind: 'composition' }] },
+            retain: { components: true },
+            retain_catch: { components: true },
+            let: { args: [{ name: 'declarations', kind: 'object' }], components: true },
+            mask: { components: true },
+            repeat: { args: [{ name: 'count', kind: 'number' }], components: true },
+            retry: { args: [{ name: 'count', kind: 'number' }], components: true },
+            value: { args: [{ name: 'value', kind: 'value' }] },
+            literal: { args: [{ name: 'value', kind: 'value' }] },
+            action: { args: [{ name: 'name', kind: 'string' }] }
+        }
+    }
 
-        for (let i in constructs) {
-            const construct = constructs[i]
-            const composition = { type: construct.name }
-            Compiler.prototype[construct.name] = function () {
-                const skip = construct.args && construct.args.length || 0
-                if (construct.components) {
+    static init() {
+        for (let name in Compiler.combinators()) {
+            const combinator = Compiler.combinators()[name]
+            const composition = { type: name }
+            Compiler.prototype[name] = function () {
+                const skip = combinator.args && combinator.args.length || 0
+                if (combinator.components) {
                     composition.components = Array.prototype.slice.call(arguments, skip).map(obj => this.task(obj))
                 } else {
                     if (arguments.length > skip) throw new ComposerError('Too many arguments')
                 }
-                for (let j in construct.args) {
-                    const arg = construct.args[j]
+                for (let j in combinator.args) {
+                    const arg = combinator.args[j]
                     switch (arg.kind) {
                         case 'composition':
                             composition[arg.name] = this.task(arg.optional ? arguments[j] || null : arguments[j])
@@ -113,6 +115,78 @@ class Compiler {
                 }
                 return this.deserialize(composition)
             }
+        }
+    }
+
+    lower(composition) {
+        switch (composition.type) {
+            case 'value':
+            case 'literal':
+                return this.let({ value: composition.value }, () => value)
+            case 'retain':
+                return this.let(
+                    { params: null },
+                    args => { params = args },
+                    this.mask(...composition.components.map(this.deserialize)),
+                    result => ({ params, result }))
+            case 'retain_catch':
+                return this.seq(
+                    this.retain(
+                        this.finally(
+                            this.seq(...composition.components.map(this.deserialize)),
+                            result => ({ result }))),
+                    ({ params, result }) => ({ params, result: result.result }))
+            case 'if':
+                return this.let(
+                    { params: null },
+                    args => { params = args },
+                    this.if_nosave(
+                        this.mask(this.deserialize(composition.test)),
+                        this.seq(() => params, this.mask(this.deserialize(composition.consequent))),
+                        this.seq(() => params, this.mask(this.deserialize(composition.alternate)))))
+            case 'while':
+                return this.let(
+                    { params: null },
+                    args => { params = args },
+                    this.while_nosave(
+                        this.mask(this.deserialize(composition.test)),
+                        this.seq(() => params, this.mask(this.deserialize(composition.body)), args => { params = args })),
+                    () => params)
+            case 'dowhile':
+                return this.let(
+                    { params: null },
+                    args => { params = args },
+                    this.dowhile_nosave(
+                        this.seq(() => params, this.mask(this.deserialize(composition.body)), args => { params = args }),
+                        this.mask(this.deserialize(composition.test))),
+                    () => params)
+            case 'repeat':
+                return this.let(
+                    { count: composition.count },
+                    this.while(
+                        () => count-- > 0,
+                        this.mask(this.seq(...composition.components.map(this.deserialize)))))
+            case 'retry':
+                return this.let(
+                    { count: composition.count },
+                    params => ({ params }),
+                    this.dowhile(
+                        this.finally(({ params }) => params, this.mask(this.retain_catch(...composition.components.map(this.deserialize)))),
+                        ({ result }) => typeof result.error !== 'undefined' && count-- > 0),
+                    ({ result }) => result)
+            default:
+            composition = Object.assign({}, composition)
+                const combinator = Compiler.combinators()[composition.type]
+                if (combinator.components) {
+                    composition.components = composition.components.map(component => this.lower(component))
+                }
+                for (let j in combinator.args) {
+                    const arg = combinator.args[j]
+                    if (arg.kind === 'composition') {
+                        composition[arg.name] = this.lower(composition[arg.name])
+                    }
+                }
+                return composition
         }
     }
 }
@@ -181,14 +255,15 @@ function encode(composition, actions) {
 }
 
 class Compositions {
-    constructor(wsk) {
+    constructor(wsk, composer) {
         this.actions = wsk.actions
+        this.composer = composer
     }
 
     deploy(composition, name) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (!(composition.constructor && composition.constructor.name === 'Composition')) throw new ComposerError('Invalid argument', composition)
-        const obj = composer.encode(composition, name)
+        const obj = this.composer.encode(composition, name)
         if (obj.composition.type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
         return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
             .then(() => this.actions.update(action)), Promise.resolve())
@@ -259,7 +334,7 @@ class Composer extends Compiler {
         if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
 
         const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
-        wsk.compositions = new Compositions(wsk)
+        wsk.compositions = new Compositions(wsk, this)
         return wsk
     }
 
@@ -272,8 +347,7 @@ class Composer extends Compiler {
     }
 }
 
-const composer = new Composer()
-module.exports = composer
+module.exports = new Composer()
 
 // conductor action
 
@@ -301,9 +375,6 @@ function conductor() {
                 return [{ type: 'action', name: json.name, path }]
             case 'function':
                 return [{ type: 'function', exec: json.function.exec, path }]
-            case 'value':
-            case 'literal':
-                return compile(composer.let({ value: json.value }, () => value))
             case 'finally':
                 var body = compile(json.body, path + '.body')
                 const finalizer = compile(json.finalizer, path + '.finalizer')
@@ -316,21 +387,6 @@ function conductor() {
             case 'mask':
                 var body = sequence(json.components, path)
                 return [[{ type: 'let', let: null, path }], body, [{ type: 'exit', path }]].reduce(chain)
-            case 'retain':
-                return compile(
-                    composer.let(
-                        { params: null },
-                        args => { params = args },
-                        composer.mask(...json.components.map(composer.deserialize)),
-                        result => ({ params, result })))
-            case 'retain_catch':
-                return compile(
-                    composer.seq(
-                        composer.retain(
-                            composer.finally(
-                                composer.seq(...json.components.map(composer.deserialize)),
-                                result => ({ result }))),
-                        ({ params, result }) => ({ params, result: result.result })))
             case 'try':
                 var body = compile(json.body, path + '.body')
                 const handler = chain(compile(json.handler, path + '.handler'), [{ type: 'pass', path }])
@@ -339,15 +395,6 @@ function conductor() {
                 fsm.slice(-1)[0].next = handler.length
                 fsm.push(...handler)
                 return fsm
-            case 'if':
-                return compile(
-                    composer.let(
-                        { params: null },
-                        args => { params = args },
-                        composer.if_nosave(
-                            composer.mask(composer.deserialize(json.test)),
-                            composer.seq(() => params, composer.mask(composer.deserialize(json.consequent))),
-                            composer.seq(() => params, composer.mask(composer.deserialize(json.alternate))))))
             case 'if_nosave':
                 var consequent = compile(json.consequent, path + '.consequent')
                 var alternate = chain(compile(json.alternate, path + '.alternate'), [{ type: 'pass', path }])
@@ -356,15 +403,6 @@ function conductor() {
                 fsm.push(...consequent)
                 fsm.push(...alternate)
                 return fsm
-            case 'while':
-                return compile(
-                    composer.let(
-                        { params: null },
-                        args => { params = args },
-                        composer.while_nosave(
-                            composer.mask(composer.deserialize(json.test)),
-                            composer.seq(() => params, composer.mask(composer.deserialize(json.body)), args => { params = args })),
-                        () => params))
             case 'while_nosave':
                 var consequent = compile(json.body, path + '.body')
                 var alternate = [{ type: 'pass', path }]
@@ -373,15 +411,6 @@ function conductor() {
                 fsm.push(...consequent)
                 fsm.push(...alternate)
                 return fsm
-            case 'dowhile':
-                return compile(
-                    composer.let(
-                        { params: null },
-                        args => { params = args },
-                        composer.dowhile_nosave(
-                            composer.seq(() => params, composer.mask(composer.deserialize(json.body)), args => { params = args }),
-                            composer.mask(composer.deserialize(json.test))),
-                        () => params))
             case 'dowhile_nosave':
                 var test = compile(json.test, path + '.test')
                 var fsm = [compile(json.body, path + '.body'), test, [{ type: 'choice', then: 1, else: 2, path }]].reduce(chain)
@@ -390,22 +419,8 @@ function conductor() {
                 var alternate = [{ type: 'pass', path }]
                 fsm.push(...alternate)
                 return fsm
-            case 'repeat':
-                return compile(
-                    composer.let(
-                        { count: json.count },
-                        composer.while(
-                            () => count-- > 0,
-                            composer.mask(composer.seq(...json.components.map(composer.deserialize))))))
-            case 'retry':
-                return compile(
-                    composer.let(
-                        { count: json.count },
-                        params => ({ params }),
-                        composer.dowhile(
-                            composer.finally(({ params }) => params, composer.mask(composer.retain_catch(...json.components.map(composer.deserialize)))),
-                            ({ result }) => typeof result.error !== 'undefined' && count-- > 0),
-                        ({ result }) => result))
+            default:
+                return compile(composer.lower(json))
         }
     }
 
