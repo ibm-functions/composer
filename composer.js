@@ -90,23 +90,6 @@ function composer(composerCode, conductorCode) {
         constructor(composition) {
             Object.assign(this, composition)
         }
-
-        /** Names the composition and returns a composition which invokes the named composition */
-        named(name) {
-            if (arguments.length > 1) throw new ComposerError('Too many arguments')
-            if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
-            name = parseActionName(name)
-            return new Composition({ type: 'composition', name, composition: this })
-        }
-
-        /** Encodes all compositions as actions by injecting the conductor code in them */
-        encode(name) {
-            if (arguments.length > 1) throw new ComposerError('Too many arguments')
-            if (typeof name !== 'undefined' && typeof name !== 'string') throw new ComposerError('Invalid argument', name)
-            const actions = []
-            const composition = encode(typeof name === 'string' ? this.named(name) : this, actions)
-            return { composition, actions }
-        }
     }
 
     class Compositions {
@@ -117,7 +100,7 @@ function composer(composerCode, conductorCode) {
         deploy(composition, name) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-            const obj = composition.encode(name)
+            const obj = composer.encode(composition, name)
             if (obj.composition.type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
             return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
                 .then(() => this.actions.update(action)), Promise.resolve())
@@ -239,6 +222,13 @@ function composer(composerCode, conductorCode) {
             return new Composition(composition)
         }
 
+        composition(name, composition) {
+            if (arguments.length > 2) throw new ComposerError('Too many arguments')
+            if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
+            name = parseActionName(name)
+            return new Composition({ type: 'composition', name, composition: this.task(composition) })
+        }
+
         openwhisk(options) {
             // try to extract apihost and key first from whisk property file file and then from process.env
             let apihost
@@ -267,9 +257,18 @@ function composer(composerCode, conductorCode) {
             wsk.compositions = new Compositions(wsk)
             return wsk
         }
+
+        encode(composition, name) {
+            if (arguments.length > 2) throw new ComposerError('Too many arguments')
+            if (typeof name !== 'undefined' && typeof name !== 'string') throw new ComposerError('Invalid argument', name)
+            const actions = []
+            composition = encode(typeof name === 'string' ? composer.composition(name, composition) : composition, actions)
+            return { composition, actions }
+        }
     }
 
-    return new Composer()
+    const composer = new Composer()
+    return composer
 }
 
 // conductor action
