@@ -9,12 +9,13 @@ const composer = require('../composer')
 
 const argv = minimist(process.argv.slice(2), {
     string: ['apihost', 'auth', 'deploy'],
-    boolean: ['insecure', 'encode', 'json'],
+    boolean: ['insecure', 'encode', 'json', 'lower'],
     alias: { auth: 'u', insecure: 'i' }
 })
 
 let count = 0
 if (argv.json) count++
+if (argv.lower) count++
 if (argv.encode) count++
 if (typeof argv.deploy !== 'undefined') count++
 
@@ -23,6 +24,7 @@ if (argv._.length !== 1 || count > 1 || argv.deploy === '') {
     console.error('  compose composition.js[on] command [flags]')
     console.error('Commands:')
     console.error('  --json                 output the json representation for the composition (default command)')
+    console.error('  --lower                output the lowered json representation for the composition')
     console.error('  --deploy NAME          deploy the composition with name NAME')
     console.error('  --encode               output the conductor action code for the composition')
     console.error('Flags:')
@@ -46,6 +48,8 @@ if (argv.deploy) {
         }, console.error)
 } else if (argv.encode) {
     console.log(composer.encode(composition, 'anonymous').actions.slice(-1)[0].action.exec.code)
+} else if (argv.lower) {
+    console.log(JSON.stringify(composer.lower(composition), null, 4))
 } else {
     console.log(JSON.stringify(composition, null, 4))
 }
