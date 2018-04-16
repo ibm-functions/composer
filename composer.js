@@ -16,127 +16,119 @@
 
 'use strict'
 
-// compiler module
+// compiler code shared between composer and conductor
 
-function composer() {
-    class ComposerError extends Error {
-        constructor(message, argument) {
-            super(message + (typeof argument !== 'undefined' ? '\nArgument: ' + util.inspect(argument) : ''))
-        }
+class ComposerError extends Error {
+    constructor(message, argument) {
+        super(message + (typeof argument !== 'undefined' ? '\nArgument: ' + util.inspect(argument) : ''))
+    }
+}
+
+class Composition {
+}
+
+class Compiler {
+    deserialize(composition) {
+        return Object.assign(new Composition(), composition)
     }
 
-    class Composition {
-        constructor(composition) {
-            Object.assign(this, composition)
-        }
+    task(obj) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        if (obj === null) return this.seq()
+        if (obj instanceof Composition) return obj
+        if (typeof obj === 'function') return this.function(obj)
+        if (typeof obj === 'string') return this.action(obj)
+        throw new ComposerError('Invalid argument', obj)
     }
 
-    class Compiler {
-        deserialize(composition) {
-            return new Composition(composition)
+    function(fun) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        if (typeof fun === 'function') {
+            fun = `${fun}`
+            if (fun.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', fun)
         }
-
-        task(obj) {
-            if (arguments.length > 1) throw new ComposerError('Too many arguments')
-            if (obj === null) return this.seq()
-            if (obj instanceof Composition) return obj
-            if (typeof obj === 'function') return this.function(obj)
-            if (typeof obj === 'string') return this.action(obj)
-            throw new ComposerError('Invalid argument', obj)
+        if (typeof fun === 'string') {
+            fun = { kind: 'nodejs:default', code: fun }
         }
-
-        function(fun) {
-            if (arguments.length > 1) throw new ComposerError('Too many arguments')
-            if (typeof fun === 'function') {
-                fun = `${fun}`
-                if (fun.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', fun)
-            }
-            if (typeof fun === 'string') {
-                fun = { kind: 'nodejs:default', code: fun }
-            }
-            if (typeof fun !== 'object' || fun === null) throw new ComposerError('Invalid argument', fun)
-            return this.deserialize({ type: 'function', function: { exec: fun } })
-        }
+        if (typeof fun !== 'object' || fun === null) throw new ComposerError('Invalid argument', fun)
+        return this.deserialize({ type: 'function', function: { exec: fun } })
     }
 
-    const constructs = [
-        { name: 'seq', components: true },
-        { name: 'sequence', components: true },
-        { name: 'if', args: [{ name: 'test', kind: 'composition' }, { name: 'consequent', kind: 'composition' }, { name: 'alternate', kind: 'composition', optional: true }] },
-        { name: 'if_nosave', args: [{ name: 'test', kind: 'composition' }, { name: 'consequent', kind: 'composition' }, { name: 'alternate', kind: 'composition', optional: true }] },
-        { name: 'while', args: [{ name: 'test', kind: 'composition' }, { name: 'body', kind: 'composition' }] },
-        { name: 'while_nosave', args: [{ name: 'test', kind: 'composition' }, { name: 'body', kind: 'composition' }] },
-        { name: 'dowhile', args: [{ name: 'body', kind: 'composition' }, { name: 'test', kind: 'composition' }] },
-        { name: 'dowhile_nosave', args: [{ name: 'body', kind: 'composition' }, { name: 'test', kind: 'composition' }] },
-        { name: 'try', args: [{ name: 'body', kind: 'composition' }, { name: 'handler', kind: 'composition' }] },
-        { name: 'finally', args: [{ name: 'body', kind: 'composition' }, { name: 'finalizer', kind: 'composition' }] },
-        { name: 'retain', components: true },
-        { name: 'retain_catch', components: true },
-        { name: 'let', args: [{ name: 'declarations', kind: 'object' }], components: true },
-        { name: 'mask', components: true },
-        { name: 'repeat', args: [{ name: 'count', kind: 'number' }], components: true },
-        { name: 'retry', args: [{ name: 'count', kind: 'number' }], components: true },
-        { name: 'value', args: [{ name: 'value', kind: 'value' }] },
-        { name: 'literal', args: [{ name: 'value', kind: 'value' }] },
-        { name: 'action', args: [{ name: 'name', kind: 'string' }] }
-    ]
+    static init() {
+        const constructs = [
+            { name: 'seq', components: true },
+            { name: 'sequence', components: true },
+            { name: 'if', args: [{ name: 'test', kind: 'composition' }, { name: 'consequent', kind: 'composition' }, { name: 'alternate', kind: 'composition', optional: true }] },
+            { name: 'if_nosave', args: [{ name: 'test', kind: 'composition' }, { name: 'consequent', kind: 'composition' }, { name: 'alternate', kind: 'composition', optional: true }] },
+            { name: 'while', args: [{ name: 'test', kind: 'composition' }, { name: 'body', kind: 'composition' }] },
+            { name: 'while_nosave', args: [{ name: 'test', kind: 'composition' }, { name: 'body', kind: 'composition' }] },
+            { name: 'dowhile', args: [{ name: 'body', kind: 'composition' }, { name: 'test', kind: 'composition' }] },
+            { name: 'dowhile_nosave', args: [{ name: 'body', kind: 'composition' }, { name: 'test', kind: 'composition' }] },
+            { name: 'try', args: [{ name: 'body', kind: 'composition' }, { name: 'handler', kind: 'composition' }] },
+            { name: 'finally', args: [{ name: 'body', kind: 'composition' }, { name: 'finalizer', kind: 'composition' }] },
+            { name: 'retain', components: true },
+            { name: 'retain_catch', components: true },
+            { name: 'let', args: [{ name: 'declarations', kind: 'object' }], components: true },
+            { name: 'mask', components: true },
+            { name: 'repeat', args: [{ name: 'count', kind: 'number' }], components: true },
+            { name: 'retry', args: [{ name: 'count', kind: 'number' }], components: true },
+            { name: 'value', args: [{ name: 'value', kind: 'value' }] },
+            { name: 'literal', args: [{ name: 'value', kind: 'value' }] },
+            { name: 'action', args: [{ name: 'name', kind: 'string' }] }
+        ]
 
-    for (let i in constructs) {
-        const construct = constructs[i]
-        const composition = { type: construct.name }
-        Compiler.prototype[construct.name] = function () {
-            const skip = construct.args && construct.args.length || 0
-            if (construct.components) {
-                composition.components = Array.prototype.slice.call(arguments, skip).map(obj => this.task(obj))
-            } else {
-                if (arguments.length > skip) throw new ComposerError('Too many arguments')
-            }
-            for (let j in construct.args) {
-                const arg = construct.args[j]
-                switch (arg.kind) {
-                    case 'composition':
-                        composition[arg.name] = this.task(arg.optional ? arguments[j] || null : arguments[j])
-                        break
-                    case 'number':
-                        if (typeof arguments[j] !== 'number') throw new ComposerError('Invalid argument', arguments[j])
-                        composition[arg.name] = arguments[j]
-                        break
-                    case 'object':
-                        if (typeof arguments[j] !== 'object' || arguments[j] === null || Array.isArray(arguments[j])) throw new ComposerError('Invalid argument', arguments[j])
-                        composition[arg.name] = arguments[j]
-                        break
-                    case 'value':
-                        if (typeof arguments[j] === 'function') throw new ComposerError('Invalid argument', arguments[j])
-                        composition[arg.name] = typeof arguments[j] === 'undefined' ? {} : arguments[j]
-                        break
-                    case 'string':
-                        if (typeof arguments[j] !== 'string') throw new ComposerError('Invalid argument', arguments[j])
-                        composition[arg.name] = arguments[j]
-                        break
+        for (let i in constructs) {
+            const construct = constructs[i]
+            const composition = { type: construct.name }
+            Compiler.prototype[construct.name] = function () {
+                const skip = construct.args && construct.args.length || 0
+                if (construct.components) {
+                    composition.components = Array.prototype.slice.call(arguments, skip).map(obj => this.task(obj))
+                } else {
+                    if (arguments.length > skip) throw new ComposerError('Too many arguments')
                 }
+                for (let j in construct.args) {
+                    const arg = construct.args[j]
+                    switch (arg.kind) {
+                        case 'composition':
+                            composition[arg.name] = this.task(arg.optional ? arguments[j] || null : arguments[j])
+                            break
+                        case 'number':
+                            if (typeof arguments[j] !== 'number') throw new ComposerError('Invalid argument', arguments[j])
+                            composition[arg.name] = arguments[j]
+                            break
+                        case 'object':
+                            if (typeof arguments[j] !== 'object' || arguments[j] === null || Array.isArray(arguments[j])) throw new ComposerError('Invalid argument', arguments[j])
+                            composition[arg.name] = arguments[j]
+                            break
+                        case 'value':
+                            if (typeof arguments[j] === 'function') throw new ComposerError('Invalid argument', arguments[j])
+                            composition[arg.name] = typeof arguments[j] === 'undefined' ? {} : arguments[j]
+                            break
+                        case 'string':
+                            if (typeof arguments[j] !== 'string') throw new ComposerError('Invalid argument', arguments[j])
+                            composition[arg.name] = arguments[j]
+                            break
+                    }
+                }
+                return this.deserialize(composition)
             }
-            return this.deserialize(composition)
         }
     }
-
-    return { ComposerError, Composition, Compiler }
 }
 
 // composer module
 
-const { minify } = require('uglify-es')
-
-const { ComposerError, Composition, Compiler } = composer()
-
-// initialize composer with composer code and conductor code
-const conductorCode = minify(`${conductor}`, { output: { max_line_len: 127 } }).code
-const composerCode = minify(`${composer}`, { output: { max_line_len: 127 } }).code
+Compiler.init()
 
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const util = require('util')
 const { version } = require('./package.json')
+const { minify } = require('uglify-es')
+
+const conductorCode = minify(`${ComposerError}${Composition}${Compiler}const main=(${conductor})()`, { output: { max_line_len: 127 } }).code
 
 /**
  * Parses a (possibly fully qualified) resource name and validates it. If it's not a fully qualified name,
@@ -176,7 +168,7 @@ function encode(composition, actions) {
         composition.components = composition.components.map(composition => encode(composition, actions))
     }
     if (composition.type === 'composition') {
-        const code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(encode(composition.composition, actions), null, 4)}\n\n// do not edit below this point\n\nconst main=(${conductorCode})(eval,(${composerCode})(),composition)` // invoke conductor on composition
+        const code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(encode(composition.composition, actions), null, 4)}\n\n// do not edit below this point\n\n${conductorCode}` // invoke conductor on composition
         composition.action = { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition.composition }] }
         delete composition.composition
         composition.type = 'action'
@@ -189,15 +181,14 @@ function encode(composition, actions) {
 }
 
 class Compositions {
-    constructor(wsk, composer) {
+    constructor(wsk) {
         this.actions = wsk.actions
-        this.composer = composer
     }
 
     deploy(composition, name) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-        const obj = this.composer.encode(composition, name)
+        const obj = composer.encode(composition, name)
         if (obj.composition.type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
         return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
             .then(() => this.actions.update(action)), Promise.resolve())
@@ -268,7 +259,7 @@ class Composer extends Compiler {
         if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
 
         const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
-        wsk.compositions = new Compositions(wsk, this)
+        wsk.compositions = new Compositions(wsk)
         return wsk
     }
 
@@ -281,11 +272,13 @@ class Composer extends Compiler {
     }
 }
 
-module.exports = new Composer()
+const composer = new Composer()
+module.exports = composer
 
 // conductor action
 
-function conductor(__eval__, { Compiler }, composition) {
+function conductor() {
+    Compiler.init()
     const composer = new Compiler()
 
     function chain(front, back) {
@@ -492,7 +485,7 @@ function conductor(__eval__, { Compiler }, composition) {
             for (const name in env) main += `arguments[1]['${name}']=${name};`
             main += '}})'
             try {
-                return __eval__(main)(params, env)
+                return (1, eval)(main)(params, env)
             } finally {
                 for (const name in env) set(name, env[name])
             }
