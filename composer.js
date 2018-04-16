@@ -35,7 +35,7 @@ class Compiler {
     task(obj) {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (obj === null) return this.seq()
-        if (obj instanceof Composition) return obj
+        if (obj.constructor && obj.constructor.name === 'Composition') return obj
         if (typeof obj === 'function') return this.function(obj)
         if (typeof obj === 'string') return this.action(obj)
         throw new ComposerError('Invalid argument', obj)
@@ -160,7 +160,7 @@ function parseActionName(name) {
 function encode(composition, actions) {
     composition = Object.assign({}, composition)
     Object.keys(composition).forEach(key => {
-        if (composition[key] instanceof Composition) {
+        if (composition[key].constructor && composition[key].constructor.name === 'Composition') {
             composition[key] = encode(composition[key], actions)
         }
     })
@@ -187,7 +187,7 @@ class Compositions {
 
     deploy(composition, name) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
-        if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+        if (!(composition.constructor && composition.constructor.name === 'Composition')) throw new ComposerError('Invalid argument', composition)
         const obj = composer.encode(composition, name)
         if (obj.composition.type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
         return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
