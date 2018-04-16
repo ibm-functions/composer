@@ -7,7 +7,7 @@ const wsk = composer.openwhisk({ ignore_certs: process.env.IGNORE_CERTS && proce
 const define = action => wsk.actions.delete(action.name).catch(() => { }).then(() => wsk.actions.create(action))
 
 // deploy and invoke composition
-const invoke = (task, params = {}, blocking = true) => wsk.compositions.deploy(task, name).then(() => wsk.actions.invoke({ name, params, blocking }))
+const invoke = (task, params = {}, blocking = true) => wsk.compositions.deploy(composer.composition(name, task)).then(() => wsk.actions.invoke({ name, params, blocking }))
 
 describe('composer', function () {
     this.timeout(60000)

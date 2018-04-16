@@ -135,7 +135,7 @@ class Compiler {
     // recursively lower non-primitive combinators
     lower(composition, omitting = []) {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
-        if (!composition instanceof Composition) throw new ComposerError('Invalid argument', composition)
+        if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
         if (!Array.isArray(omitting)) throw new ComposerError('Invalid argument', omitting)
 
         // keep lowering root combinator
@@ -276,11 +276,11 @@ class Compositions {
         this.composer = composer
     }
 
-    deploy(composition, name) {
-        if (arguments.length > 2) throw new ComposerError('Too many arguments')
-        if (!composition instanceof Composition) throw new ComposerError('Invalid argument', composition)
-        const obj = this.composer.encode(composition, name)
-        if (obj.composition.type !== 'action') throw new ComposerError('Cannot deploy anonymous composition')
+    deploy(composition) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+        if (composition.type !== 'composition') throw new ComposerError('Cannot deploy anonymous composition')
+        const obj = this.composer.encode(composition)
         return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
             .then(() => this.actions.update(action)), Promise.resolve())
             .then(() => obj)
@@ -364,10 +364,9 @@ class Composer extends Compiler {
     }
 
     // encode composition into { composition, actions } by encoding nested compositions into actions and extracting nested action definitions
-    encode(composition, name) {
-        if (arguments.length > 2) throw new ComposerError('Too many arguments')
-        if (!composition instanceof Composition) throw new ComposerError('Invalid argument', composition)
-        if (typeof name !== 'undefined' && typeof name !== 'string') throw new ComposerError('Invalid argument', name)
+    encode(composition) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
 
         const actions = []
 
@@ -394,7 +393,7 @@ class Composer extends Compiler {
             return composition
         }
 
-        composition = encode(typeof name === 'string' ? this.composition(name, composition) : composition)
+        composition = encode(composition)
         return { composition, actions }
     }
 }
