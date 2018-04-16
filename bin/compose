@@ -45,7 +45,7 @@ if (argv.deploy) {
             console.log(`ok: created action${names.length > 1 ? 's' : ''} ${names}`)
         }, console.error)
 } else if (argv.encode) {
-    console.log(composition.encode('anonymous').actions.slice(-1)[0].action.exec.code)
+    console.log(composer.encode(composition, 'anonymous').actions.slice(-1)[0].action.exec.code)
 } else {
     console.log(JSON.stringify(composition, null, 4))
 }
