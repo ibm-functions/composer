@@ -125,7 +125,66 @@ function composer(composerCode, conductorCode) {
         }
     }
 
+    const constructs = [
+        { name: 'seq', components: true },
+        { name: 'sequence', components: true },
+        { name: 'if', args: [{ name: 'test', kind: 'composition' }, { name: 'consequent', kind: 'composition' }, { name: 'alternate', kind: 'composition', optional: true }] },
+        { name: 'if_nosave', args: [{ name: 'test', kind: 'composition' }, { name: 'consequent', kind: 'composition' }, { name: 'alternate', kind: 'composition', optional: true }] },
+        { name: 'while', args: [{ name: 'test', kind: 'composition' }, { name: 'body', kind: 'composition' }] },
+        { name: 'while_nosave', args: [{ name: 'test', kind: 'composition' }, { name: 'body', kind: 'composition' }] },
+        { name: 'dowhile', args: [{ name: 'body', kind: 'composition' }, { name: 'test', kind: 'composition' }] },
+        { name: 'dowhile_nosave', args: [{ name: 'body', kind: 'composition' }, { name: 'test', kind: 'composition' }] },
+        { name: 'try', args: [{ name: 'body', kind: 'composition' }, { name: 'handler', kind: 'composition' }] },
+        { name: 'finally', args: [{ name: 'body', kind: 'composition' }, { name: 'finalizer', kind: 'composition' }] },
+        { name: 'retain', components: true },
+        { name: 'retain_catch', components: true },
+        { name: 'let', args: [{ name: 'declarations', kind: 'object' }], components: true },
+        { name: 'mask', components: true },
+        { name: 'repeat', args: [{ name: 'count', kind: 'number' }], components: true },
+        { name: 'retry', args: [{ name: 'count', kind: 'number' }], components: true },
+        { name: 'value', args: [{ name: 'value', kind: 'value' }] },
+        { name: 'literal', args: [{ name: 'value', kind: 'value' }] }
+    ]
+
+
     class Composer {
+        constructor() {
+            const composer = this
+            for (let i in constructs) {
+                const construct = constructs[i]
+                const composition = { type: construct.name }
+                composer[construct.name] = function () {
+                    const skip = construct.args && construct.args.length || 0
+                    if (construct.components) {
+                        composition.components = Array.prototype.slice.call(arguments, skip).map(obj => composer.task(obj))
+                    } else {
+                        if (arguments.length > skip) throw new ComposerError('Too many arguments')
+                    }
+                    for (let j in construct.args) {
+                        const arg = construct.args[j]
+                        switch (arg.kind) {
+                            case 'composition':
+                                composition[arg.name] = composer.task(arg.optional ? arguments[j] || null : arguments[j])
+                                break
+                            case 'number':
+                                if (typeof arguments[j] !== 'number') throw new ComposerError('Invalid argument', arguments[j])
+                                composition[arg.name] = arguments[j]
+                                break
+                            case 'object':
+                                if (typeof arguments[j] !== 'object' || arguments[j] === null) throw new ComposerError('Invalid argument', arguments[j])
+                                composition[arg.name] = arguments[j]
+                                break
+                            case 'value':
+                                if (typeof arguments[j] === 'function') throw new ComposerError('Invalid argument', arguments[j])
+                                composition[arg.name] = typeof arguments[j] === 'undefined' ? {} : arguments[j]
+                                break
+                        }
+                    }
+                    return new Composition(composition)
+                }
+            }
+        }
+
         openwhisk(options) {
             // try to extract apihost and key first from whisk property file file and then from process.env
             let apihost
@@ -155,17 +214,6 @@ function composer(composerCode, conductorCode) {
             return wsk
         }
 
-        seq() {
-            const args = Array.prototype.slice.call(arguments)
-            return new Composition({ type: 'seq', components: args.map(obj => this.task(obj)) })
-        }
-
-        value() {
-            if (arguments.length > 1) throw new ComposerError('Too many arguments')
-            if (typeof value === 'function') throw new ComposerError('Invalid argument', value)
-            return new Composition({ type: 'value', value: typeof value === 'undefined' ? {} : value })
-        }
-
         /** Takes a serialized Composition and returns a Composition instance */
         deserialize(composition) {
             return new Composition(composition)
@@ -178,63 +226,6 @@ function composer(composerCode, conductorCode) {
             if (typeof obj === 'function') return this.function(obj)
             if (typeof obj === 'string') return this.action(obj)
             throw new ComposerError('Invalid argument', obj)
-        }
-
-        sequence(/* ...components */) {
-            const args = Array.prototype.slice.call(arguments)
-            return new Composition({ type: 'sequence', components: args.map(obj => this.task(obj)) })
-        }
-
-        if(test, consequent, alternate) {
-            if (arguments.length > 3) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'if', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null) })
-        }
-
-        if_nosave(test, consequent, alternate) {
-            if (arguments.length > 3) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'if_nosave', test: this.task(test), consequent: this.task(consequent), alternate: this.task(alternate || null) })
-        }
-
-        while(test, body) {
-            if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'while', test: this.task(test), body: this.task(body) })
-        }
-
-        while_nosave(test, body) {
-            if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'while_nosave', test: this.task(test), body: this.task(body) })
-        }
-
-        dowhile(body, test) {
-            if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'dowhile', test: this.task(test), body: this.task(body) })
-        }
-
-        dowhile_nosave(body, test) {
-            if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'dowhile_nosave', test: this.task(test), body: this.task(body) })
-        }
-
-        try(body, handler) {
-            if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'try', body: this.task(body), handler: this.task(handler) })
-        }
-
-        finally(body, finalizer) {
-            if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            return new Composition({ type: 'finally', body: this.task(body), finalizer: this.task(finalizer) })
-        }
-
-        let(declarations /* , ...components */) {
-            if (typeof declarations !== 'object' || declarations === null) throw new ComposerError('Invalid argument', declarations)
-            const args = Array.prototype.slice.call(arguments, 1)
-            return new Composition({ type: 'let', declarations, components: args.map(obj => this.task(obj), this) })
-        }
-
-        literal(value) {
-            if (arguments.length > 1) throw new ComposerError('Too many arguments')
-            if (typeof value === 'function') throw new ComposerError('Invalid argument', value)
-            return new Composition({ type: 'literal', value: typeof value === 'undefined' ? {} : value })
         }
 
         function(fun) {
@@ -278,33 +269,6 @@ function composer(composerCode, conductorCode) {
             const composition = { type: 'action', name }
             if (exec) composition.action = { exec }
             return new Composition(composition)
-        }
-
-        retain(/* ...components */) {
-            const args = Array.prototype.slice.call(arguments)
-            return new Composition({ type: 'retain', components: args.map(obj => this.task(obj)) })
-        }
-
-        retain_catch(/* ...components */) {
-            const args = Array.prototype.slice.call(arguments)
-            return new Composition({ type: 'retain_catch', components: args.map(obj => this.task(obj)) })
-        }
-
-        repeat(count /* , ...components */) {
-            if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
-            const args = Array.prototype.slice.call(arguments, 1)
-            return new Composition({ type: 'repeat', count, components: args.map(obj => this.task(obj)) })
-        }
-
-        retry(count /* , ...components */) {
-            if (typeof count !== 'number') throw new ComposerError('Invalid argument', count)
-            const args = Array.prototype.slice.call(arguments, 1)
-            return new Composition({ type: 'retry', count, components: args.map(obj => this.task(obj)) })
-        }
-
-        mask(/* ...components */) {
-            const args = Array.prototype.slice.call(arguments)
-            return new Composition({ type: 'mask', components: args.map(obj => this.task(obj)) })
         }
     }
 
