@@ -25,21 +25,21 @@ class ComposerError extends Error {
     }
 }
 
-// marker class for composition objects
+// composition class
 class Composition {
     // weaker instanceof to tolerate multiple instances of this class
     static [Symbol.hasInstance](instance) {
         return instance.constructor && instance.constructor.name === 'Composition'
     }
+
+    // construct a composition object with the specified fields
+    constructor(composition) {
+        return Object.assign(this, composition)
+    }
 }
 
 // compiler class
 class Compiler {
-    // construct a composition object with the specified fields
-    deserialize(composition) {
-        return Object.assign(new Composition(), composition)
-    }
-
     // detect task type and create corresponding composition object
     task(task) {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
@@ -61,34 +61,113 @@ class Compiler {
             fun = { kind: 'nodejs:default', code: fun }
         }
         if (typeof fun !== 'object' || fun === null) throw new ComposerError('Invalid argument', fun)
-        return this.deserialize({ type: 'function', function: { exec: fun } })
+        return new Composition({ type: 'function', function: { exec: fun } })
     }
 
     // standard combinators
     static get combinators() {
         return {
-            seq: { components: true, lowered: true },
+            seq: { components: true },
             sequence: { components: true },
-            if: { args: [{ name: 'test', type: 'composition' }, { name: 'consequent', type: 'composition' }, { name: 'alternate', type: 'composition', optional: true }], lowered: true },
-            if_nosave: { args: [{ name: 'test', type: 'composition' }, { name: 'consequent', type: 'composition' }, { name: 'alternate', type: 'composition', optional: true }] },
-            while: { args: [{ name: 'test', type: 'composition' }, { name: 'body', type: 'composition' }], lowered: true },
-            while_nosave: { args: [{ name: 'test', type: 'composition' }, { name: 'body', type: 'composition' }] },
-            dowhile: { args: [{ name: 'body', type: 'composition' }, { name: 'test', type: 'composition' }], lowered: true },
-            dowhile_nosave: { args: [{ name: 'body', type: 'composition' }, { name: 'test', type: 'composition' }] },
-            try: { args: [{ name: 'body', type: 'composition' }, { name: 'handler', type: 'composition' }] },
-            finally: { args: [{ name: 'body', type: 'composition' }, { name: 'finalizer', type: 'composition' }] },
-            retain: { components: true, lowered: true },
-            retain_catch: { components: true, lowered: true },
-            let: { args: [{ name: 'declarations', type: 'object' }], components: true },
+            if: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }] },
+            if_nosave: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }] },
+            while: { args: [{ _: 'test' }, { _: 'body' }] },
+            while_nosave: { args: [{ _: 'test' }, { _: 'body' }] },
+            dowhile: { args: [{ _: 'body' }, { _: 'test' }] },
+            dowhile_nosave: { args: [{ _: 'body' }, { _: 'test' }] },
+            try: { args: [{ _: 'body' }, { _: 'handler' }] },
+            finally: { args: [{ _: 'body' }, { _: 'finalizer' }] },
+            retain: { components: true },
+            retain_catch: { components: true },
+            let: { args: [{ _: 'declarations', type: 'object' }], components: true },
             mask: { components: true },
-            action: { args: [{ name: 'name', type: 'string' }] },
-            composition: { args: [{ name: 'name', type: 'string' }, { name: 'composition', type: 'composition' }] },
-            repeat: { args: [{ name: 'count', type: 'number' }], components: true, lowered: true },
-            retry: { args: [{ name: 'count', type: 'number' }], components: true, lowered: true },
-            value: { args: [{ name: 'value', type: 'value' }], lowered: true },
-            literal: { args: [{ name: 'value', type: 'value' }], lowered: true },
-            function: { args: [{ name: 'function', type: 'object' }] }
+            action: { args: [{ _: 'name', type: 'string' }] },
+            composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition' }] },
+            repeat: { args: [{ _: 'count', type: 'number' }], components: true },
+            retry: { args: [{ _: 'count', type: 'number' }], components: true },
+            value: { args: [{ _: 'value', type: 'value' }] },
+            literal: { args: [{ _: 'value', type: 'value' }] },
+            function: { args: [{ _: 'function', type: 'object' }] }
         }
+    }
+
+    // lowering
+
+    _seq(composition) {
+        return this.sequence(...composition.components)
+    }
+
+    _value(composition) {
+        return this._literal(composition)
+    }
+
+    _literal(composition) {
+        return this.let({ value: composition.value }, () => value)
+    }
+
+    _retain(composition) {
+        return this.let(
+            { params: null },
+            args => { params = args },
+            this.mask(...composition.components),
+            result => ({ params, result }))
+    }
+
+    _retain_catch(composition) {
+        return this.seq(
+            this.retain(
+                this.finally(
+                    this.seq(...composition.components),
+                    result => ({ result }))),
+            ({ params, result }) => ({ params, result: result.result }))
+    }
+
+    _if(composition) {
+        return this.let(
+            { params: null },
+            args => { params = args },
+            this.if_nosave(
+                this.mask(composition.test),
+                this.seq(() => params, this.mask(composition.consequent)),
+                this.seq(() => params, this.mask(composition.alternate))))
+    }
+
+    _while(composition) {
+        return this.let(
+            { params: null },
+            args => { params = args },
+            this.while_nosave(
+                this.mask(composition.test),
+                this.seq(() => params, this.mask(composition.body), args => { params = args })),
+            () => params)
+    }
+
+    _dowhile(composition) {
+        return this.let(
+            { params: null },
+            args => { params = args },
+            this.dowhile_nosave(
+                this.seq(() => params, this.mask(composition.body), args => { params = args }),
+                this.mask(composition.test)),
+            () => params)
+    }
+
+    _repeat(composition) {
+        return this.let(
+            { count: composition.count },
+            this.while(
+                () => count-- > 0,
+                this.mask(this.seq(...composition.components))))
+    }
+
+    _retry(composition) {
+        return this.let(
+            { count: composition.count },
+            params => ({ params }),
+            this.dowhile(
+                this.finally(({ params }) => params, this.mask(this.retain_catch(...composition.components))),
+                ({ result }) => result.error !== undefined && count-- > 0),
+            ({ result }) => result)
     }
 
     // define combinator methods for the standard combinators
@@ -97,39 +176,49 @@ class Compiler {
             const combinator = Compiler.combinators[type]
             // do not overwrite hand-written combinators
             Compiler.prototype[type] = Compiler.prototype[type] || function () {
-                const composition = this.deserialize({ type })
+                const composition = new Composition({ type })
                 const skip = combinator.args && combinator.args.length || 0
                 if (combinator.components) {
                     composition.components = Array.prototype.slice.call(arguments, skip).map(obj => this.task(obj))
                 } else {
                     if (arguments.length > skip) throw new ComposerError('Too many arguments')
                 }
-                for (let i in combinator.args) {
+                for (let i = 0; i < skip; ++i) {
                     const arg = combinator.args[i]
                     const argument = arg.optional ? arguments[i] || null : arguments[i]
                     switch (arg.type) {
-                        case 'composition':
-                            composition[arg.name] = this.task(argument)
+                        case undefined:
+                            composition[arg._] = this.task(argument)
                             continue
                         case 'value':
                             if (typeof argument === 'function') throw new ComposerError('Invalid argument', argument)
-                            composition[arg.name] = argument === undefined ? {} : argument
+                            composition[arg._] = argument === undefined ? {} : argument
                             continue
-                        case 'string':
-                            if (typeof argument !== 'string') throw new ComposerError('Invalid argument', argument)
-                            break
-                        case 'number':
-                            if (typeof argument !== 'number') throw new ComposerError('Invalid argument', argument)
-                            break
                         case 'object':
-                            if (typeof argument !== 'object' || argument === null || Array.isArray(argument)) throw new ComposerError('Invalid argument', argument)
-                            break
+                            if (argument === null || Array.isArray(argument)) throw new ComposerError('Invalid argument', argument)
+                        default:
+                            if (typeof argument !== arg.type) throw new ComposerError('Invalid argument', argument)
+                            composition[arg._] = argument
                     }
-                    composition[arg.name] = argument
                 }
                 return composition
             }
         }
+    }
+
+    // recursively deserialize composition
+    deserialize(composition) {
+        composition = new Composition(composition) // copy
+        const combinator = Compiler.combinators[composition.type]
+        if (combinator.components) {
+            composition.components = composition.components.map(composition => this.deserialize(composition))
+        }
+        for (let arg of combinator.args || []) {
+            if (arg.type === undefined) {
+                composition[arg._] = this.deserialize(composition[arg._])
+            }
+        }
+        return composition
     }
 
     // recursively lower non-primitive combinators
@@ -138,93 +227,26 @@ class Compiler {
         if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
         if (!Array.isArray(omitting)) throw new ComposerError('Invalid argument', omitting)
 
-        // keep lowering root combinator
-        while (true) {
-            if (Compiler.combinators[composition.type].lowered && omitting.indexOf(composition.type) < 0) {
-                switch (composition.type) {
-                    case 'seq':
-                        composition = this.sequence(...composition.components.map(this.deserialize))
-                        continue
-                    case 'value':
-                    case 'literal':
-                        composition = this.let({ value: composition.value }, () => value)
-                        continue
-                    case 'retain':
-                        composition = this.let(
-                            { params: null },
-                            args => { params = args },
-                            this.mask(...composition.components.map(this.deserialize)),
-                            result => ({ params, result }))
-                        continue
-                    case 'retain_catch':
-                        composition = this.seq(
-                            this.retain(
-                                this.finally(
-                                    this.seq(...composition.components.map(this.deserialize)),
-                                    result => ({ result }))),
-                            ({ params, result }) => ({ params, result: result.result }))
-                        continue
-                    case 'if':
-                        composition = this.let(
-                            { params: null },
-                            args => { params = args },
-                            this.if_nosave(
-                                this.mask(this.deserialize(composition.test)),
-                                this.seq(() => params, this.mask(this.deserialize(composition.consequent))),
-                                this.seq(() => params, this.mask(this.deserialize(composition.alternate)))))
-                        continue
-                    case 'while':
-                        composition = this.let(
-                            { params: null },
-                            args => { params = args },
-                            this.while_nosave(
-                                this.mask(this.deserialize(composition.test)),
-                                this.seq(() => params, this.mask(this.deserialize(composition.body)), args => { params = args })),
-                            () => params)
-                        continue
-                    case 'dowhile':
-                        composition = this.let(
-                            { params: null },
-                            args => { params = args },
-                            this.dowhile_nosave(
-                                this.seq(() => params, this.mask(this.deserialize(composition.body)), args => { params = args }),
-                                this.mask(this.deserialize(composition.test))),
-                            () => params)
-                        continue
-                    case 'repeat':
-                        composition = this.let(
-                            { count: composition.count },
-                            this.while(
-                                () => count-- > 0,
-                                this.mask(this.seq(...composition.components.map(this.deserialize)))))
-                        continue
-                    case 'retry':
-                        composition = this.let(
-                            { count: composition.count },
-                            params => ({ params }),
-                            this.dowhile(
-                                this.finally(({ params }) => params, this.mask(this.retain_catch(...composition.components.map(this.deserialize)))),
-                                ({ result }) => typeof result.error !== 'undefined' && count-- > 0),
-                            ({ result }) => result)
-                        continue
+        const lower = composition => {
+            composition = new Composition(composition) // copy
+            // repeatedly lower root combinator
+            while (omitting.indexOf(composition.type) < 0 && this[`_${composition.type}`]) {
+                composition = this[`_${composition.type}`](composition)
+            }
+            // lower nested combinators
+            const combinator = Compiler.combinators[composition.type]
+            if (combinator.components) {
+                composition.components = composition.components.map(lower)
+            }
+            for (let arg of combinator.args || []) {
+                if (arg.type === undefined) {
+                    composition[arg._] = lower(composition[arg._])
                 }
             }
-            break // root combinator does not need lowering, break loop
+            return composition
         }
 
-        // lower nested combinators
-        composition = this.deserialize(composition) // copy composition
-        const combinator = Compiler.combinators[composition.type]
-        if (combinator.components) {
-            composition.components = composition.components.map(component => this.lower(this.deserialize(component), omitting))
-        }
-        for (let i in combinator.args) {
-            const arg = combinator.args[i]
-            if (arg.type === 'composition') {
-                composition[arg.name] = this.lower(this.deserialize(composition[arg.name]), omitting)
-            }
-        }
-        return composition
+        return lower(composition)
     }
 }
 
@@ -325,7 +347,7 @@ class Composer extends Compiler {
         }
         const composition = { type: 'action', name }
         if (exec) composition.action = { exec }
-        return this.deserialize(composition)
+        return new Composition(composition)
     }
 
     // enhanced composition combinator: mangle name
@@ -333,7 +355,7 @@ class Composer extends Compiler {
         if (arguments.length > 2) throw new ComposerError('Too many arguments')
         if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
         name = parseActionName(name)
-        return this.deserialize({ type: 'composition', name, composition: this.task(composition) })
+        return new Composition({ type: 'composition', name, composition: this.task(composition) })
     }
 
     // return enhanced openwhisk client capable of deploying compositions
@@ -366,7 +388,7 @@ class Composer extends Compiler {
         return wsk
     }
 
-    // encode composition into { composition, actions } by encoding nested compositions into actions and extracting nested action definitions
+    // recursively encode composition into { composition, actions } by encoding nested compositions into actions and extracting nested action definitions
     encode(composition) {
         if (arguments.length > 1) throw new ComposerError('Too many arguments')
         if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
@@ -374,14 +396,15 @@ class Composer extends Compiler {
         const actions = []
 
         const encode = composition => {
-            composition = this.deserialize(composition) // copy
-            Object.keys(composition).forEach(key => {
-                if (composition[key] instanceof Composition) {
-                    composition[key] = encode(composition[key])
+            composition = new Composition(composition) // copy
+            const combinator = Compiler.combinators[composition.type]
+            if (combinator.components) {
+                composition.components = composition.components.map(encode)
+            }
+            for (let arg of combinator.args || []) {
+                if (arg.type === undefined) {
+                    composition[arg._] = encode(composition[arg._])
                 }
-            })
-            if (Array.isArray(composition.components)) {
-                composition.components = composition.components.map(composition => encode(composition))
             }
             if (composition.type === 'composition') {
                 const code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(encode(composition.composition), null, 4)}\n\n// do not edit below this point\n\n${conductorCode}` // invoke conductor on composition
@@ -527,12 +550,12 @@ function conductor() {
             // handle let/mask pairs
             const view = []
             let n = 0
-            for (let i in stack) {
-                if (stack[i].let === null) {
+            for (let frame of stack) {
+                if (frame.let === null) {
                     n++
-                } else if (typeof stack[i].let !== 'undefined') {
+                } else if (typeof frame.let !== 'undefined') {
                     if (n === 0) {
-                        view.push(stack[i])
+                        view.push(frame)
                     } else {
                         n--
                     }
