@@ -21,7 +21,7 @@
 // composer error class
 class ComposerError extends Error {
     constructor(message, argument) {
-        super(message + (argument !== undefined ? '\nArgument: ' + util.inspect(argument) : ''))
+        super(message + (argument !== undefined ? '\nArgument: ' + require('util').inspect(argument) : ''))
     }
 }
 
@@ -249,171 +249,174 @@ class Compiler {
 
 // composer module
 
-const fs = require('fs')
-const os = require('os')
-const path = require('path')
-const util = require('util')
-const { minify } = require('uglify-es')
+function composer() {
+    const fs = require('fs')
+    const os = require('os')
+    const path = require('path')
+    const { minify } = require('uglify-es')
 
-// read composer version number
-const { version } = require('./package.json')
+    // read composer version number
+    const { version } = require('./package.json')
 
-// capture compiler and conductor code (omitting composer code)
-const conductorCode = minify(`${ComposerError}${Composition}${Compiler}const main=(${conductor})()`, { output: { max_line_len: 127 } }).code
+    // capture compiler and conductor code (omitting composer code)
+    const conductorCode = minify(`${ComposerError}${Composition}${Compiler}const main=(${conductor})()`, { output: { max_line_len: 127 } }).code
 
-// initialize compiler
-Compiler.init()
+    // initialize compiler
+    Compiler.init()
 
-/**
- * Parses a (possibly fully qualified) resource name and validates it. If it's not a fully qualified name,
- * then attempts to qualify it.
- *
- * Examples string to namespace, [package/]action name
- *   foo => /_/foo
- *   pkg/foo => /_/pkg/foo
- *   /ns/foo => /ns/foo
- *   /ns/pkg/foo => /ns/pkg/foo
- */
-function parseActionName(name) {
-    if (typeof name !== 'string' || name.trim().length == 0) throw new ComposerError('Name is not specified')
-    name = name.trim()
-    let delimiter = '/'
-    let parts = name.split(delimiter)
-    let n = parts.length
-    let leadingSlash = name[0] == delimiter
-    // no more than /ns/p/a                           
-    if (n < 1 || n > 4 || (leadingSlash && n == 2) || (!leadingSlash && n == 4)) throw new ComposerError('Name is not valid')
-    // skip leading slash, all parts must be non empty (could tighten this check to match EntityName regex)
-    parts.forEach(function (part, i) { if (i > 0 && part.trim().length == 0) throw new ComposerError('Name is not valid') })
-    let newName = parts.join(delimiter)
-    if (leadingSlash) return newName
-    else if (n < 3) return `${delimiter}_${delimiter}${newName}`
-    else return `${delimiter}${newName}`
-}
-
-// management class for compositions
-class Compositions {
-    constructor(wsk, composer) {
-        this.actions = wsk.actions
-        this.composer = composer
+    /**
+     * Parses a (possibly fully qualified) resource name and validates it. If it's not a fully qualified name,
+     * then attempts to qualify it.
+     *
+     * Examples string to namespace, [package/]action name
+     *   foo => /_/foo
+     *   pkg/foo => /_/pkg/foo
+     *   /ns/foo => /ns/foo
+     *   /ns/pkg/foo => /ns/pkg/foo
+     */
+    function parseActionName(name) {
+        if (typeof name !== 'string' || name.trim().length == 0) throw new ComposerError('Name is not specified')
+        name = name.trim()
+        let delimiter = '/'
+        let parts = name.split(delimiter)
+        let n = parts.length
+        let leadingSlash = name[0] == delimiter
+        // no more than /ns/p/a
+        if (n < 1 || n > 4 || (leadingSlash && n == 2) || (!leadingSlash && n == 4)) throw new ComposerError('Name is not valid')
+        // skip leading slash, all parts must be non empty (could tighten this check to match EntityName regex)
+        parts.forEach(function (part, i) { if (i > 0 && part.trim().length == 0) throw new ComposerError('Name is not valid') })
+        let newName = parts.join(delimiter)
+        if (leadingSlash) return newName
+        else if (n < 3) return `${delimiter}_${delimiter}${newName}`
+        else return `${delimiter}${newName}`
     }
 
-    deploy(composition) {
-        if (arguments.length > 1) throw new ComposerError('Too many arguments')
-        if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-        if (composition.type !== 'composition') throw new ComposerError('Cannot deploy anonymous composition')
-        const obj = this.composer.encode(composition)
-        return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
-            .then(() => this.actions.update(action)), Promise.resolve())
-            .then(() => obj)
-    }
-}
+    // management class for compositions
+    class Compositions {
+        constructor(wsk, composer) {
+            this.actions = wsk.actions
+            this.composer = composer
+        }
 
-// enhanced client-side compiler
-class Composer extends Compiler {
-    // return combinator list
-    get combinators() {
-        return Compiler.combinators
-    }
-
-    // enhanced action combinator: mangle name, capture code
-    action(name, options = {}) {
-        if (arguments.length > 2) throw new ComposerError('Too many arguments')
-        name = parseActionName(name) // throws ComposerError if name is not valid
-        if (typeof options === 'object') options = Object.assign({}, options)
-        let exec
-        if (options && Array.isArray(options.sequence)) { // native sequence
-            const components = options.sequence.map(a => a.indexOf('/') == -1 ? `/_/${a}` : a)
-            exec = { kind: 'sequence', components }
-            delete options.sequence
+        deploy(composition) {
+            if (arguments.length > 1) throw new ComposerError('Too many arguments')
+            if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+            if (composition.type !== 'composition') throw new ComposerError('Cannot deploy anonymous composition')
+            const obj = this.composer.encode(composition)
+            return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
+                .then(() => this.actions.update(action)), Promise.resolve())
+                .then(() => obj)
         }
-        if (options && typeof options.filename === 'string') { // read action code from file
-            options.action = fs.readFileSync(options.filename, { encoding: 'utf8' })
-            delete options.filename
-        }
-        if (options && typeof options.action === 'function') {
-            options.action = `const main = ${options.action}`
-            if (options.action.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function'.action)
-        }
-        if (options && typeof options.action === 'string') {
-            options.action = { kind: 'nodejs:default', code: options.action }
-        }
-        if (options && typeof options.action === 'object' && options.action !== null) {
-            exec = options.action
-            delete options.action
-        }
-        const composition = { type: 'action', name }
-        if (exec) composition.action = { exec }
-        return new Composition(composition)
     }
 
-    // enhanced composition combinator: mangle name
-    composition(name, composition) {
-        if (arguments.length > 2) throw new ComposerError('Too many arguments')
-        if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
-        name = parseActionName(name)
-        return new Composition({ type: 'composition', name, composition: this.task(composition) })
-    }
+    // enhanced client-side compiler
+    class Composer extends Compiler {
+        // return combinator list
+        get combinators() {
+            return Compiler.combinators
+        }
 
-    // return enhanced openwhisk client capable of deploying compositions
-    openwhisk(options) {
-        // try to extract apihost and key first from whisk property file file and then from process.env
-        let apihost
-        let api_key
+        // enhanced action combinator: mangle name, capture code
+        action(name, options = {}) {
+            if (arguments.length > 2) throw new ComposerError('Too many arguments')
+            name = parseActionName(name) // throws ComposerError if name is not valid
+            if (typeof options === 'object') options = Object.assign({}, options)
+            let exec
+            if (options && Array.isArray(options.sequence)) { // native sequence
+                const components = options.sequence.map(a => a.indexOf('/') == -1 ? `/_/${a}` : a)
+                exec = { kind: 'sequence', components }
+                delete options.sequence
+            }
+            if (options && typeof options.filename === 'string') { // read action code from file
+                options.action = fs.readFileSync(options.filename, { encoding: 'utf8' })
+                delete options.filename
+            }
+            if (options && typeof options.action === 'function') {
+                options.action = `const main = ${options.action}`
+                if (options.action.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function'.action)
+            }
+            if (options && typeof options.action === 'string') {
+                options.action = { kind: 'nodejs:default', code: options.action }
+            }
+            if (options && typeof options.action === 'object' && options.action !== null) {
+                exec = options.action
+                delete options.action
+            }
+            const composition = { type: 'action', name }
+            if (exec) composition.action = { exec }
+            return new Composition(composition)
+        }
 
-        try {
-            const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
-            const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
+        // enhanced composition combinator: mangle name
+        composition(name, composition) {
+            if (arguments.length > 2) throw new ComposerError('Too many arguments')
+            if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
+            name = parseActionName(name)
+            return new Composition({ type: 'composition', name, composition: this.task(composition) })
+        }
 
-            for (let line of lines) {
-                let parts = line.trim().split('=')
-                if (parts.length === 2) {
-                    if (parts[0] === 'APIHOST') {
-                        apihost = parts[1]
-                    } else if (parts[0] === 'AUTH') {
-                        api_key = parts[1]
+        // return enhanced openwhisk client capable of deploying compositions
+        openwhisk(options) {
+            // try to extract apihost and key first from whisk property file file and then from process.env
+            let apihost
+            let api_key
+
+            try {
+                const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
+                const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
+
+                for (let line of lines) {
+                    let parts = line.trim().split('=')
+                    if (parts.length === 2) {
+                        if (parts[0] === 'APIHOST') {
+                            apihost = parts[1]
+                        } else if (parts[0] === 'AUTH') {
+                            api_key = parts[1]
+                        }
                     }
                 }
-            }
-        } catch (error) { }
+            } catch (error) { }
 
-        if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
-        if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
+            if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
+            if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
 
-        const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
-        wsk.compositions = new Compositions(wsk, this)
-        return wsk
-    }
-
-    // recursively encode composition into { composition, actions } by encoding nested compositions into actions and extracting nested action definitions
-    encode(composition) {
-        if (arguments.length > 1) throw new ComposerError('Too many arguments')
-        if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-
-        const actions = []
-
-        const encode = composition => {
-            composition = new Composition(composition) // copy
-            composition.visit(encode)
-            if (composition.type === 'composition') {
-                const code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(encode(composition.composition), null, 4)}\n\n// do not edit below this point\n\n${conductorCode}` // invoke conductor on composition
-                composition.action = { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition.composition }] }
-                delete composition.composition
-                composition.type = 'action'
-            }
-            if (composition.type === 'action' && composition.action) {
-                actions.push({ name: composition.name, action: composition.action })
-                delete composition.action
-            }
-            return composition
+            const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
+            wsk.compositions = new Compositions(wsk, this)
+            return wsk
         }
 
-        composition = encode(composition)
-        return { composition, actions }
+        // recursively encode composition into { composition, actions } by encoding nested compositions into actions and extracting nested action definitions
+        encode(composition) {
+            if (arguments.length > 1) throw new ComposerError('Too many arguments')
+            if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+
+            const actions = []
+
+            const encode = composition => {
+                composition = new Composition(composition) // copy
+                composition.visit(encode)
+                if (composition.type === 'composition') {
+                    const code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(encode(composition.composition), null, 4)}\n\n// do not edit below this point\n\n${conductorCode}` // invoke conductor on composition
+                    composition.action = { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition.composition }] }
+                    delete composition.composition
+                    composition.type = 'action'
+                }
+                if (composition.type === 'action' && composition.action) {
+                    actions.push({ name: composition.name, action: composition.action })
+                    delete composition.action
+                }
+                return composition
+            }
+
+            composition = encode(composition)
+            return { composition, actions }
+        }
     }
+
+    return new Composer()
 }
 
-module.exports = new Composer()
+module.exports = composer()
 
 // conductor action
 
@@ -512,11 +515,11 @@ function conductor() {
         let stack = []
 
         // restore state and stack when resuming
-        if (typeof params.$resume !== 'undefined') {
+        if (params.$resume !== undefined) {
             if (!isObject(params.$resume)) return badRequest('The type of optional $resume parameter must be object')
             state = params.$resume.state
             stack = params.$resume.stack
-            if (typeof state !== 'undefined' && typeof state !== 'number') return badRequest('The type of optional $resume.state parameter must be number')
+            if (state !== undefined && typeof state !== 'number') return badRequest('The type of optional $resume.state parameter must be number')
             if (!Array.isArray(stack)) return badRequest('The type of $resume.stack must be an array')
             delete params.$resume
             inspect() // handle error objects when resuming
@@ -525,7 +528,7 @@ function conductor() {
         // wrap params if not a dictionary, branch to error handler if error
         function inspect() {
             if (!isObject(params)) params = { value: params }
-            if (typeof params.error !== 'undefined') {
+            if (params.error !== undefined) {
                 params = { error: params.error } // discard all fields but the error field
                 state = undefined // abort unless there is a handler in the stack
                 while (stack.length > 0) {
@@ -542,7 +545,7 @@ function conductor() {
             for (let frame of stack) {
                 if (frame.let === null) {
                     n++
-                } else if (typeof frame.let !== 'undefined') {
+                } else if (frame.let !== undefined) {
                     if (n === 0) {
                         view.push(frame)
                     } else {
@@ -553,8 +556,8 @@ function conductor() {
 
             // update value of topmost matching symbol on stack if any
             function set(symbol, value) {
-                const element = view.find(element => typeof element.let !== 'undefined' && typeof element.let[symbol] !== 'undefined')
-                if (typeof element !== 'undefined') element.let[symbol] = JSON.parse(JSON.stringify(value))
+                const element = view.find(element => element.let !== undefined && element.let[symbol] !== undefined)
+                if (element !== undefined) element.let[symbol] = JSON.parse(JSON.stringify(value))
             }
 
             // collapse stack for invocation
@@ -573,7 +576,7 @@ function conductor() {
 
         while (true) {
             // final state, return composition result
-            if (typeof state === 'undefined') {
+            if (state === undefined) {
                 console.log(`Entering final state`)
                 console.log(JSON.stringify(params))
                 if (params.error) return params; else return { params }
@@ -583,7 +586,7 @@ function conductor() {
             const json = fsm[state] // json definition for current state
             console.log(`Entering state ${state} at path fsm${json.path}`)
             const current = state
-            state = typeof json.next === 'undefined' ? undefined : current + json.next // default next state
+            state = json.next === undefined ? undefined : current + json.next // default next state
             switch (json.type) {
                 case 'choice':
                     state = current + (params.value ? json.then : json.else)
@@ -611,7 +614,7 @@ function conductor() {
                     }
                     if (typeof result === 'function') result = { error: `State ${current} evaluated to a function` }
                     // if a function has only side effects and no return value, return params
-                    params = JSON.parse(JSON.stringify(typeof result === 'undefined' ? params : result))
+                    params = JSON.parse(JSON.stringify(result === undefined ? params : result))
                     inspect()
                     break
                 case 'pass':
