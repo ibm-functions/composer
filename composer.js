@@ -57,7 +57,7 @@ function compiler() {
     class Composition {
         // weaker instanceof to tolerate multiple instances of this class
         static [Symbol.hasInstance](instance) {
-            return instance.constructor && instance.constructor.name === 'Composition'
+            return instance.constructor && instance.constructor.name === Composition.name
         }
 
         // construct a composition object with the specified fields
