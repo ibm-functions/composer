@@ -17,6 +17,7 @@ Commands:
   --deploy NAME          deploy the composition with name NAME
   --encode               output the conductor action code for the composition
 Flags:
+  --lower                only use primitive combinators
   --apihost HOST         API HOST
   -u, --auth KEY         authorization KEY
   -i, --insecure         bypass certificate checking
@@ -36,58 +37,37 @@ compose demo.js
 ```
 ```json
 {
-    "actions": [
-        {
-            "name": "/_/authenticate",
-            "action": {
-                "exec": {
-                    "kind": "nodejs:default",
-                    "code": "const main = function ({ password }) { return { value: password === 'abc123' } }"
-                }
-            }
-        },
-        {
-            "name": "/_/success",
-            "action": {
-                "exec": {
-                    "kind": "nodejs:default",
-                    "code": "const main = function () { return { message: 'success' } }"
-                }
-            }
-        },
-        {
-            "name": "/_/failure",
-            "action": {
-                "exec": {
-                    "kind": "nodejs:default",
-                    "code": "const main = function () { return { message: 'failure' } }"
-                }
+    "type": "if",
+    "test": {
+        "type": "action",
+        "name": "/_/authenticate",
+        "action": {
+            "exec": {
+                "kind": "nodejs:default",
+                "code": "const main = function ({ password }) { return { value: password === 'abc123' } }"
             }
         }
-    ],
-    "composition": [
-        {
-            "type": "if",
-            "test": [
-                {
-                    "type": "action",
-                    "name": "/_/authenticate"
-                }
-            ],
-            "consequent": [
-                {
-                    "type": "action",
-                    "name": "/_/success"
-                }
-            ],
-            "alternate": [
-                {
-                    "type": "action",
-                    "name": "/_/failure"
-                }
-            ]
+    },
+    "consequent": {
+        "type": "action",
+        "name": "/_/success",
+        "action": {
+            "exec": {
+                "kind": "nodejs:default",
+                "code": "const main = function () { return { message: 'success' } }"
+            }
         }
-    ]
+    },
+    "alternate": {
+        "type": "action",
+        "name": "/_/failure",
+        "action": {
+            "exec": {
+                "kind": "nodejs:default",
+                "code": "const main = function () { return { message: 'failure' } }"
+            }
+        }
+    }
 }
 ```
 The evaluation context includes the `composer` object implicitly defined as:
@@ -150,3 +130,7 @@ wsk action create demo demo-conductor.js -a conductor true
 ok: created action demo
 ```
 The conductor action code does not include definitions for nested actions or compositions.
+
+## Lowering
+
+If the `--lower` option is specified, the `compose` command uses a minimal set of combinators. Combinators that are not in this set are replaced with combinators of combinators in the set. This option can be combined with any of the three commands.

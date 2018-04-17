@@ -13,9 +13,7 @@ Combinators are described in [COMBINATORS.md](COMBINATORS.md).
 
 ## Composition objects
 
-Combinators return composition objects. Compositions object offer several helper methods described below:
-- [`composition.named(name)`](#nested-declarations) to nest one composition definition inside another,
-- [`composition.encode([name])`](#conductor-actions) to synthesize conductor actions for compositions.
+Combinators return composition objects, i.e., instances of the `Composition` class.
 
 ## Parameter objects and error objects
 
@@ -64,9 +62,9 @@ composer.if(
 ```
 Deploying such a composition deploys the embedded actions.
 
-A composition can also include the definition of another composition thank to the `named` method on composition objects.
+A composition can also include the definition of another composition:
 ```javascript
-composer.if('isEven', 'half', composer.sequence('triple', 'increment').named('tripleAndIncrement'))
+composer.if('isEven', 'half', composer.composition('tripleAndIncrement', composer.sequence('triple', 'increment')))
 ```
 In this example, the `composer.sequence('triple', 'increment')` composition is given the name `tripleAndIncrement` and the enclosing composition references the `tripleAndIncrement` composition by name. In other words, deploying this composition actually deploys two compositions:
 - a composition named `tripleAndIncrement` defined as `composer.sequence('triple', 'increment')`, and
@@ -79,6 +77,4 @@ In this example, the `composer.sequence('triple', 'increment')` composition is g
 
 ## Conductor actions
 
-Compositions are implemented by means of OpenWhisk [conductor actions](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md). The conductor actions are implicitly synthesized when compositions are deployed using the `compose` command or the `composer` module. The `encode` method on compositions may also be used to generate the conductor actions for compositions.
-- `composition.encode()` replaces all the compositions nested inside `composition` with conductor actions. It does not alter the composition itself, only its components.
-- `composition.encode(name)` is a shorthand for `composition.named(name).encode()`. It encodes the composition and all its components into conductor actions, replacing the composition with an invocation of the action named `name` bound to the conductor action for `composition`.
+Compositions are implemented by means of OpenWhisk [conductor actions](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md). The conductor actions are implicitly synthesized when compositions are deployed using the `compose` command or the `composer.deploy` method. Alternatively, the `composer.encode` method can encode compositions without deploying them. See [COMPOSER.md](COMPOSER.md) for details.
