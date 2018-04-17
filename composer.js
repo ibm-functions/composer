@@ -23,6 +23,7 @@ function compiler() {
 
     // standard combinators
     const combinators = {
+        empty: {},
         seq: { components: true },
         sequence: { components: true },
         if: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }] },
@@ -84,7 +85,7 @@ function compiler() {
         // detect task type and create corresponding composition object
         task(task) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
-            if (task === null) return this.seq()
+            if (task === null) return this.empty()
             if (task instanceof Composition) return task
             if (typeof task === 'function') return this.function(task)
             if (typeof task === 'string') return this.action(task)
@@ -106,6 +107,10 @@ function compiler() {
         }
 
         // lowering
+
+        _empty() {
+            return this.sequence()
+        }
 
         _seq(composition) {
             return this.sequence(...composition.components)
@@ -227,6 +232,7 @@ function compiler() {
 
         // recursively deserialize composition
         deserialize(composition) {
+            if (arguments.length > 1) throw new ComposerError('Too many arguments')
             composition = new Composition(composition) // copy
             composition.visit(composition => this.deserialize(composition))
             return composition
