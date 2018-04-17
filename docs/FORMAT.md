@@ -42,19 +42,19 @@ The field names and types typically match the combinator method signatures:
 
 | Type | Fields |
 | --:| --- | 
-| `action` | name |
-| `function`] | function |
-| `literal` or `value` | value |
-| `composition` | name, composition |
+| `action` | name:string, action:optional object |
+| `function` | function:string |
+| `literal` or `value` | value:any |
+| `composition` | name:string, composition:composition |
 | `empty` |
-| `sequence` or `seq`sequence) | components |
-| `let` | declarations, components |
-| `mask`| components |
-| `if` and `if_nosave` | test, consequent, alternate |
-| `while` and `while_nosave` | test, body |
-| `dowhile` and `dowhile_nosave` | body, test |
-| `repeat` | count, components |
-| `try` | body, handler |
-| `finally` | body, finalizer |
-| `retry` | count, components |
-| `retain` and `retain_catch` | components |
+| `sequence` or `seq` | components:array of compositions |
+| `let` | declarations:object, components:array of compositions |
+| `mask`| components:array of compositions |
+| `if` and `if_nosave` | test:composition, consequent:composition, alternate:composition |
+| `while` and `while_nosave` | test:composition, body:composition |
+| `dowhile` and `dowhile_nosave` | body:composition, test:composition |
+| `repeat` | count:number, components:array of compositions |
+| `try` | body:composition, handler:composition |
+| `finally` | body:composition, finalizer:composition |
+| `retry` | count:number, components:array of compositions |
+| `retain` and `retain_catch` | components:array of compositions |
