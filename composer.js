@@ -94,7 +94,7 @@ class Compiler {
             retain_catch: { components: true },
             let: { args: [{ _: 'declarations', type: 'object' }], components: true },
             mask: { components: true },
-            action: { args: [{ _: 'name', type: 'string' }] },
+            action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }] },
             composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition' }] },
             repeat: { args: [{ _: 'count', type: 'number' }], components: true },
             retry: { args: [{ _: 'count', type: 'number' }], components: true },
