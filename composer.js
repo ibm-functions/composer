@@ -332,27 +332,22 @@ function composer() {
         action(name, options = {}) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             name = parseActionName(name) // throws ComposerError if name is not valid
-            if (typeof options === 'object') options = Object.assign({}, options)
             let exec
-            if (options && Array.isArray(options.sequence)) { // native sequence
-                const components = options.sequence.map(a => a.indexOf('/') == -1 ? `/_/${a}` : a)
-                exec = { kind: 'sequence', components }
-                delete options.sequence
+            if (Array.isArray(options.sequence)) { // native sequence
+                exec = { kind: 'sequence', components: options.sequence.map(parseActionName) }
             }
-            if (options && typeof options.filename === 'string') { // read action code from file
-                options.action = fs.readFileSync(options.filename, { encoding: 'utf8' })
-                delete options.filename
+            if (typeof options.filename === 'string') { // read action code from file
+                exec = fs.readFileSync(options.filename, { encoding: 'utf8' })
             }
-            if (options && typeof options.action === 'function') {
-                options.action = `const main = ${options.action}`
-                if (options.action.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function'.action)
+            if (typeof options.action === 'function') { // capture function
+                exec = `const main = ${options.action}`
+                if (exec.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', options.action)
             }
-            if (options && typeof options.action === 'string') {
-                options.action = { kind: 'nodejs:default', code: options.action }
-            }
-            if (options && typeof options.action === 'object' && options.action !== null) {
+            if (typeof options.action === 'string' || typeof options.action === 'object' && options.action !== null && !Array.isArray(options.action)) {
                 exec = options.action
-                delete options.action
+            }
+            if (typeof exec === 'string') {
+                exec = { kind: 'nodejs:default', code: exec }
             }
             const composition = { type: 'action', name }
             if (exec) composition.action = { exec }
