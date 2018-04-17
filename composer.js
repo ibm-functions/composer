@@ -273,7 +273,7 @@ function composer() {
     const { ComposerError, Composition, Compiler } = compiler()
 
     // capture compiler and conductor code (omitting composer code)
-    const conductorCode = minify(`const main=(${conductor})(${compiler}())`, { output: { max_line_len: 127 }, mangle: { reserved: ['Composition'] } }).code
+    const conductorCode = minify(`const main=(${conductor})(${compiler}())`, { output: { max_line_len: 127 }, mangle: { reserved: [Composition.name] } }).code
 
     /**
      * Parses a (possibly fully qualified) resource name and validates it. If it's not a fully qualified name,
