@@ -185,7 +185,7 @@ In this example, the variable `n` is exposed to the invoked action as a field of
 For instance, the following function is a possible implementation of a repeat loop:
 ```javascript
 function loop(n, composition) {
-    return composer.let({ n }, this.while(() => n-- > 0, this.mask(composition)))
+    return .let({ n }, composer.while(() => n-- > 0, composer.mask(composition)))
 }
 ```
 This function takes two parameters: the number of iterations _n_ and the _composition_ to repeat _n_ times. Here, the `mask` combinator makes sure that this declaration of _n_ is not visible to _composition_. Thanks to `mask`, the following example correctly returns `{ value: 12 }`.
