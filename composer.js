@@ -74,7 +74,7 @@ function compiler() {
             }
             for (let arg of combinator.args || []) {
                 if (arg.type === undefined) {
-                    this[arg._] = f(this[arg._])
+                    this[arg._] = f(this[arg._], arg._)
                 }
             }
         }
@@ -197,10 +197,8 @@ function compiler() {
                 Compiler.prototype[type] = Compiler.prototype[type] || function () {
                     const composition = new Composition({ type })
                     const skip = combinator.args && combinator.args.length || 0
-                    if (combinator.components) {
-                        composition.components = Array.prototype.slice.call(arguments, skip).map(obj => this.task(obj))
-                    } else {
-                        if (arguments.length > skip) throw new ComposerError('Too many arguments')
+                    if (!combinator.components && (arguments.length > skip)) {
+                        throw new ComposerError('Too many arguments')
                     }
                     for (let i = 0; i < skip; ++i) {
                         const arg = combinator.args[i]
@@ -220,6 +218,9 @@ function compiler() {
                                 composition[arg._] = argument
                         }
                     }
+                    if (combinator.components) {
+                        composition.components = Array.prototype.slice.call(arguments, skip).map(obj => this.task(obj))
+                    }
                     return composition
                 }
             }
@@ -238,7 +239,23 @@ function compiler() {
             return composition
         }
 
-        // recursively lower non-primitive combinators
+        // label combinators with the json path
+        label(composition) {
+            if (arguments.length > 1) throw new ComposerError('Too many arguments')
+            if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+
+            const label = path => (composition, name, array) => {
+                composition = new Composition(composition) // copy
+                composition.path = path + (name !== undefined ? (array === undefined ? `.${name}` : `[${name}]`) : '')
+                // label nested combinators
+                composition.visit(label(composition.path))
+                return composition
+            }
+
+            return composition.path === undefined ? label('')(composition) : composition
+        }
+
+        // recursively label and lower non-primitive combinators
         lower(composition, omitting = []) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
@@ -248,14 +265,16 @@ function compiler() {
                 composition = new Composition(composition) // copy
                 // repeatedly lower root combinator
                 while (omitting.indexOf(composition.type) < 0 && this[`_${composition.type}`]) {
+                    const path = composition.path
                     composition = this[`_${composition.type}`](composition)
+                    if (path !== undefined) composition.path = path
                 }
                 // lower nested combinators
                 composition.visit(lower)
                 return composition
             }
 
-            return lower(composition)
+            return lower(this.label(composition))
         }
     }
 
@@ -438,61 +457,62 @@ function conductor({ Compiler }) {
         return front
     }
 
-    function sequence(components, path) {
-        if (components.length === 0) return [{ type: 'pass', path }]
-        return components.map((json, index) => compile(json, path + '[' + index + ']')).reduce(chain)
+    function sequence(components) {
+        if (components.length === 0) return [{ type: 'empty' }]
+        return components.map(compile).reduce(chain)
     }
 
-    function compile(json, path = '') {
+    function compile(json) {
+        const path = json.path
         switch (json.type) {
             case 'sequence':
-                return sequence(json.components, path)
+                return chain([{ type: 'pass', path }], sequence(json.components))
             case 'action':
                 return [{ type: 'action', name: json.name, path }]
             case 'function':
                 return [{ type: 'function', exec: json.function.exec, path }]
             case 'finally':
-                var body = compile(json.body, path + '.body')
-                const finalizer = compile(json.finalizer, path + '.finalizer')
-                var fsm = [[{ type: 'try', path }], body, [{ type: 'exit', path }], finalizer].reduce(chain)
+                var body = compile(json.body)
+                const finalizer = compile(json.finalizer)
+                var fsm = [[{ type: 'try', path }], body, [{ type: 'exit' }], finalizer].reduce(chain)
                 fsm[0].catch = fsm.length - finalizer.length
                 return fsm
             case 'let':
-                var body = sequence(json.components, path)
-                return [[{ type: 'let', let: json.declarations, path }], body, [{ type: 'exit', path }]].reduce(chain)
+                var body = sequence(json.components)
+                return [[{ type: 'let', let: json.declarations, path }], body, [{ type: 'exit' }]].reduce(chain)
             case 'mask':
-                var body = sequence(json.components, path)
-                return [[{ type: 'let', let: null, path }], body, [{ type: 'exit', path }]].reduce(chain)
+                var body = sequence(json.components)
+                return [[{ type: 'let', let: null, path }], body, [{ type: 'exit' }]].reduce(chain)
             case 'try':
-                var body = compile(json.body, path + '.body')
-                const handler = chain(compile(json.handler, path + '.handler'), [{ type: 'pass', path }])
-                var fsm = [[{ type: 'try', path }], body, [{ type: 'exit', path }]].reduce(chain)
+                var body = compile(json.body)
+                const handler = chain(compile(json.handler), [{ type: 'pass' }])
+                var fsm = [[{ type: 'try', path }], body, [{ type: 'exit' }]].reduce(chain)
                 fsm[0].catch = fsm.length
                 fsm.slice(-1)[0].next = handler.length
                 fsm.push(...handler)
                 return fsm
             case 'if_nosave':
-                var consequent = compile(json.consequent, path + '.consequent')
-                var alternate = chain(compile(json.alternate, path + '.alternate'), [{ type: 'pass', path }])
-                var fsm = chain(compile(json.test, path + '.test'), [{ type: 'choice', then: 1, else: consequent.length + 1, path }])
+                var consequent = compile(json.consequent)
+                var alternate = chain(compile(json.alternate), [{ type: 'pass' }])
+                var fsm = [[{ type: 'pass', path }], compile(json.test), [{ type: 'choice', then: 1, else: consequent.length + 1 }]].reduce(chain)
                 consequent.slice(-1)[0].next = alternate.length
                 fsm.push(...consequent)
                 fsm.push(...alternate)
                 return fsm
             case 'while_nosave':
-                var consequent = compile(json.body, path + '.body')
-                var alternate = [{ type: 'pass', path }]
-                var fsm = chain(compile(json.test, path + '.test'), [{ type: 'choice', then: 1, else: consequent.length + 1, path }])
+                var consequent = compile(json.body)
+                var alternate = [{ type: 'pass' }]
+                var fsm = [[{ type: 'pass', path }], compile(json.test), [{ type: 'choice', then: 1, else: consequent.length + 1 }]].reduce(chain)
                 consequent.slice(-1)[0].next = 1 - fsm.length - consequent.length
                 fsm.push(...consequent)
                 fsm.push(...alternate)
                 return fsm
             case 'dowhile_nosave':
-                var test = compile(json.test, path + '.test')
-                var fsm = [compile(json.body, path + '.body'), test, [{ type: 'choice', then: 1, else: 2, path }]].reduce(chain)
+                var test = compile(json.test)
+                var fsm = [[{ type: 'pass', path }], compile(json.body), test, [{ type: 'choice', then: 1, else: 2 }]].reduce(chain)
                 fsm.slice(-1)[0].then = 1 - fsm.length
                 fsm.slice(-1)[0].else = 1
-                var alternate = [{ type: 'pass', path }]
+                var alternate = [{ type: 'pass' }]
                 fsm.push(...alternate)
                 return fsm
         }
@@ -590,7 +610,7 @@ function conductor({ Compiler }) {
 
             // process one state
             const json = fsm[state] // json definition for current state
-            console.log(`Entering state ${state} at path fsm${json.path}`)
+            if (json.path !== undefined) console.log(`Entering composition${json.path}`)
             const current = state
             state = json.next === undefined ? undefined : current + json.next // default next state
             switch (json.type) {
@@ -623,8 +643,10 @@ function conductor({ Compiler }) {
                     params = JSON.parse(JSON.stringify(result === undefined ? params : result))
                     inspect()
                     break
-                case 'pass':
+                case 'empty':
                     inspect()
+                    break
+                case 'pass':
                     break
                 default:
                     return internalError(`State ${current} has an unknown type`)
