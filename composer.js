@@ -252,7 +252,7 @@ function compiler() {
                 return composition
             }
 
-            return composition.path === undefined ? label('')(composition) : composition
+            return label('')(composition)
         }
 
         // recursively label and lower non-primitive combinators
@@ -274,7 +274,7 @@ function compiler() {
                 return composition
             }
 
-            return lower(this.label(composition))
+            return lower(composition)
         }
     }
 
@@ -518,7 +518,7 @@ function conductor({ Compiler }) {
         }
     }
 
-    const fsm = compile(compiler.lower(compiler.deserialize(composition)))
+    const fsm = compile(compiler.lower(compiler.label(compiler.deserialize(composition))))
 
     const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
 
