@@ -437,6 +437,10 @@ function composer() {
             composition = encode(composition)
             return { composition, actions }
         }
+
+        get version() {
+            return version
+        }
     }
 
     return new Composer()

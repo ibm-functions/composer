@@ -9,9 +9,14 @@ const composer = require('../composer')
 
 const argv = minimist(process.argv.slice(2), {
     string: ['apihost', 'auth', 'deploy'],
-    boolean: ['insecure', 'encode', 'json', 'lower'],
-    alias: { auth: 'u', insecure: 'i' }
+    boolean: ['insecure', 'encode', 'json', 'lower, version'],
+    alias: { auth: 'u', insecure: 'i', version: 'v' }
 })
+
+if (argv.version) {
+    console.log(composer.version)
+    return
+}
 
 let count = 0
 if (argv.json) count++
@@ -30,6 +35,7 @@ if (argv._.length !== 1 || count > 1 || argv.deploy === '') {
     console.error('  --apihost HOST         API HOST')
     console.error('  -u, --auth KEY         authorization KEY')
     console.error('  -i, --insecure         bypass certificate checking')
+    console.error('  -v, --version          output the composer version')
     return
 }
 
