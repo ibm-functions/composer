@@ -20,31 +20,32 @@
 
 function compiler() {
     const util = require('util')
+    const semver = require('semver')
 
     // standard combinators
     const combinators = {
-        empty: {},
-        seq: { components: true },
-        sequence: { components: true },
-        if: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }] },
-        if_nosave: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }] },
-        while: { args: [{ _: 'test' }, { _: 'body' }] },
-        while_nosave: { args: [{ _: 'test' }, { _: 'body' }] },
-        dowhile: { args: [{ _: 'body' }, { _: 'test' }] },
-        dowhile_nosave: { args: [{ _: 'body' }, { _: 'test' }] },
-        try: { args: [{ _: 'body' }, { _: 'handler' }] },
-        finally: { args: [{ _: 'body' }, { _: 'finalizer' }] },
-        retain: { components: true },
-        retain_catch: { components: true },
-        let: { args: [{ _: 'declarations', type: 'object' }], components: true },
-        mask: { components: true },
-        action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }] },
-        composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition' }] },
-        repeat: { args: [{ _: 'count', type: 'number' }], components: true },
-        retry: { args: [{ _: 'count', type: 'number' }], components: true },
-        value: { args: [{ _: 'value', type: 'value' }] },
-        literal: { args: [{ _: 'value', type: 'value' }] },
-        function: { args: [{ _: 'function', type: 'object' }] }
+        empty: { since: '0.4.0' },
+        seq: { components: true, since: '0.4.0' },
+        sequence: { components: true, since: '0.4.0' },
+        if: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }], since: '0.4.0' },
+        if_nosave: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }], since: '0.4.0' },
+        while: { args: [{ _: 'test' }, { _: 'body' }], since: '0.4.0' },
+        while_nosave: { args: [{ _: 'test' }, { _: 'body' }], since: '0.4.0' },
+        dowhile: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
+        dowhile_nosave: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
+        try: { args: [{ _: 'body' }, { _: 'handler' }], since: '0.4.0' },
+        finally: { args: [{ _: 'body' }, { _: 'finalizer' }], since: '0.4.0' },
+        retain: { components: true, since: '0.4.0' },
+        retain_catch: { components: true, since: '0.4.0' },
+        let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
+        mask: { components: true, since: '0.4.0' },
+        action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }], since: '0.4.0' },
+        composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition' }], since: '0.4.0' },
+        repeat: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
+        retry: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
+        value: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
+        literal: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
+        function: { args: [{ _: 'function', type: 'object' }], since: '0.4.0' }
     }
 
     // composer error class
@@ -255,16 +256,22 @@ function compiler() {
             return label('')(composition)
         }
 
-        // recursively label and lower non-primitive combinators
-        lower(composition, omitting = []) {
+        // recursively label and lower combinators to the desired set of combinators (including primitive combinators)
+        lower(composition, combinators = []) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-            if (!Array.isArray(omitting)) throw new ComposerError('Invalid argument', omitting)
+            if (!Array.isArray(combinators) && typeof combinators !== 'boolean' && typeof combinators !== 'string') throw new ComposerError('Invalid argument', combinators)
+
+            if (combinators === false) return composition // no lowering
+            if (combinators === true || combinators === '') combinators = [] // maximal lowering
+            if (typeof combinators === 'string') { // lower to combinators of specific composer version 
+                combinators = Object.keys(this.combinators).filter(key => semver.gte(combinators, this.combinators[key].since))
+            }
 
             const lower = composition => {
                 composition = new Composition(composition) // copy
                 // repeatedly lower root combinator
-                while (omitting.indexOf(composition.type) < 0 && this[`_${composition.type}`]) {
+                while (combinators.indexOf(composition.type) < 0 && this[`_${composition.type}`]) {
                     const path = composition.path
                     composition = this[`_${composition.type}`](composition)
                     if (path !== undefined) composition.path = path
@@ -334,11 +341,11 @@ function composer() {
             this.composer = composer
         }
 
-        deploy(composition) {
-            if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        deploy(composition, combinators) {
+            if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
             if (composition.type !== 'composition') throw new ComposerError('Cannot deploy anonymous composition')
-            const obj = this.composer.encode(composition)
+            const obj = this.composer.encode(composition, combinators)
             return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
                 .then(() => this.actions.update(action)), Promise.resolve())
                 .then(() => obj)
@@ -412,9 +419,11 @@ function composer() {
         }
 
         // recursively encode composition into { composition, actions } by encoding nested compositions into actions and extracting nested action definitions
-        encode(composition) {
-            if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        encode(composition, combinators = []) { // lower non-primitive combinators by default
+            if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+
+            composition = this.lower(composition, combinators)
 
             const actions = []
 
@@ -423,7 +432,7 @@ function composer() {
                 composition.visit(encode)
                 if (composition.type === 'composition') {
                     const code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(encode(composition.composition), null, 4)}\n\n// do not edit below this point\n\n${conductorCode}` // invoke conductor on composition
-                    composition.action = { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition.composition }] }
+                    composition.action = { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition.composition }, { key: 'composer', value: version }] }
                     delete composition.composition
                     composition.type = 'action'
                 }
