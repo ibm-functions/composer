@@ -7,16 +7,19 @@ The `composer` module offers a number of combinators to define compositions:
 | [`action`](#action) | action | `composer.action('echo')` |
 | [`function`](#function) | function | `composer.function(({ x, y }) => ({ product: x * y }))` |
 | [`literal` or `value`](#literal) | constant value | `composer.literal({ message: 'Hello, World!' })` |
+| [`composition`](#composition) | named composition | `composer.composition('myCompositionName', myComposition)` |
+| [`empty`](#empty) | empty sequence | `composer.empty()`
 | [`sequence` or `seq`](#sequence) | sequence | `composer.sequence('hello', 'bye')` |
 | [`let`](#let) | variable declarations | `composer.let({ count: 3, message: 'hello' }, ...)` |
-| [`if`](#if) | conditional | `composer.if('authenticate', 'success', 'failure')` |
-| [`while`](#while) | loop | `composer.while('notEnough', 'doMore')` |
-| [`dowhile`](#dowhile) | loop at least once | `composer.dowhile('fetchData', 'needMoreData')` |
+| [`mask`](#mask) | variable hiding | `composer.let({ n }, composer.while(_ => n-- > 0, composer.mask(composition)))` |
+| [`if` and `if_nosave`](#if) | conditional | `composer.if('authenticate', 'success', 'failure')` |
+| [`while` and `while_nosave`](#while) | loop | `composer.while('notEnough', 'doMore')` |
+| [`dowhile` and `dowhile_nosave`](#dowhile) | loop at least once | `composer.dowhile('fetchData', 'needMoreData')` |
 | [`repeat`](#repeat) | counted loop | `composer.repeat(3, 'hello')` |
 | [`try`](#try) | error handling | `composer.try('divideByN', 'NaN')` |
 | [`finally`](#finally) | finalization | `composer.finally('tryThis', 'doThatAlways')` |
 | [`retry`](#retry) | error recovery | `composer.retry(3, 'connect')` |
-| [`retain`](#retain) | persistence | `composer.retain('validateInput')` |
+| [`retain` and `retain_catch`](#retain) | persistence | `composer.retain('validateInput')` |
 
 The `action`, `function`, and `literal` combinators construct compositions respectively from actions, functions, and constant values. The other combinators combine existing compositions to produce new compositions.
 
@@ -25,7 +28,11 @@ The `action`, `function`, and `literal` combinators construct compositions respe
 Where a composition is expected, the following shorthands are permitted:
  - `name` of type `string` stands for `composer.action(name)`,
  - `fun` of type `function` stands for `composer.function(fun)`,
- - `null` stands for the empty sequence `composer.sequence()`.
+ - `null` stands for the empty sequence `composer.empty()`.
+
+## Primitive combinators
+
+Some of these combinators are _derived_ combinators: they are equivalent to combinations of other combinators. The `composer` module offers a `composer.lower` method (see [COMPOSER.md](#COMPOSER.md)) that can eliminate derived combinators from a composition, producing an equivalent composition made only of _primitive_ combinators. The primitive combinators are: `action`, `function`, `composition`, `sequence`, `let`, `mask`, `if_nosave`, `while_nosave`, `dowhile_nosave`, `try`, and `finally`.
 
 ## Action
 
@@ -129,6 +136,23 @@ JSON values cannot represent functions. Applying `composer.literal` to a value o
 
 In general, a function can be embedded in a composition either by using the `composer.function` combinator, or by embedding the source code for the function as a string and later using `eval` to evaluate the function code.
 
+## Composition
+
+`composition(name, composition)` returns a composition consisting of the invocation of the composition named `name` and of the declaration of the composition named `name` defined to be `composition`.
+
+```javascript
+composer.if('isEven', 'half', composer.composition('tripleAndIncrement', composer.sequence('triple', 'increment')))
+```
+In this example, the `composer.sequence('triple', 'increment')` composition is given the name `tripleAndIncrement` and the enclosing composition references the `tripleAndIncrement` composition by name. In particular, deploying this composition actually deploys two compositions:
+- a composition named `tripleAndIncrement` defined as `composer.sequence('triple', 'increment')`, and
+- a composition defined as `composer.if('isEven', 'half', 'tripleAndIncrement')` whose name will be specified as deployment time.
+
+Importantly, the behavior of the second composition would be altered if we redefine the `tripleAndIncrement` composition to do something else, since it refers to the composition by name.
+
+## Empty
+
+`composer.empty()` is a shorthand for the empty sequence `composer.sequence()`. It is typically used to make it clear that a composition, e.g., a branch of an `if` combinator, is intentionally doing nothing.
+
 ## Sequence
 
 `composer.sequence(composition_1, composition_2, ...)` chains a series of compositions (possibly empty).
@@ -158,30 +182,49 @@ composer.let({ n: 42 }, () => ({ n }), 'increment', params => { n = params.n })
 
 In this example, the variable `n` is exposed to the invoked action as a field of the input parameter object. Moreover, the value of the field `n` of the output parameter object is assigned back to variable `n`.
 
+## Mask
+
+`composer.mask(composition)` is meant to be used in combination with the `let` combinator. It makes it possible to hide the innermost enclosing `let` combinator from _composition_. It is typically used to define composition templates that need to introduce variables.
+
+For instance, the following function is a possible implementation of a repeat loop:
+```javascript
+function loop(n, composition) {
+    return .let({ n }, composer.while(() => n-- > 0, composer.mask(composition)))
+}
+```
+This function takes two parameters: the number of iterations _n_ and the _composition_ to repeat _n_ times. Here, the `mask` combinator makes sure that this declaration of _n_ is not visible to _composition_. Thanks to `mask`, the following example correctly returns `{ value: 12 }`.
+```javascript
+composer.let({ n: 0 }, loop(3, loop(4, () => ++n)))
+```
+While composer variables are dynamically scoped, the `mask` combinator alleviates the biggest concern with dynamic scoping: incidental name collision.
+
 ## If
 
-`composer.if(condition, consequent, [alternate], [options])` runs either the _consequent_ composition if the _condition_ evaluates to true or the _alternate_ composition if not.
+`composer.if(condition, consequent, [alternate])` runs either the _consequent_ composition if the _condition_ evaluates to true or the _alternate_ composition if not.
 
 A _condition_ composition evaluates to true if and only if it produces a JSON dictionary with a field `value` with value `true`. Other fields are ignored. Because JSON values other than dictionaries are implicitly lifted to dictionaries with a `value` field, _condition_ may be a Javascript function returning a Boolean value. An expression such as `params.n > 0` is not a valid condition (or in general a valid composition). One should write instead `params => params.n > 0`. The input parameter object for the composition is the input parameter object for the _condition_ composition.
 
 The _alternate_ composition may be omitted. If _condition_ fails, neither branch is executed.
 
-The optional `options` dictionary supports a `nosave` option. If `options.nosave` is thruthy, the _consequent_ composition or _alternate_ composition is invoked on the output parameter object of the _condition_ composition. Otherwise, the output parameter object of the _condition_ composition is discarded and the _consequent_ composition or _alternate_ composition is invoked on the input parameter object for the composition. For example, the following compositions divide parameter `n` by two if `n` is even:
+The output parameter object of the _condition_ composition is discarded, one the choice of a branch has been made and the _consequent_ composition or _alternate_ composition is invoked on the input parameter object for the composition. For example, the following composition divides parameter `n` by two if `n` is even:
 ```javascript
 composer.if(params => params.n % 2 === 0, params => { params.n /= 2 })
-composer.if(params => { params.value = params.n % 2 === 0 }, params => { params.n /= 2 }, null, { nosave: true })
+```
+The `if_nosave` combinator is similar but it does not preserve the input parameter object, i.e., the _consequent_ composition or _alternate_ composition is invoked on the output parameter object of _condition_. The following example also divides parameter `n` by two if `n` is even:
+```javascript
+composer.if_nosave(params => { params.value = params.n % 2 === 0 }, params => { params.n /= 2 })
 ```
 In the first example, the condition function simply returns a Boolean value. The consequent function uses the saved input parameter object to compute `n`'s value. In the second example, the condition function adds a `value` field to the input parameter object. The consequent function applies to the resulting object. In particular, in the second example, the output parameter object for the condition includes the `value` field.
 
-While, the default `nosave == false` behavior is typically more convenient, preserving the input parameter object is not free as it counts toward the parameter size limit for OpenWhisk actions. In essence, the limit on the size of parameter objects processed during the evaluation of the condition is reduced by the size of the saved parameter object. The `nosave` option omits the parameter save, hence preserving the parameter size limit.
+While, the `if` combinator is typically more convenient, preserving the input parameter object is not free as it counts toward the parameter size limit for OpenWhisk actions. In essence, the limit on the size of parameter objects processed during the evaluation of the condition is reduced by the size of the saved parameter object. The `if_nosave` combinator omits the parameter save, hence preserving the parameter size limit.
 
 ## While
 
-`composer.while(condition, body, [options])` runs _body_ repeatedly while _condition_ evaluates to true. The _condition_ composition is evaluated before any execution of the _body_ composition. See [composer.if](#composerifcondition-consequent-alternate) for a discussion of conditions.
+`composer.while(condition, body)` runs _body_ repeatedly while _condition_ evaluates to true. The _condition_ composition is evaluated before any execution of the _body_ composition. See [composer.if](#composerifcondition-consequent-alternate) for a discussion of conditions.
 
 A failure of _condition_ or _body_ interrupts the execution. The composition returns the error object from the failed component.
 
-Like `composer.if`, `composer.while` supports a `nosave` option. By default, the output parameter object of the _condition_ composition is discarded and the input parameter object for the _body_ composition is either the input parameter object for the whole composition the first time around or the output parameter object of the previous iteration of _body_. However if `options.nosave` is thruthy, the input parameter object for _body_ is the output parameter object of _condition_. Moreover, the output parameter object for the whole composition is the output parameter object of the last _condition_ evaluation.
+The output parameter object of the _condition_ composition is discarded and the input parameter object for the _body_ composition is either the input parameter object for the whole composition the first time around or the output parameter object of the previous iteration of _body_. However, if `while_nosave` combinator is used, the input parameter object for _body_ is the output parameter object of _condition_. Moreover, the output parameter object for the whole composition is the output parameter object of the last _condition_ evaluation.
 
 For instance, the following composition invoked on dictionary `{ n: 28 }` returns `{ n: 7 }`:
 ```javascript
@@ -189,12 +232,14 @@ composer.while(params => params.n % 2 === 0, params => { params.n /= 2 })
 ```
 For instance, the following composition invoked on dictionary `{ n: 28 }` returns `{ n: 7, value: false }`:
 ```javascript
-composer.while(params => { params.value = params.n % 2 === 0 }, params => { params.n /= 2 }, { nosave: true })
+composer.while_nosave(params => { params.value = params.n % 2 === 0 }, params => { params.n /= 2 })
 ```
 
 ## Dowhile
 
-`composer.dowhile(condition, body, [options])` is similar to `composer.while(body, condition, [options])` except that _body_ is invoked before _condition_ is evaluated, hence _body_ is always invoked at least once.
+`composer.dowhile(condition, body)` is similar to `composer.while(body, condition)` except that _body_ is invoked before _condition_ is evaluated, hence _body_ is always invoked at least once.
+
+Like `while_nosave`, `dowhile_nosave` does not implicitly preserve the parameter object while evaluating _condition_.
 
 ## Repeat
 
@@ -218,9 +263,6 @@ The _finalizer_ is invoked in sequence after _body_ even if _body_ returns an er
 
 ## Retain
 
-`composer.retain(body, [options])` runs _body_ on the input parameter object producing an object with two fields `params` and `result` such that `params` is the input parameter object of the composition and `result` is the output parameter object of _body_.
+`composer.retain(body)` runs _body_ on the input parameter object producing an object with two fields `params` and `result` such that `params` is the input parameter object of the composition and `result` is the output parameter object of _body_.
 
-An `options` dictionary object may be specified to alter the default behavior of `composer.retain` in the following ways:
-- If `options.catch` is thruthy, the `retain` combinator behavior will be the same even if _body_ returns an error object. Otherwise, if _body_ fails, the output of the `retain` combinator is only the error object (i.e., the input parameter object is not preserved).
-- If `options.filter` is a function, the combinator only persists the result of the function application to the input parameter object.
-- If `options.field` is a string, the combinator only persists the value of the field of the input parameter object with the given name.
+If _body_ fails, the output of the `retain` combinator is only the error object (i.e., the input parameter object is not preserved). In constrast, the `retain_catch` combinator always outputs `{ params, result }`, even if `result` is an error result.

@@ -26,6 +26,6 @@ const composition = composer.if(
 // instantiate OpenWhisk client
 const wsk = composer.openwhisk({ ignore_certs: true })
 
-wsk.compositions.deploy(composition, 'demo') // deploy composition
+wsk.compositions.deploy(composer.composition('demo', composition)) // deploy composition
     .then(() => wsk.actions.invoke({ name: 'demo', params: { password: 'abc123' }, blocking: true })) // invoke composition
     .then(({ response }) => console.log(JSON.stringify(response.result, null, 4)), console.error)
