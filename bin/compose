@@ -8,10 +8,15 @@ const minimist = require('minimist')
 const composer = require('../composer')
 
 const argv = minimist(process.argv.slice(2), {
-    string: ['apihost', 'auth', 'deploy'],
-    boolean: ['insecure', 'encode', 'json'],
-    alias: { auth: 'u', insecure: 'i' }
+    string: ['apihost', 'auth', 'deploy', 'lower'],
+    boolean: ['insecure', 'encode', 'json', 'version'],
+    alias: { auth: 'u', insecure: 'i', version: 'v' }
 })
+
+if (argv.version) {
+    console.log(composer.version)
+    return
+}
 
 let count = 0
 if (argv.json) count++
@@ -26,27 +31,29 @@ if (argv._.length !== 1 || count > 1 || argv.deploy === '') {
     console.error('  --deploy NAME          deploy the composition with name NAME')
     console.error('  --encode               output the conductor action code for the composition')
     console.error('Flags:')
+    console.error('  --lower [VERSION]      lower to primitive combinators or specific composer version')
     console.error('  --apihost HOST         API HOST')
     console.error('  -u, --auth KEY         authorization KEY')
     console.error('  -i, --insecure         bypass certificate checking')
+    console.error('  -v, --version          output the composer version')
     return
 }
 
 const filename = argv._[0]
 const source = fs.readFileSync(filename, { encoding: 'utf8' })
-const composition = filename.slice(filename.lastIndexOf('.')) === '.js' ? vm.runInNewContext(source, { composer, require, console, process }) : composer.deserialize(JSON.parse(source))
+let composition = filename.slice(filename.lastIndexOf('.')) === '.js' ? vm.runInNewContext(source, { composer, require, console, process }) : composer.deserialize(JSON.parse(source))
+const lower = typeof argv.lower === 'string' ? argv.lower : false
 if (argv.deploy) {
     const options = { ignore_certs: argv.insecure }
     if (argv.apihost) options.apihost = argv.apihost
     if (argv.auth) options.api_key = argv.auth
-    const obj = composition.named(argv.deploy)
-    composer.openwhisk(options).compositions.deploy(obj)
-        .then(() => {
+    composer.openwhisk(options).compositions.deploy(composer.composition(argv.deploy, composition), lower)
+        .then(obj => {
             const names = obj.actions.map(action => action.name)
             console.log(`ok: created action${names.length > 1 ? 's' : ''} ${names}`)
         }, console.error)
 } else if (argv.encode) {
-    console.log(composition.encode('anonymous').actions.slice(-1)[0].action.exec.code)
+    console.log(composer.encode(composer.composition('anonymous', composition), lower).actions.slice(-1)[0].action.exec.code)
 } else {
-    console.log(JSON.stringify(composition, null, 4))
+    console.log(JSON.stringify(composer.lower(composition, lower), null, 4))
 }

@@ -1,54 +1,33 @@
 {
-    "actions": [
-        {
-            "name": "/_/authenticate",
-            "action": {
-                "exec": {
-                    "kind": "nodejs:default",
-                    "code": "const main = function ({ password }) { return { value: password === 'abc123' } }"
-                }
-            }
-        },
-        {
-            "name": "/_/success",
-            "action": {
-                "exec": {
-                    "kind": "nodejs:default",
-                    "code": "const main = function () { return { message: 'success' } }"
-                }
-            }
-        },
-        {
-            "name": "/_/failure",
-            "action": {
-                "exec": {
-                    "kind": "nodejs:default",
-                    "code": "const main = function () { return { message: 'failure' } }"
-                }
+    "type": "if",
+    "test": {
+        "type": "action",
+        "name": "/_/authenticate",
+        "action": {
+            "exec": {
+                "kind": "nodejs:default",
+                "code": "const main = function ({ password }) { return { value: password === 'abc123' } }"
             }
         }
-    ],
-    "composition": [
-        {
-            "type": "if",
-            "test": [
-                {
-                    "type": "action",
-                    "name": "/_/authenticate"
-                }
-            ],
-            "consequent": [
-                {
-                    "type": "action",
-                    "name": "/_/success"
-                }
-            ],
-            "alternate": [
-                {
-                    "type": "action",
-                    "name": "/_/failure"
-                }
-            ]
+    },
+    "consequent": {
+        "type": "action",
+        "name": "/_/success",
+        "action": {
+            "exec": {
+                "kind": "nodejs:default",
+                "code": "const main = function () { return { message: 'success' } }"
+            }
         }
-    ]
+    },
+    "alternate": {
+        "type": "action",
+        "name": "/_/failure",
+        "action": {
+            "exec": {
+                "kind": "nodejs:default",
+                "code": "const main = function () { return { message: 'failure' } }"
+            }
+        }
+    }
 }
