@@ -30,6 +30,10 @@ Where a composition is expected, the following shorthands are permitted:
  - `fun` of type `function` stands for `composer.function(fun)`,
  - `null` stands for the empty sequence `composer.empty()`.
 
+## Primitive combinators
+
+Some of these combinators are _derived_ combinators: they are equivalent to combinations of other combinators. The `composer` module offers a `composer.lower` method (see [COMPOSER.md](#COMPOSER.md)) that can eliminate derived combinators from a composition, producing an equivalent composition made only of _primitive_ combinators. The primitive combinators are: `action`, `function`, `composition`, `sequence`, `let`, `mask`, `if_nosave`, `while_nosave`, `dowhile_nosave`, `try`, and `finally`.
+
 ## Action
 
 `composer.action(name, [options])` is a composition with a single action named _name_. It invokes the action named _name_ on the input parameter object for the composition and returns the output parameter object of this action invocation.

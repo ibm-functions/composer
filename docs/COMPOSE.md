@@ -17,7 +17,7 @@ Commands:
   --deploy NAME          deploy the composition with name NAME
   --encode               output the conductor action code for the composition
 Flags:
-  --lower                only use primitive combinators
+  --lower [VERSION]      lower to primitive combinators or specific composer version
   --apihost HOST         API HOST
   -u, --auth KEY         authorization KEY
   -i, --insecure         bypass certificate checking
@@ -133,4 +133,8 @@ The conductor action code does not include definitions for nested actions or com
 
 ## Lowering
 
-If the `--lower` option is specified, the `compose` command uses a minimal set of combinators. Combinators that are not in this set are replaced with combinators of combinators in the set. This option can be combined with any of the three commands.
+If the `--lower VERSION` option is specified, the `compose` command uses the set of combinators of the specified revision of the `composer` module. More recently introduced combinators (if any) are translated into combinators of the older set.
+
+If the `--lower` option is specified without a version number, the `compose` command uses only primitive combinators.
+
+These options may be combined with any of the `compose` commands.
