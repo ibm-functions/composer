@@ -15,21 +15,26 @@ Usage:
 Commands:
   --json                 output the json representation for the composition (default command)
   --deploy NAME          deploy the composition with name NAME
+  --entity NAME          output the conductor action definition for the composition (giving name NAME to the composition)
+  --entities NAME        convert the composition into an array of action definition (giving name NAME to the composition)
   --encode               output the conductor action code for the composition
 Flags:
   --lower [VERSION]      lower to primitive combinators or specific composer version
   --apihost HOST         API HOST
   -u, --auth KEY         authorization KEY
   -i, --insecure         bypass certificate checking
+  -v, --version          output the composer version
 ```
 The `compose` command requires either a Javascript file that evaluates to a composition (for example [demo.js](../samples/demo.js)) or a JSON file that encodes a composition (for example [demo.json](../samples/demo.json)). The JSON format is documented in [FORMAT.md](FORMAT.md).
 
-The `compose` command has three modes of operation:
+The `compose` command has several modes of operation:
 - By default or when the `--json` option is specified, the command returns the composition encoded as a JSON dictionary.
 - When the `--deploy` option is specified, the command deploys the composition given the desired name for the composition.
 - When the `--encode` option is specified, the command returns the Javascript code for the [conductor action](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md) for the composition.
+- When the `--entity` option is specified, the command returns the complete conductor action definition as a JSON dictionary.
+- When the `--entities` option is specified, the command returns an array of action definitions including not only the conductor action for the composition, but possibly also the nested action definitions.
 
-## JSON format
+## JSON option
 
 By default, the `compose` command evaluates the composition code and outputs the resulting JSON dictionary:
 ```
@@ -76,7 +81,122 @@ composer = require('@ibm-functions/composer')
 ```
 In other words, there is no need to require the `composer` module explicitly in the composition code.
 
-## Deployment
+## Entity option
+
+With the `--entity` option the `compose` command returns the conductor action definition for the composition.
+```
+compose demo.js --entity demo
+```
+```json
+{
+    "name": "/_/demo",
+    "action": {
+        "exec": {
+            "kind": "nodejs:default",
+            "code": "..."
+        },
+        "annotations": [
+            {
+                "key": "conductor",
+                "value": {
+                    "type": "if",
+                    "test": {
+                        "type": "action",
+                        "name": "/_/authenticate"
+                    },
+                    "consequent": {
+                        "type": "action",
+                        "name": "/_/success"
+                    },
+                    "alternate": {
+                        "type": "action",
+                        "name": "/_/failure"
+                    }
+                }
+            },
+            {
+                "key": "composer",
+                "value": "0.4.0"
+            }
+        ]
+    }
+}
+```
+
+
+## Entities option
+
+With the `--entities` option the `compose` command returns not only the conductor action definition for the composition but also the definitions of nested actions and compositions.
+```
+compose demo.js --entities demo
+```
+```json
+[
+    {
+        "name": "/_/authenticate",
+        "action": {
+            "exec": {
+                "kind": "nodejs:default",
+                "code": "const main = function ({ password }) { return { value: password === 'abc123' } }"
+            }
+        }
+    },
+    {
+        "name": "/_/success",
+        "action": {
+            "exec": {
+                "kind": "nodejs:default",
+                "code": "const main = function () { return { message: 'success' } }"
+            }
+        }
+    },
+    {
+        "name": "/_/failure",
+        "action": {
+            "exec": {
+                "kind": "nodejs:default",
+                "code": "const main = function () { return { message: 'failure' } }"
+            }
+        }
+    },
+    {
+        "name": "/_/demo",
+        "action": {
+            "exec": {
+                "kind": "nodejs:default",
+                "code": "..."
+            },
+            "annotations": [
+                {
+                    "key": "conductor",
+                    "value": {
+                        "type": "if",
+                        "test": {
+                            "type": "action",
+                            "name": "/_/authenticate"
+                        },
+                        "consequent": {
+                            "type": "action",
+                            "name": "/_/success"
+                        },
+                        "alternate": {
+                            "type": "action",
+                            "name": "/_/failure"
+                        }
+                    }
+                },
+                {
+                    "key": "composer",
+                    "value": "0.4.0"
+                }
+            ]
+        }
+    }
+]
+
+```
+
+## Deploy option
 
 The `--deploy` option makes it possible to deploy a composition (Javascript or JSON) given the desired name for the composition:
 ```
@@ -115,7 +235,7 @@ If the `--auth` flag is absent, the environment variable `__OW_API_KEY` is used 
 
 The default path for the whisk property file is `$HOME/.wskprops`. It can be altered by setting the `WSK_CONFIG_FILE` environment variable.
 
-## Code generation
+## Encode option
 
 The `compose` command returns the code of the conductor action for the composition (Javascript or JSON) when invoked with the `--encode` option.
 For instance, the conductor action code for the [demo.js](../samples/demo.js) composition is [demo-conductor.js](../samples/demo-conductor.js):
