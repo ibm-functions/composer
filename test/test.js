@@ -33,8 +33,9 @@ describe('composer', function () {
 
             it('action name must parse to fully qualified', function () {
                 let combos = [
-                    { n: '', s: false, e: 'Name is not specified' },
-                    { n: ' ', s: false, e: 'Name is not specified' },
+                    { n: 42, s: false, e: 'Name must be a string' },
+                    { n: '', s: false, e: 'Name is not valid' },
+                    { n: ' ', s: false, e: 'Name is not valid' },
                     { n: '/', s: false, e: 'Name is not valid' },
                     { n: '//', s: false, e: 'Name is not valid' },
                     { n: '/a', s: false, e: 'Name is not valid' },
