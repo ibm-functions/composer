@@ -8,7 +8,7 @@ const minimist = require('minimist')
 const composer = require('../composer')
 
 const argv = minimist(process.argv.slice(2), {
-    string: ['apihost', 'auth', 'deploy', 'lower'],
+    string: ['apihost', 'auth', 'deploy', 'lower', 'entity', 'entities'],
     boolean: ['insecure', 'encode', 'json', 'version'],
     alias: { auth: 'u', insecure: 'i', version: 'v' }
 })
@@ -21,14 +21,17 @@ if (argv.version) {
 let count = 0
 if (argv.json) count++
 if (argv.encode) count++
+if (argv.entity) count++
 if (typeof argv.deploy !== 'undefined') count++
 
-if (argv._.length !== 1 || count > 1 || argv.deploy === '') {
+if (argv._.length !== 1 || count > 1 || argv.deploy === '' || argv.entity === '' || argv.entities === '') {
     console.error('Usage:')
     console.error('  compose composition.js[on] command [flags]')
     console.error('Commands:')
     console.error('  --json                 output the json representation for the composition (default command)')
     console.error('  --deploy NAME          deploy the composition with name NAME')
+    console.error('  --entity NAME          output the conductor action definition for the composition (giving name NAME to the composition)')
+    console.error('  --entities NAME        convert the composition into an array of action definition (giving name NAME to the composition)')
     console.error('  --encode               output the conductor action code for the composition')
     console.error('Flags:')
     console.error('  --lower [VERSION]      lower to primitive combinators or specific composer version')
@@ -54,6 +57,10 @@ if (argv.deploy) {
         }, console.error)
 } else if (argv.encode) {
     console.log(composer.encode(composer.composition('anonymous', composition), lower).actions.slice(-1)[0].action.exec.code)
+} else if (argv.entity) {
+    console.log(JSON.stringify(composer.encode(composer.composition(argv.entity, composition), lower).actions.slice(-1)[0], null, 4))
+} else if (argv.entities) {
+    console.log(JSON.stringify(composer.encode(composer.composition(argv.entities, composition), lower).actions, null, 4))
 } else {
     console.log(JSON.stringify(composer.lower(composition, lower), null, 4))
 }
