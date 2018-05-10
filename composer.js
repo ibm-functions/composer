@@ -318,7 +318,8 @@ function composer() {
      *   /ns/pkg/foo => /ns/pkg/foo
      */
     function parseActionName(name) {
-        if (typeof name !== 'string' || name.trim().length == 0) throw new ComposerError('Name is not specified')
+        if (typeof name !== 'string') throw new ComposerError('Name must be a string')
+        if (name.trim().length == 0) throw new ComposerError('Name is not valid')
         name = name.trim()
         let delimiter = '/'
         let parts = name.split(delimiter)
