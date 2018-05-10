@@ -75,9 +75,9 @@ composer.action('hello', { filename: 'hello.js' })
 // specify a sequence of actions
 composer.action('helloAndBye', { sequence: ['hello', 'bye'] })
 ```
-The action may de defined by providing the code for the action as a string, as a Javascript function, or as a file name. Alternatively, a sequence action may be defined by providing the list of sequenced actions. The code (specified as a string) may be annotated with the kind of the action runtime.
+The action may be defined by providing the code for the action as a string, as a Javascript function, or as a file name. Alternatively, a sequence action may be defined by providing the list of sequenced actions. The code (specified as a string) may be annotated with the kind of the action runtime.
 
-### Environment capture
+### Environment capture in actions
 
 Javascript functions used to define actions cannot capture any part of their declaration environment. The following code is not correct as the declaration of `name` would not be available at invocation time:
 ```javascript
@@ -107,7 +107,7 @@ function product({ x, y }) { return { product: x * y } }
 composer.function(product)
 ```
 
-### Environment capture
+### Environment capture in functions
 
 Functions intended for compositions cannot capture any part of their declaration environment. They may however access and mutate variables in an environment consisting of the variables declared by the [composer.let](#composerletname-value-composition_1-composition_2-) combinator discussed below.
 
