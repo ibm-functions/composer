@@ -9,7 +9,7 @@ const composer = require('../composer')
 
 const argv = minimist(process.argv.slice(2), {
     string: ['apihost', 'auth', 'deploy', 'lower', 'entity', 'entities'],
-    boolean: ['insecure', 'encode', 'json', 'version'],
+    boolean: ['insecure', 'encode', 'json', 'version', 'quiet'],
     alias: { auth: 'u', insecure: 'i', version: 'v' }
 })
 
@@ -39,28 +39,67 @@ if (argv._.length !== 1 || count > 1 || argv.deploy === '' || argv.entity === ''
     console.error('  -u, --auth KEY         authorization KEY')
     console.error('  -i, --insecure         bypass certificate checking')
     console.error('  -v, --version          output the composer version')
-    return
+    console.error('  --quiet                omit detailed diagnostic messages')
+    process.exit(127)
 }
 
-const filename = argv._[0]
-const source = fs.readFileSync(filename, { encoding: 'utf8' })
-let composition = filename.slice(filename.lastIndexOf('.')) === '.js' ? vm.runInNewContext(source, { composer, require, console, process }) : composer.deserialize(JSON.parse(source))
-const lower = typeof argv.lower === 'string' ? argv.lower : false
-if (argv.deploy) {
-    const options = { ignore_certs: argv.insecure }
-    if (argv.apihost) options.apihost = argv.apihost
-    if (argv.auth) options.api_key = argv.auth
-    composer.openwhisk(options).compositions.deploy(composer.composition(argv.deploy, composition), lower)
-        .then(obj => {
-            const names = obj.actions.map(action => action.name)
-            console.log(`ok: created action${names.length > 1 ? 's' : ''} ${names}`)
-        }, console.error)
-} else if (argv.encode) {
-    console.log(composer.encode(composer.composition('anonymous', composition), lower).actions.slice(-1)[0].action.exec.code)
-} else if (argv.entity) {
-    console.log(JSON.stringify(composer.encode(composer.composition(argv.entity, composition), lower).actions.slice(-1)[0], null, 4))
-} else if (argv.entities) {
-    console.log(JSON.stringify(composer.encode(composer.composition(argv.entities, composition), lower).actions, null, 4))
-} else {
-    console.log(JSON.stringify(composer.lower(composition, lower), null, 4))
+try {
+    const filename = argv._[0]
+    let source
+    try {
+        source = fs.readFileSync(filename, { encoding: 'utf8' })
+    } catch (error) {
+        console.error('File not found')
+        if (!argv.quiet) console.log(error)
+        process.exit(6)
+    }
+    let composition
+    try {
+        composition = filename.slice(filename.lastIndexOf('.')) === '.js' ? vm.runInNewContext(source, { composer, require, console, process }) : composer.deserialize(JSON.parse(source))
+        if (typeof argv.lower === 'string') composition = composer.lower(composition, argv.lower)
+    } catch (error) {
+        console.error('Bad composition')
+        if (!argv.quiet) console.log(error)
+        process.exit(4)
+    }
+    if (argv.deploy) {
+        const options = { ignore_certs: argv.insecure }
+        if (argv.apihost) options.apihost = argv.apihost
+        if (argv.auth) options.api_key = argv.auth
+        return Promise.resolve()
+            .then(() => composer.openwhisk(options).compositions.deploy(composer.composition(argv.deploy, composition), false))
+            .then(obj => {
+                const names = obj.actions.map(action => action.name)
+                console.log(`ok: created action${names.length > 1 ? 's' : ''} ${names}`)
+            })
+            .catch(error => {
+                if (error.constructor && error.constructor.name === 'OpenWhiskError') {
+                    switch (error.statusCode) {
+                        case 401:
+                            console.error('Authentication failure')
+                            if (!argv.quiet) console.log(error)
+                            process.exit(2)
+                        case 403:
+                            console.error('Authorization failure')
+                            if (!argv.quiet) console.log(error)
+                            process.exit(3)
+                    }
+                }
+                console.error('Server error')
+                if (!argv.quiet) console.log(error)
+                process.exit(5)
+            })
+    } else if (argv.encode) {
+        console.log(composer.encode(composer.composition('anonymous', composition), false).actions.slice(-1)[0].action.exec.code)
+    } else if (argv.entity) {
+        console.log(JSON.stringify(composer.encode(composer.composition(argv.entity, composition), false).actions.slice(-1)[0], null, 4))
+    } else if (argv.entities) {
+        console.log(JSON.stringify(composer.encode(composer.composition(argv.entities, composition), false).actions, null, 4))
+    } else {
+        console.log(JSON.stringify(composition, null, 4))
+    }
+} catch (error) {
+    console.error('Internal error')
+    if (!argv.quiet) console.log(error)
+    process.exit(1)
 }
