@@ -10,4 +10,5 @@ The documentation for the Composer package is organized as follows:
 - [COMPOSE.md](COMPOSE.md) documents the `compose` command.
 - [COMBINATORS.md](COMBINATORS.md) documents the methods of the `composer` object.
 - [FORMAT.md](FORMAT.md) documents the JSON format for encoding compositions.
+- [TEMPLATES.md](TEMPLATES.md) demonstrates various composition templates.
 - The [tutorials](tutorials) folder includes various tutorials.
