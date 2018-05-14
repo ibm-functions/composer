@@ -137,6 +137,10 @@ describe('composer', function () {
                 return invoke(composer.function('({ n }) => n % 2 === 0'), { n: 4 }).then(activation => assert.deepEqual(activation.response.result, { value: true }))
             })
 
+            it('function may return a promise', function () {
+                return invoke(composer.function(({ n }) => Promise.resolve(n % 2 === 0)), { n: 4 }).then(activation => assert.deepEqual(activation.response.result, { value: true }))
+            })
+
             it('invalid argument', function () {
                 try {
                     invoke(composer.function(42))

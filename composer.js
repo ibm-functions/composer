@@ -614,7 +614,7 @@ function conductor({ Compiler }) {
             }
         }
 
-        while (true) {
+        function step() {
             // final state, return composition result
             if (state === undefined) {
                 console.log(`Entering final state`)
@@ -645,18 +645,17 @@ function conductor({ Compiler }) {
                     return { action: json.name, params, state: { $resume: { state, stack } } } // invoke continuation
                     break
                 case 'function':
-                    let result
-                    try {
-                        result = run(json.exec.code)
-                    } catch (error) {
-                        console.error(error)
-                        result = { error: `An exception was caught at state ${current} (see log for details)` }
-                    }
-                    if (typeof result === 'function') result = { error: `State ${current} evaluated to a function` }
-                    // if a function has only side effects and no return value, return params
-                    params = JSON.parse(JSON.stringify(result === undefined ? params : result))
-                    inspect()
-                    break
+                    return Promise.resolve().then(() => run(json.exec.code))
+                        .catch(error => {
+                            console.error(error)
+                            return { error: `An exception was caught at state ${current} (see log for details)` }
+                        })
+                        .then(result => {
+                            if (typeof result === 'function') result = { error: `State ${current} evaluated to a function` }
+                            // if a function has only side effects and no return value, return params
+                            params = JSON.parse(JSON.stringify(result === undefined ? params : result))
+                            inspect()
+                        }).then(step)
                 case 'empty':
                     inspect()
                     break
@@ -665,6 +664,9 @@ function conductor({ Compiler }) {
                 default:
                     return internalError(`State ${current} has an unknown type`)
             }
+            return step()
         }
+
+        return step()
     }
 }
