@@ -1,6 +1,7 @@
 const assert = require('assert')
 const composer = require('../composer')
 const name = 'TestAction'
+const compositionName = 'TestComposition'
 const wsk = composer.openwhisk({ ignore_certs: process.env.IGNORE_CERTS && process.env.IGNORE_CERTS !== 'false' && process.env.IGNORE_CERTS !== '0' })
 
 // deploy action
@@ -29,6 +30,10 @@ describe('composer', function () {
 
             it('action must return false', function () {
                 return invoke(composer.action('isNotOne'), { n: 1 }).then(activation => assert.deepEqual(activation.response.result, { value: false }))
+            })
+
+            it('action must return activationId', function () {
+                return invoke(composer.action('isNotOne', { async: true }), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
             })
 
             it('action name must parse to fully qualified', function () {
@@ -65,9 +70,9 @@ describe('composer', function () {
                 })
             })
 
-            it('invalid argument', function () {
+            it('invalid options', function () {
                 try {
-                    invoke(composer.function(42))
+                    invoke(composer.action('foo', 42))
                     assert.fail()
                 } catch (error) {
                     assert.ok(error.message.startsWith('Invalid argument'))
@@ -76,7 +81,44 @@ describe('composer', function () {
 
             it('too many arguments', function () {
                 try {
-                    invoke(composer.function('foo', 'foo'))
+                    invoke(composer.action('foo', {}, 'foo'))
+                    assert.fail()
+                } catch (error) {
+                    assert.ok(error.message.startsWith('Too many arguments'))
+                }
+            })
+        })
+
+        describe('compositions', function () {
+            it('composition must return true', function () {
+                return invoke(composer.composition(compositionName, composer.action('isNotOne')), { n: 0 }).then(activation => assert.deepEqual(activation.response.result, { value: true }))
+            })
+
+            it('action must return activationId', function () {
+                return invoke(composer.composition(compositionName, composer.action('isNotOne'), { async: true }), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
+            })
+
+            it('invalid argument', function () {
+                try {
+                    invoke(composer.composition(compositionName, 42))
+                    assert.fail()
+                } catch (error) {
+                    assert.ok(error.message.startsWith('Invalid argument'))
+                }
+            })
+
+            it('invalid options', function () {
+                try {
+                    invoke(composer.composition(compositionName, 'foo', 42))
+                    assert.fail()
+                } catch (error) {
+                    assert.ok(error.message.startsWith('Invalid argument'))
+                }
+            })
+
+            it('too many arguments', function () {
+                try {
+                    invoke(composer.composition(compositionName, 'foo', {}, 'foo'))
                     assert.fail()
                 } catch (error) {
                     assert.ok(error.message.startsWith('Too many arguments'))
