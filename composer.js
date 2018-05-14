@@ -39,8 +39,8 @@ function compiler() {
         retain_catch: { components: true, since: '0.4.0' },
         let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
         mask: { components: true, since: '0.4.0' },
-        action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }], since: '0.4.0' },
-        composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition' }], since: '0.4.0' },
+        action: { args: [{ _: 'name', type: 'string' }, { _: 'options', type: 'object', optional: true }], since: '0.4.0' },
+        composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition' }, { _: 'options', type: 'object', optional: true }], since: '0.4.0' },
         repeat: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
         retry: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
         value: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
@@ -358,6 +358,7 @@ function composer() {
         // enhanced action combinator: mangle name, capture code
         action(name, options = {}) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
+            if (typeof options !== 'object') throw new ComposerError('Invalid argument', options)
             name = parseActionName(name) // throws ComposerError if name is not valid
             let exec
             if (Array.isArray(options.sequence)) { // native sequence
@@ -378,15 +379,18 @@ function composer() {
             }
             const composition = { type: 'action', name }
             if (exec) composition.action = { exec }
+            if (options.async) composition.async = true
             return new Composition(composition)
         }
 
         // enhanced composition combinator: mangle name
-        composition(name, composition) {
-            if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            if (typeof name !== 'string') throw new ComposerError('Invalid argument', name)
+        composition(name, composition, options = {}) {
+            if (arguments.length > 3) throw new ComposerError('Too many arguments')
+            if (typeof options !== 'object') throw new ComposerError('Invalid argument', options)
             name = parseActionName(name)
-            return new Composition({ type: 'composition', name, composition: this.task(composition) })
+            const obj = { type: 'composition', name, composition: this.task(composition) }
+            if (options.async) obj.async = true
+            return new Composition(obj)
         }
 
         // return enhanced openwhisk client capable of deploying compositions
@@ -464,6 +468,8 @@ function conductor({ Compiler }) {
     const compiler = new Compiler()
 
     this.require = require
+    const openwhisk = require('openwhisk')
+    let wsk
 
     function chain(front, back) {
         front.slice(-1)[0].next = 1
@@ -482,7 +488,7 @@ function conductor({ Compiler }) {
             case 'sequence':
                 return chain([{ type: 'pass', path }], sequence(json.components))
             case 'action':
-                return [{ type: 'action', name: json.name, path }]
+                return [{ type: 'action', name: json.name, async: json.async, path }]
             case 'function':
                 return [{ type: 'function', exec: json.function.exec, path }]
             case 'finally':
@@ -642,7 +648,20 @@ function conductor({ Compiler }) {
                     stack.shift()
                     break
                 case 'action':
-                    return { action: json.name, params, state: { $resume: { state, stack } } } // invoke continuation
+                    if (json.async) {
+                        if (!wsk) wsk = openwhisk({ ignore_certs: true })
+                        return wsk.actions.invoke({ name: json.name, params })
+                            .catch(error => {
+                                console.error(error)
+                                return { error: `An exception was caught at state ${current} (see log for details)` }
+                            })
+                            .then(result => {
+                                params = result
+                                inspect()
+                            }).then(step)
+                    } else {
+                        return { action: json.name, params, state: { $resume: { state, stack } } } // invoke continuation
+                    }
                     break
                 case 'function':
                     return Promise.resolve().then(() => run(json.exec.code))
