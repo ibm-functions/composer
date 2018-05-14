@@ -659,10 +659,8 @@ function conductor({ Compiler }) {
                                 params = result
                                 inspect()
                             }).then(step)
-                    } else {
-                        return { action: json.name, params, state: { $resume: { state, stack } } } // invoke continuation
                     }
-                    break
+                    return { action: json.name, params, state: { $resume: { state, stack } } } // invoke continuation
                 case 'function':
                     return Promise.resolve().then(() => run(json.exec.code))
                         .catch(error => {
