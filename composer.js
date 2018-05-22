@@ -336,17 +336,18 @@ function main() {
                 }
                 for (let i = 0; i < skip; ++i) {
                     const arg = combinator.args[i]
-                    const argument = arg.optional ? arguments[i] || null : arguments[i]
+                    const argument = arguments[i]
+                    if (argument === undefined && arg.optional && arg.type !== undefined) continue
                     switch (arg.type) {
                         case undefined:
-                            composition[arg._] = composer.task(argument)
+                            composition[arg._] = this.task(arg.optional ? argument || null : argument)
                             continue
                         case 'value':
                             if (typeof argument === 'function') throw new ComposerError('Invalid argument', argument)
                             composition[arg._] = argument === undefined ? {} : argument
                             continue
                         case 'object':
-                            if (!isObject(argument)) throw new ComposerError('Invalid argument', argument)
+                            if (argument === null || Array.isArray(argument)) throw new ComposerError('Invalid argument', argument)
                         default:
                             if (typeof argument !== arg.type) throw new ComposerError('Invalid argument', argument)
                             composition[arg._] = argument
