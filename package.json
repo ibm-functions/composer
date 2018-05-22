@@ -1,6 +1,6 @@
 {
   "name": "@ibm-functions/composer",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Composer is an IBM Cloud Functions programming model for composing individual functions into larger applications.",
   "homepage": "https://github.com/ibm-functions/composer",
   "main": "composer.js",
