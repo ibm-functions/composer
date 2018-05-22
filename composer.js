@@ -266,7 +266,7 @@ function main() {
             if (combinators === false) return composition // no lowering
             if (combinators === true || combinators === '') combinators = [] // maximal lowering
             if (typeof combinators === 'string') { // lower to combinators of specific composer version 
-                combinators = Object.keys(this.combinators.filter(key => semver.gte(combinators, this.combinators[key].since)))
+                combinators = Object.keys(this.combinators).filter(key => semver.gte(combinators, this.combinators[key].since))
             }
 
             const lower = composition => {
