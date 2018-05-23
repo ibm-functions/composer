@@ -88,6 +88,7 @@ wsk action invoke example -r -p payload '{"n":1,"p":42}'
     }
 }
 ```
+In this example, the `let` combinator is used to capture the desired field name: it binds the `field` variable to the field name.
 
 ## Forward
 
@@ -100,5 +101,15 @@ composer.forward = (fields, composition) =>
         composer.retain(p => require('lodash').omit(p, ...fields), composer.mask(composition)),
         ({ params, result }) => Object.assign(result, require('lodash').pick(params, ...fields)))
 
-composer.forward(['user', 'password'], evilComposition)
+composer.forward(['user', 'password'], untrustedComposition)
+```
+
+## Inject and extract
+
+The following combinators make it possible to bind a field of the parameter object to the value of the homonymous variable and vice versa.
+```javascript
+composer.inject = v => composer.seq(composer.let({ v }, params => { params[v] = eval(v) }))
+composer.extract = v => composer.seq(composer.let({ v }, params => { eval(`${v} = params[v]`); delete params[v] }))
+
+composer.let({ token: null }, 'getSecretToken', composer.extract('token'), untrustedAction, composer.inject('token'), trustedAction)
 ```
