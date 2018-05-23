@@ -46,7 +46,7 @@ function main() {
         retry: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
         value: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
         literal: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
-        function: { args: [{ _: 'function', type: 'object' }], since: '0.4.0' }
+        function: { args: [{ _: 'function', type: 'object' }], since: '0.4.0' },
     }
 
     // error class
@@ -341,6 +341,7 @@ function main() {
                     switch (arg.type) {
                         case undefined:
                             composition[arg._] = this.task(arg.optional ? argument || null : argument)
+                            if (arg.named && composition[arg._].name === undefined) throw new ComposerError('Invalid argument', argument)
                             continue
                         case 'value':
                             if (typeof argument === 'function') throw new ComposerError('Invalid argument', argument)
@@ -354,7 +355,11 @@ function main() {
                     }
                 }
                 if (combinator.components) {
-                    composition.components = Array.prototype.slice.call(arguments, skip).map(obj => composer.task(obj))
+                    composition.components = Array.prototype.slice.call(arguments, skip).map(obj => {
+                        const task = composer.task(obj)
+                        if (combinator.components.named && task.name === undefined) throw new ComposerError('Invalid argument', obj)
+                        return task
+                    })
                 }
                 return composition
             }
@@ -382,7 +387,7 @@ function main() {
             deploy(composition, combinators) {
                 if (arguments.length > 2) throw new ComposerError('Too many arguments')
                 if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-                if (composition.type !== 'composition') throw new ComposerError('Cannot deploy anonymous composition')
+                if (composition.name === undefined) throw new ComposerError('Cannot deploy anonymous entity')
                 const obj = this.composer.encode(composition, combinators)
                 return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
                     .then(() => this.actions.update(action)), Promise.resolve())
