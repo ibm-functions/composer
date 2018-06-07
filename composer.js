@@ -475,7 +475,6 @@ function main() {
     // server-side stuff
     function server() {
         function chain(front, back) {
-            front.slice(-1)[0].next = 1
             front.push(...back)
             return front
         }
@@ -651,9 +650,9 @@ function main() {
             if (!isObject(p.params)) p.params = { value: p.params }
             if (p.params.error !== undefined) {
                 p.params = { error: p.params.error } // discard all fields but the error field
-                p.s.state = undefined // abort unless there is a handler in the stack
+                p.s.state = -1 // abort unless there is a handler in the stack
                 while (p.s.stack.length > 0) {
-                    if (typeof (p.s.state = p.s.stack.shift().catch) === 'number') break
+                    if ((p.s.state = p.s.stack.shift().catch || -1) >= 0) break
                 }
             }
         }
@@ -699,7 +698,7 @@ function main() {
 
         function step(p) {
             // final state, return composition result
-            if (p.s.state === undefined) {
+            if (p.s.state < 0 || p.s.state >= fsm.length) {
                 console.log(`Entering final state`)
                 console.log(JSON.stringify(p.params))
                 return finishers.reduce((promise, _finish) => promise.then(() => _finish(p)), Promise.resolve())
@@ -709,8 +708,8 @@ function main() {
             // process one state
             const node = fsm[p.s.state] // json definition for index state
             if (node.path !== undefined) console.log(`Entering composition${node.path}`)
-            const index = p.s.state // save current state for logging purposes
-            p.s.state = node.next === undefined ? undefined : p.s.state + node.next // default next state
+            const index = p.s.state // current state
+            p.s.state = p.s.state + (node.next || 1) // default next state
             return conductor[node.type]({ p, index, node, inspect, step }) || step(p)
         }
 
@@ -724,9 +723,8 @@ function main() {
                 if (!isObject(params.$resume)) return badRequest('The type of optional $resume parameter must be object')
                 const resuming = params.$resume.stack
                 Object.assign(p.s, params.$resume)
-                if (resuming) p.s.state = params.$resume.state // undef
-                if (p.s.state !== undefined && typeof p.s.state !== 'number') return badRequest('The type of optional $resume.state parameter must be number')
-                if (!Array.isArray(p.s.stack)) return badRequest('The type of $resume.stack must be an array')
+                if (typeof p.s.state !== 'number') return badRequest('The type of optional $resume.state parameter must be number')
+                if (!Array.isArray(p.s.stack)) return badRequest('The type of optional $resume.stack parameter must be an array')
                 delete params.$resume
                 if (resuming) inspect(p) // handle error objects when resuming
             }
