@@ -3,13 +3,13 @@
 'use strict'
 
 const minimist = require('minimist')
-let composer = require('../composer')
 
 const argv = minimist(process.argv.slice(2), {
-    string: ['apihost', 'auth', 'deploy', 'lower', 'entity', 'entities', 'string'],
+    string: ['apihost', 'auth', 'deploy', 'lower', 'entity', 'entities', 'composer'],
     boolean: ['insecure', 'encode', 'json', 'version', 'quiet'],
     alias: { auth: 'u', insecure: 'i', version: 'v' }
 })
+let composer = require(argv.composer || '@ibm-functions/composer')
 
 if (argv.version) {
     console.log(composer.version)
@@ -38,22 +38,15 @@ if (argv._.length !== 1 || count > 1 || argv.deploy === '' || argv.entity === ''
     console.error('  -i, --insecure         bypass certificate checking')
     console.error('  -v, --version          output the composer version')
     console.error('  --quiet                omit detailed diagnostic messages')
-    console.error('  --plugin PLUGIN        register a composer plugin')
+    console.error('  --composer COMPOSER    instantiate a custom composer module')
     process.exit(127)
 }
 
 try {
-    switch (typeof argv.plugin) {
-        case 'string':
-            composer = composer.register(require(argv.plugin))
-            break
-        case 'object':
-            for (let plugin of argv.plugin) composer = composer.register(require(plugin))
-    }
     const filename = argv._[0]
     let composition
     try {
-        composition = require(filename)
+        composition = require(filename[0] === '/' ? filename : process.cwd() + '/' + filename)
         if (filename.slice(filename.lastIndexOf('.')) === '.json') composition = composer.deserialize(composition)
         if (typeof argv.lower === 'string') composition = composer.lower(composition, argv.lower)
     } catch (error) {

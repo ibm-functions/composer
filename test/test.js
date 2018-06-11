@@ -1,5 +1,5 @@
 const assert = require('assert')
-const composer = require('../composer')
+const composer = require('@ibm-functions/composer')
 const name = 'TestAction'
 const compositionName = 'TestComposition'
 const wsk = composer.openwhisk({ ignore_certs: process.env.IGNORE_CERTS && process.env.IGNORE_CERTS !== 'false' && process.env.IGNORE_CERTS !== '0' })
@@ -20,7 +20,6 @@ describe('composer', function () {
             .then(() => define({ name: 'isNotOne', action: 'function main({n}) { return { value: n != 1 } }' }))
             .then(() => define({ name: 'isEven', action: 'function main({n}) { return { value: n % 2 == 0 } }' }))
     })
-
 
     describe('blocking invocations', function () {
         describe('actions', function () {
