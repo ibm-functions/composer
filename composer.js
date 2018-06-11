@@ -474,20 +474,15 @@ function main() {
 
     // server-side stuff
     function server() {
-        function chain(front, back) {
-            front.push(...back)
-            return front
-        }
-
         const compiler = {
             compile(node) {
                 if (arguments.length === 0) return [{ type: 'empty' }]
                 if (arguments.length === 1) return this[node.type](node)
-                return Array.prototype.map.call(arguments, node => this.compile(node)).reduce(chain)
+                return Array.prototype.reduce.call(arguments, (fsm, node) => { fsm.push(...this.compile(node)); return fsm }, [])
             },
 
             sequence(node) {
-                return chain([{ type: 'pass', path: node.path }], this.compile(...node.components))
+                return [{ type: 'pass', path: node.path }, ...this.compile(...node.components)]
             },
 
             action(node) {
@@ -499,60 +494,46 @@ function main() {
             },
 
             finally(node) {
-                var body = this.compile(node.body)
                 const finalizer = this.compile(node.finalizer)
-                var fsm = [[{ type: 'try', path: node.path }], body, [{ type: 'exit' }], finalizer].reduce(chain)
+                const fsm = [{ type: 'try', path: node.path }, ...this.compile(node.body), { type: 'exit' }, ...finalizer]
                 fsm[0].catch = fsm.length - finalizer.length
                 return fsm
             },
 
             let(node) {
-                var body = this.compile(...node.components)
-                return [[{ type: 'let', let: node.declarations, path: node.path }], body, [{ type: 'exit' }]].reduce(chain)
+                return [{ type: 'let', let: node.declarations, path: node.path }, ...this.compile(...node.components), { type: 'exit' }]
             },
 
             mask(node) {
-                var body = this.compile(...node.components)
-                return [[{ type: 'let', let: null, path: node.path }], body, [{ type: 'exit' }]].reduce(chain)
+                return [{ type: 'let', let: null, path: node.path }, ...this.compile(...node.components), { type: 'exit' }]
             },
 
             try(node) {
-                var body = this.compile(node.body)
-                const handler = chain(this.compile(node.handler), [{ type: 'pass' }])
-                var fsm = [[{ type: 'try', path: node.path }], body, [{ type: 'exit' }]].reduce(chain)
-                fsm[0].catch = fsm.length
-                fsm.slice(-1)[0].next = handler.length
-                fsm.push(...handler)
+                const handler = [...this.compile(node.handler), { type: 'pass' }]
+                const fsm = [{ type: 'try', path: node.path }, ...this.compile(node.body), { type: 'exit' }, ...handler]
+                fsm[0].catch = fsm.length - handler.length
+                fsm[fsm.length - handler.length - 1].next = handler.length
                 return fsm
             },
 
             if_nosave(node) {
-                var consequent = this.compile(node.consequent)
-                var alternate = chain(this.compile(node.alternate), [{ type: 'pass' }])
-                var fsm = [[{ type: 'pass', path: node.path }], this.compile(node.test), [{ type: 'choice', then: 1, else: consequent.length + 1 }]].reduce(chain)
-                consequent.slice(-1)[0].next = alternate.length
-                fsm.push(...consequent)
-                fsm.push(...alternate)
+                const consequent = this.compile(node.consequent)
+                const alternate = [...this.compile(node.alternate), { type: 'pass' }]
+                const fsm = [{ type: 'pass', path: node.path }, ...this.compile(node.test), { type: 'choice', then: 1, else: consequent.length + 1 }, ...consequent, ...alternate]
+                fsm[fsm.length - alternate.length - 1].next = alternate.length
                 return fsm
             },
 
             while_nosave(node) {
-                var consequent = this.compile(node.body)
-                var alternate = [{ type: 'pass' }]
-                var fsm = [[{ type: 'pass', path: node.path }], this.compile(node.test), [{ type: 'choice', then: 1, else: consequent.length + 1 }]].reduce(chain)
-                consequent.slice(-1)[0].next = 1 - fsm.length - consequent.length
-                fsm.push(...consequent)
-                fsm.push(...alternate)
+                const body = this.compile(node.body)
+                const fsm = [{ type: 'pass', path: node.path }, ...this.compile(node.test), { type: 'choice', then: 1, else: body.length + 1 }, ...body, { type: 'pass' }]
+                fsm[fsm.length - 2].next = 2 - fsm.length
                 return fsm
             },
 
             dowhile_nosave(node) {
-                var test = this.compile(node.test)
-                var fsm = [[{ type: 'pass', path: node.path }], this.compile(node.body), test, [{ type: 'choice', then: 1, else: 2 }]].reduce(chain)
-                fsm.slice(-1)[0].then = 1 - fsm.length
-                fsm.slice(-1)[0].else = 1
-                var alternate = [{ type: 'pass' }]
-                fsm.push(...alternate)
+                const fsm = [{ type: 'pass', path: node.path }, ...this.compile(node.body), ...this.compile(node.test), { type: 'choice', else: 1 }, { type: 'pass' }]
+                fsm[fsm.length - 2].then = 2 - fsm.length
                 return fsm
             },
         }
