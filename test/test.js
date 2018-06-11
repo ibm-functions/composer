@@ -95,21 +95,12 @@ describe('composer', function () {
             })
 
             it('action must return activationId', function () {
-                return invoke(composer.composition(compositionName, composer.action('isNotOne'), { async: true }), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
-            })
-
-            it('invalid argument', function () {
-                try {
-                    invoke(composer.composition(compositionName, 42))
-                    assert.fail()
-                } catch (error) {
-                    assert.ok(error.message.startsWith('Invalid argument'))
-                }
+                return invoke(composer.composition(compositionName, { composition: composer.action('isNotOne'), async: true }), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
             })
 
             it('invalid options', function () {
                 try {
-                    invoke(composer.composition(compositionName, 'foo', 42))
+                    invoke(composer.composition(compositionName, 42))
                     assert.fail()
                 } catch (error) {
                     assert.ok(error.message.startsWith('Invalid argument'))
