@@ -41,7 +41,7 @@ function main() {
         let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
         mask: { components: true, since: '0.4.0' },
         action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }, { _: 'async', type: 'boolean', optional: true }], since: '0.4.0' },
-        composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition', type: 'object', optional: true }, { _: 'async', type: 'boolean', optional: true }], since: '0.4.0' },
+        composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition', optional: true }, { _: 'async', type: 'boolean', optional: true }], since: '0.4.0' },
         repeat: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
         retry: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
         value: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
@@ -75,7 +75,7 @@ function main() {
                 this.components = this.components.map(f)
             }
             for (let arg of combinator.args || []) {
-                if (arg.type === undefined) {
+                if (arg.type === undefined && this[arg._] !== undefined) {
                     this[arg._] = f(this[arg._], arg._)
                 }
             }
