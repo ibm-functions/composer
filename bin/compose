@@ -53,17 +53,10 @@ try {
             for (let plugin of argv.plugin) composer = composer.register(require(plugin))
     }
     const filename = argv._[0]
-    let source
-    try {
-        source = fs.readFileSync(filename, { encoding: 'utf8' })
-    } catch (error) {
-        console.error('File not found')
-        if (!argv.quiet) console.log(error)
-        process.exit(6)
-    }
     let composition
     try {
-        composition = filename.slice(filename.lastIndexOf('.')) === '.js' ? vm.runInNewContext(source, { composer, require, console, process }) : composer.deserialize(JSON.parse(source))
+        composition = require(filename)
+        if (filename.slice(filename.lastIndexOf('.')) === '.json') composition = composer.deserialize(composition)
         if (typeof argv.lower === 'string') composition = composer.lower(composition, argv.lower)
     } catch (error) {
         console.error('Bad composition')
