@@ -3,6 +3,7 @@
 'use strict'
 
 const minimist = require('minimist')
+const path = require('path')
 
 const argv = minimist(process.argv.slice(2), {
     string: ['apihost', 'auth', 'deploy', 'lower', 'entity', 'entities', 'composer'],
@@ -46,7 +47,7 @@ try {
     const filename = argv._[0]
     let composition
     try {
-        composition = require(filename[0] === '/' ? filename : process.cwd() + '/' + filename)
+        composition = require(path.resolve(filename))
         if (filename.slice(filename.lastIndexOf('.')) === '.json') composition = composer.deserialize(composition)
         if (typeof argv.lower === 'string') composition = composer.lower(composition, argv.lower)
     } catch (error) {
