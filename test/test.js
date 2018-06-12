@@ -32,7 +32,7 @@ describe('composer', function () {
             })
 
             it('action must return activationId', function () {
-                return invoke(composer.action('isNotOne', { async: true }), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
+                return invoke(composer.async('isNotOne'), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
             })
 
             it('action name must parse to fully qualified', function () {
@@ -91,10 +91,6 @@ describe('composer', function () {
         describe('compositions', function () {
             it('composition must return true', function () {
                 return invoke(composer.composition(compositionName, { composition: composer.action('isNotOne') }), { n: 0 }).then(activation => assert.deepEqual(activation.response.result, { value: true }))
-            })
-
-            it('action must return activationId', function () {
-                return invoke(composer.composition(compositionName, { composition: composer.action('isNotOne'), async: true }), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
             })
 
             it('invalid options', function () {

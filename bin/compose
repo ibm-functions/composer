@@ -9,7 +9,7 @@ const argv = minimist(process.argv.slice(2), {
     boolean: ['insecure', 'encode', 'json', 'version', 'quiet'],
     alias: { auth: 'u', insecure: 'i', version: 'v' }
 })
-let composer = require(argv.composer || '../composer')
+const composer = require(argv.composer || '../composer')
 
 if (argv.version) {
     console.log(composer.version)

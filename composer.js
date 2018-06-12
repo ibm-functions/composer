@@ -40,13 +40,14 @@ function main() {
         retain_catch: { components: true, since: '0.4.0' },
         let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
         mask: { components: true, since: '0.4.0' },
-        action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }, { _: 'async', type: 'boolean', optional: true }], since: '0.4.0' },
-        composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition', optional: true }, { _: 'async', type: 'boolean', optional: true }], since: '0.4.0' },
+        action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }], since: '0.4.0' },
+        composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition', optional: true }], since: '0.4.0' },
         repeat: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
         retry: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
         value: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
         literal: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
         function: { args: [{ _: 'function', type: 'object' }], since: '0.4.0' },
+        async: { args: [{ _: 'body' }], since: '0.6.0' },
     }
 
     // error class
@@ -135,7 +136,6 @@ function main() {
             }
             const composition = { type: 'action', name }
             if (exec) composition.action = { exec }
-            if (options.async) composition.async = true
             return new Composition(composition)
         },
 
@@ -148,7 +148,6 @@ function main() {
             if (options.composition !== undefined) {
                 composition.composition = this.task(options.composition)
             }
-            if (options.async) composition.async = true
             return new Composition(composition)
         },
 
@@ -344,7 +343,6 @@ function main() {
                     switch (arg.type) {
                         case undefined:
                             composition[arg._] = this.task(arg.optional ? argument || null : argument)
-                            if (arg.named && composition[arg._].name === undefined) throw new ComposerError('Invalid argument', argument)
                             continue
                         case 'value':
                             if (typeof argument === 'function') throw new ComposerError('Invalid argument', argument)
@@ -358,11 +356,7 @@ function main() {
                     }
                 }
                 if (combinator.components) {
-                    composition.components = Array.prototype.slice.call(arguments, skip).map(obj => {
-                        const task = composer.task(obj)
-                        if (combinator.components.named && task.name === undefined) throw new ComposerError('Invalid argument', obj)
-                        return task
-                    })
+                    composition.components = Array.prototype.slice.call(arguments, skip).map(obj => composer.task(obj))
                 }
                 return composition
             }
@@ -489,11 +483,16 @@ function main() {
             },
 
             action(node) {
-                return [{ type: 'action', name: node.name, async: node.async, path: node.path }]
+                return [{ type: 'action', name: node.name, path: node.path }]
+            },
+
+            async(node) {
+                const body = this.compile(node.body)
+                return [{ type: 'async', path: node.path, return: body.length + 2 }, ...body, { type: 'stop' }, { type: 'pass' }]
             },
 
             composition(node) {
-                return [{ type: 'composition', name: node.name, async: node.async, path: node.path }]
+                return [{ type: 'composition', name: node.name, path: node.path }]
             },
 
             function(node) {
@@ -567,19 +566,6 @@ function main() {
             },
 
             action({ p, node, index }) {
-                if (node.async) {
-                    if (!wsk) wsk = openwhisk({ ignore_certs: true })
-                    return wsk.actions.invoke({ name: node.name, params: p.params })
-                        .catch(error => {
-                            console.error(error)
-                            return { error: `An exception was caught at state ${index} (see log for details)` }
-                        })
-                        .then(result => {
-                            p.params = result
-                            inspect(p)
-                            return step(p)
-                        })
-                }
                 return { action: node.name, params: p.params, state: { $resume: p.s } }
             },
 
@@ -607,6 +593,26 @@ function main() {
             },
 
             pass({ p, node, index }) {
+            },
+
+            async({ p, node, index, inspect, step }) {
+                if (!wsk) wsk = openwhisk({ ignore_certs: true })
+                p.params.$resume = { state: p.s.state }
+                p.s.state = index + node.return
+                return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params: p.params })
+                    .catch(error => {
+                        console.error(error)
+                        return { error: `An exception was caught at state ${index} (see log for details)` }
+                    })
+                    .then(result => {
+                        p.params = result
+                        inspect(p)
+                        return step(p)
+                    })
+            },
+
+            stop({ p, node, index, inspect, step }) {
+                p.s.state = -1
             },
         }
 
