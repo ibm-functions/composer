@@ -20,6 +20,7 @@ The `composer` module offers a number of combinators to define compositions:
 | [`finally`](#finally) | finalization | `composer.finally('tryThis', 'doThatAlways')` |
 | [`retry`](#retry) | error recovery | `composer.retry(3, 'connect')` |
 | [`retain` and `retain_catch`](#retain) | persistence | `composer.retain('validateInput')` |
+| [`async`](#async) | asynchronous invocation | `composer.async('sendMessage')` |
 
 The `action`, `function`, and `literal` combinators construct compositions respectively from actions, functions, and constant values. The other combinators combine existing compositions to produce new compositions.
 
@@ -138,10 +139,16 @@ In general, a function can be embedded in a composition either by using the `com
 
 ## Composition
 
-`composition(name, composition)` returns a composition consisting of the invocation of the composition named `name` and of the declaration of the composition named `name` defined to be `composition`.
+`composition(name, [options])` invokes the composition named `name` possibly also defining this composition.
 
+The optional `options` dictionary makes it possible to provide a definition for the composition.
 ```javascript
-composer.if('isEven', 'half', composer.composition('tripleAndIncrement', composer.sequence('triple', 'increment')))
+// specify the code for the composition
+composer.composition('tripleAndIncrement', { composition: composer.sequence('triple', 'increment') })
+```
+Composition definitions may be nested.
+```javascript
+composer.if('isEven', 'half', composer.composition('tripleAndIncrement', { composition: composer.sequence('triple', 'increment') }))
 ```
 In this example, the `composer.sequence('triple', 'increment')` composition is given the name `tripleAndIncrement` and the enclosing composition references the `tripleAndIncrement` composition by name. In particular, deploying this composition actually deploys two compositions:
 - a composition named `tripleAndIncrement` defined as `composer.sequence('triple', 'increment')`, and
@@ -266,3 +273,7 @@ The _finalizer_ is invoked in sequence after _body_ even if _body_ returns an er
 `composer.retain(body)` runs _body_ on the input parameter object producing an object with two fields `params` and `result` such that `params` is the input parameter object of the composition and `result` is the output parameter object of _body_.
 
 If _body_ fails, the output of the `retain` combinator is only the error object (i.e., the input parameter object is not preserved). In constrast, the `retain_catch` combinator always outputs `{ params, result }`, even if `result` is an error result.
+
+## Async
+
+`composer.async(body)` runs the _body_ composition asynchronously. It spawns _body_ but does not wait for it to execute. It immediately returns a dictionary with a single field named `activationId` identifying the invocation of _body_.

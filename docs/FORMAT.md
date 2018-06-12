@@ -43,9 +43,9 @@ The field names and types typically match the combinator method signatures:
 | Type | Fields |
 | --:| --- | 
 | `action` | name:string, action:optional object |
-| `function` | function:string |
-| `literal` or `value` | value:any |
-| `composition` | name:string, composition:composition |
+| `function` | function:object |
+| `literal` or `value` | value:json value |
+| `composition` | name:string, composition:optional composition |
 | `empty` |
 | `sequence` or `seq` | components:array of compositions |
 | `let` | declarations:object, components:array of compositions |
@@ -58,3 +58,4 @@ The field names and types typically match the combinator method signatures:
 | `finally` | body:composition, finalizer:composition |
 | `retry` | count:number, components:array of compositions |
 | `retain` and `retain_catch` | components:array of compositions |
+| `async` | body:composition |

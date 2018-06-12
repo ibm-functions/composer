@@ -26,7 +26,7 @@ const composition = composer.if(
 // instantiate OpenWhisk client
 const wsk = composer.openwhisk({ ignore_certs: true })
 
-wsk.compositions.deploy(composer.composition('demo', composition)) // name and deploy composition
+wsk.compositions.deploy(composer.composition('demo', { composition })) // name and deploy composition
     .then(() => wsk.actions.invoke({ name: 'demo', params: { password: 'abc123' }, blocking: true })) // invoke composition
     .then(({ response }) => console.log(JSON.stringify(response.result, null, 4)), console.error)
 ```
@@ -87,7 +87,7 @@ The `composer` module adds to the OpenWhisk client instance a new top-level cate
 
 `wsk.compositions.deploy(composition, [combinators])` lowers and deploys the composition `composition`. More precisely, it successively deploys all the actions and compositions defined in `composition` including `composition` itself. The composition `composition` must have a name, hence the `deploy` method is typically used as illustrated above:
 ```
-wsk.compositions.deploy(composer.composition('demo', composition))
+wsk.compositions.deploy(composer.composition('demo', { composition }))
 ```
 
 The optional `combinators` parameter controls the lowering. See [lower](#lower) for details.

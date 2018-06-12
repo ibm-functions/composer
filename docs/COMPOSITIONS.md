@@ -64,7 +64,7 @@ Deploying such a composition deploys the embedded actions.
 
 A composition can also include the definition of another composition:
 ```javascript
-composer.if('isEven', 'half', composer.composition('tripleAndIncrement', composer.sequence('triple', 'increment')))
+composer.if('isEven', 'half', composer.composition('tripleAndIncrement', { composition: composer.sequence('triple', 'increment') }))
 ```
 In this example, the `composer.sequence('triple', 'increment')` composition is given the name `tripleAndIncrement` and the enclosing composition references the `tripleAndIncrement` composition by name. In other words, deploying this composition actually deploys two compositions:
 - a composition named `tripleAndIncrement` defined as `composer.sequence('triple', 'increment')`, and

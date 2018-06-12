@@ -24,6 +24,8 @@ Flags:
   -u, --auth KEY         authorization KEY
   -i, --insecure         bypass certificate checking
   -v, --version          output the composer version
+  --quiet                omit detailed diagnostic messages
+  --composer COMPOSER    instantiate a custom composer module
 ```
 The `compose` command requires either a Javascript file that evaluates to a composition (for example [demo.js](../samples/demo.js)) or a JSON file that encodes a composition (for example [demo.json](../samples/demo.json)). The JSON format is documented in [FORMAT.md](FORMAT.md).
 
@@ -74,12 +76,6 @@ compose demo.js
         }
     }
 }
-```
-The evaluation context includes the `composer` object implicitly defined as:
-```javascript
-composer = require('@ibm-functions/composer')
-```
-In other words, there is no need to require the `composer` module explicitly in the composition code.
 
 ## Entity option
 
@@ -258,3 +254,7 @@ If the `--lower VERSION` option is specified, the `compose` command uses the set
 If the `--lower` option is specified without a version number, the `compose` command uses only primitive combinators.
 
 These options may be combined with any of the `compose` commands.
+
+## Composer option
+
+If the composition code uses a custom `composer` module, the path to the module must be specified via the `--composer` option.
