@@ -144,14 +144,12 @@ function main() {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!isObject(options)) throw new ComposerError('Invalid argument', options)
             name = parseActionName(name)
-            const obj = { type: 'composition', name }
-            if (options instanceof Composition) {
-                obj.composition = options
-            } else if (options.composition !== undefined) {
-                obj.composition = this.task(options.composition)
+            const composition = { type: 'composition', name }
+            if (options.composition !== undefined) {
+                composition.composition = this.task(options.composition)
             }
-            if (options.async) obj.async = true
-            return new Composition(obj)
+            if (options.async) composition.async = true
+            return new Composition(composition)
         },
 
         // lowering
