@@ -64,9 +64,9 @@ For instance, `composer.lower(composition, ['retry'])` will preserve any instanc
 
 ## Encode
 
-`composer.encode(composition, [combinators])` first lowers the composition. It then converts compositions nested into `composition` into conductor actions. It finally extracts the action definitions from `composition` (both embedded action definitions and synthesized conductor actions) returning a dictionary with two fields `{ composition, actions }` where `composition` no longer contains any action or composition definitions and `actions` is the corresponding array of extracted action definitions.
+`composer.encode(composition, [combinators])` first invokes `composer.lower` with the specified `combinators` argument if any. It then converts compositions nested into `composition` into conductor actions. It finally extracts the action definitions from `composition` (both embedded action definitions and synthesized conductor actions) returning a dictionary with two fields `{ composition, actions }` where `composition` no longer contains any action or composition definitions and `actions` is the corresponding array of extracted action definitions.
 
-The optional `combinators` parameter controls the lowering. See [lower](#lower) for details.
+The optional `combinators` parameter controls the optional lowering. See [lower](#lower) for details.
 
 # Deployment
 
@@ -85,12 +85,12 @@ The `composer` module adds to the OpenWhisk client instance a new top-level cate
 
 ## Deploying compositions
 
-`wsk.compositions.deploy(composition, [combinators])` lowers and deploys the composition `composition`. More precisely, it successively deploys all the actions and compositions defined in `composition` including `composition` itself. The composition `composition` must have a name, hence the `deploy` method is typically used as illustrated above:
+`wsk.compositions.deploy(composition, [combinators])` optionally lowers, encodes, and deploys the composition `composition`. More precisely, it successively deploys all the actions and compositions defined in `composition` including `composition` itself. The composition `composition` must have a name, hence the `deploy` method is typically used as illustrated above:
 ```
 wsk.compositions.deploy(composer.composition('demo', { composition }))
 ```
 
-The optional `combinators` parameter controls the lowering. See [lower](#lower) for details.
+The optional `combinators` parameter controls the optional lowering. See [lower](#lower) for details.
 
 The compositions are encoded into conductor actions prior to deployment. In other words, the `deploy` method deploys one or several actions.
 

@@ -249,7 +249,7 @@ The conductor action code does not include definitions for nested actions or com
 
 ## Lowering
 
-If the `--lower VERSION` option is specified, the `compose` command uses the set of combinators of the specified revision of the `composer` module. More recently introduced combinators (if any) are translated into combinators of the older set.
+If the `--lower VERSION` option is specified, the `compose` command uses the set of combinators of the specified revision of the `composer` module. Derived combinators that are more recent (if any) are translated into combinators of the older set.
 
 If the `--lower` option is specified without a version number, the `compose` command uses only primitive combinators.
 

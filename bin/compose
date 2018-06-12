@@ -59,7 +59,7 @@ try {
         if (argv.apihost) options.apihost = argv.apihost
         if (argv.auth) options.api_key = argv.auth
         return Promise.resolve()
-            .then(() => composer.openwhisk(options).compositions.deploy(composer.composition(argv.deploy, { composition }), false))
+            .then(() => composer.openwhisk(options).compositions.deploy(composer.composition(argv.deploy, { composition })))
             .then(obj => {
                 const names = obj.actions.map(action => action.name)
                 console.log(`ok: created action${names.length > 1 ? 's' : ''} ${names}`)
@@ -82,11 +82,11 @@ try {
                 process.exit(5)
             })
     } else if (argv.encode) {
-        console.log(composer.encode(composer.composition('anonymous', { composition }), false).actions.slice(-1)[0].action.exec.code)
+        console.log(composer.encode(composer.composition('anonymous', { composition })).actions.slice(-1)[0].action.exec.code)
     } else if (argv.entity) {
-        console.log(JSON.stringify(composer.encode(composer.composition(argv.entity, { composition }), false).actions.slice(-1)[0], null, 4))
+        console.log(JSON.stringify(composer.encode(composer.composition(argv.entity, { composition })).actions.slice(-1)[0], null, 4))
     } else if (argv.entities) {
-        console.log(JSON.stringify(composer.encode(composer.composition(argv.entities, { composition }), false).actions, null, 4))
+        console.log(JSON.stringify(composer.encode(composer.composition(argv.entities, { composition })).actions, null, 4))
     } else {
         console.log(JSON.stringify(composition, null, 4))
     }

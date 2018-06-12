@@ -33,7 +33,7 @@ Where a composition is expected, the following shorthands are permitted:
 
 ## Primitive combinators
 
-Some of these combinators are _derived_ combinators: they are equivalent to combinations of other combinators. The `composer` module offers a `composer.lower` method (see [COMPOSER.md](#COMPOSER.md)) that can eliminate derived combinators from a composition, producing an equivalent composition made only of _primitive_ combinators. The primitive combinators are: `action`, `function`, `composition`, `sequence`, `let`, `mask`, `if_nosave`, `while_nosave`, `dowhile_nosave`, `try`, and `finally`.
+Some of these combinators are _derived_ combinators: they are equivalent to combinations of other combinators. The `composer` module offers a `composer.lower` method (see [COMPOSER.md](#COMPOSER.md)) that can eliminate derived combinators from a composition, producing an equivalent composition made only of _primitive_ combinators.
 
 ## Action
 

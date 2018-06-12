@@ -425,7 +425,7 @@ function main() {
             },
 
             // recursively encode composition into { composition, actions } by encoding nested compositions into actions and extracting nested action definitions
-            encode(composition, combinators = []) { // lower non-primitive combinators by default
+            encode(composition, combinators = false) {
                 if (arguments.length > 2) throw new ComposerError('Too many arguments')
                 if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
 

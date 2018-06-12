@@ -15,7 +15,7 @@
  */
 
 // require the composer module
-const composer = require('../composer')
+const composer = require('@ibm-functions/composer')
 
 // define the composition
 const composition = composer.if(
