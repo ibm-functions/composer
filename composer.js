@@ -145,7 +145,9 @@ function main() {
             if (!isObject(options)) throw new ComposerError('Invalid argument', options)
             name = parseActionName(name)
             const composition = { type: 'composition', name }
-            if (options.composition !== undefined) {
+            if (options instanceof Composition) {
+                composition.composition = new Composition(options) // for backward compatibility
+            } else if (options.composition !== undefined) {
                 composition.composition = this.task(options.composition)
             }
             return new Composition(composition)
