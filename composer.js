@@ -90,12 +90,9 @@ function main() {
             if (exec) composition.action = { exec }
             return new Composition(composition)
         },
-
-        util: {}
     })
 
-    const lowerer = {}
-    Object.assign(lowerer, {
+    const lowerer = {
         empty() {
             return composer.sequence()
         },
@@ -105,7 +102,7 @@ function main() {
         },
 
         value({ value }) {
-            return lowerer.literal({ value })
+            return composer.literal(value)
         },
 
         literal({ value }) {
@@ -180,22 +177,6 @@ function main() {
                     composer.function('({ result }) => result.error !== undefined && count-- > 0')),
                 ({ result }) => result)
         },
-    })
-
-    // recursively label combinators with the json path
-    function label(composition) {
-        if (arguments.length > 1) throw new ComposerError('Too many arguments')
-        if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-
-        const label = path => (composition, name, array) => {
-            composition = new Composition(composition) // copy
-            composition.path = path + (name !== undefined ? (array === undefined ? `.${name}` : `[${name}]`) : '')
-            // label nested combinators
-            composition.visit(label(composition.path))
-            return composition
-        }
-
-        return label('')(composition)
     }
 
     // recursively flatten composition into { composition, actions } by extracting embedded action definitions
@@ -234,7 +215,7 @@ function main() {
         return { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition }, { key: 'composer', value: version }] }
     }
 
-    Object.assign(composer.util, {
+    composer.util = {
         // return the signatures of the combinators
         get combinators() {
             return combinators
@@ -276,7 +257,7 @@ function main() {
         // register plugin
         register(plugin) {
             if (plugin.combinators) init(plugin.combinators())
-            if (plugin.composer) Object.assign(composer, plugin.composer({ ComposerError, Composition }))
+            if (plugin.composer) Object.assign(composer, plugin.composer({ composer, ComposerError, Composition }))
             if (plugin.lowerer) Object.assign(lowerer, plugin.lowerer({ composer, ComposerError, Composition }))
             plugins.push(plugin)
             return composer
@@ -355,7 +336,7 @@ function main() {
             wsk.compositions = new Compositions(wsk)
             return wsk
         },
-    })
+    }
 
     // composition class
     class Composition {
@@ -463,16 +444,26 @@ function main() {
 
     // runtime stuff
     function runtime() {
-        const compiler = {}
-        Object.assign(compiler, {
-            compile(node) {
-                if (arguments.length === 0) return [{ type: 'empty' }]
-                if (arguments.length === 1) return this[node.type](node)
-                return Array.prototype.reduce.call(arguments, (fsm, node) => { fsm.push(...compiler.compile(node)); return fsm }, [])
-            },
+        // recursively label combinators with the json path
+        function label(composition) {
+            if (arguments.length > 1) throw new ComposerError('Too many arguments')
+            if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
 
+            const label = path => (composition, name, array) => {
+                composition = new Composition(composition) // copy
+                composition.path = path + (name !== undefined ? (array === undefined ? `.${name}` : `[${name}]`) : '')
+                // label nested combinators
+                composition.visit(label(composition.path))
+                return composition
+            }
+
+            return label('')(composition)
+        }
+
+        // compile ast to fsm
+        const compiler = {
             sequence(node) {
-                return [{ type: 'pass', path: node.path }, ...compiler.compile(...node.components)]
+                return [{ type: 'pass', path: node.path }, ...compile(...node.components)]
             },
 
             action(node) {
@@ -480,7 +471,7 @@ function main() {
             },
 
             async(node) {
-                const body = compiler.compile(node.body)
+                const body = compile(node.body)
                 return [{ type: 'async', path: node.path, return: body.length + 2 }, ...body, { type: 'stop' }, { type: 'pass' }]
             },
 
@@ -489,49 +480,55 @@ function main() {
             },
 
             finally(node) {
-                const finalizer = compiler.compile(node.finalizer)
-                const fsm = [{ type: 'try', path: node.path }, ...compiler.compile(node.body), { type: 'exit' }, ...finalizer]
+                const finalizer = compile(node.finalizer)
+                const fsm = [{ type: 'try', path: node.path }, ...compile(node.body), { type: 'exit' }, ...finalizer]
                 fsm[0].catch = fsm.length - finalizer.length
                 return fsm
             },
 
             let(node) {
-                return [{ type: 'let', let: node.declarations, path: node.path }, ...compiler.compile(...node.components), { type: 'exit' }]
+                return [{ type: 'let', let: node.declarations, path: node.path }, ...compile(...node.components), { type: 'exit' }]
             },
 
             mask(node) {
-                return [{ type: 'let', let: null, path: node.path }, ...compiler.compile(...node.components), { type: 'exit' }]
+                return [{ type: 'let', let: null, path: node.path }, ...compile(...node.components), { type: 'exit' }]
             },
 
             try(node) {
-                const handler = [...compiler.compile(node.handler), { type: 'pass' }]
-                const fsm = [{ type: 'try', path: node.path }, ...compiler.compile(node.body), { type: 'exit' }, ...handler]
+                const handler = [...compile(node.handler), { type: 'pass' }]
+                const fsm = [{ type: 'try', path: node.path }, ...compile(node.body), { type: 'exit' }, ...handler]
                 fsm[0].catch = fsm.length - handler.length
                 fsm[fsm.length - handler.length - 1].next = handler.length
                 return fsm
             },
 
             if_nosave(node) {
-                const consequent = compiler.compile(node.consequent)
-                const alternate = [...compiler.compile(node.alternate), { type: 'pass' }]
-                const fsm = [{ type: 'pass', path: node.path }, ...compiler.compile(node.test), { type: 'choice', then: 1, else: consequent.length + 1 }, ...consequent, ...alternate]
+                const consequent = compile(node.consequent)
+                const alternate = [...compile(node.alternate), { type: 'pass' }]
+                const fsm = [{ type: 'pass', path: node.path }, ...compile(node.test), { type: 'choice', then: 1, else: consequent.length + 1 }, ...consequent, ...alternate]
                 fsm[fsm.length - alternate.length - 1].next = alternate.length
                 return fsm
             },
 
             while_nosave(node) {
-                const body = compiler.compile(node.body)
-                const fsm = [{ type: 'pass', path: node.path }, ...compiler.compile(node.test), { type: 'choice', then: 1, else: body.length + 1 }, ...body, { type: 'pass' }]
+                const body = compile(node.body)
+                const fsm = [{ type: 'pass', path: node.path }, ...compile(node.test), { type: 'choice', then: 1, else: body.length + 1 }, ...body, { type: 'pass' }]
                 fsm[fsm.length - 2].next = 2 - fsm.length
                 return fsm
             },
 
             dowhile_nosave(node) {
-                const fsm = [{ type: 'pass', path: node.path }, ...compiler.compile(node.body), ...compiler.compile(node.test), { type: 'choice', else: 1 }, { type: 'pass' }]
+                const fsm = [{ type: 'pass', path: node.path }, ...compile(node.body), ...compile(node.test), { type: 'choice', else: 1 }, { type: 'pass' }]
                 fsm[fsm.length - 2].then = 2 - fsm.length
                 return fsm
             },
-        })
+        }
+
+        function compile(node) {
+            if (arguments.length === 0) return [{ type: 'empty' }]
+            if (arguments.length === 1) return compiler[node.type](node)
+            return Array.prototype.reduce.call(arguments, (fsm, node) => { fsm.push(...compile(node)); return fsm }, [])
+        }
 
         const openwhisk = require('openwhisk')
         let wsk
@@ -605,7 +602,7 @@ function main() {
 
         for (let { plugin, config } of arguments) {
             composer.util.register(plugin)
-            if (plugin.compiler) Object.assign(compiler, plugin.compiler())
+            if (plugin.compiler) Object.assign(compiler, plugin.compiler({ compile }))
             if (plugin.conductor) {
                 Object.assign(conductor, plugin.conductor(config))
                 if (conductor._finish) {
@@ -615,7 +612,7 @@ function main() {
             }
         }
 
-        const fsm = compiler.compile(composer.util.lower(label(composer.util.deserialize(composition))))
+        const fsm = compile(composer.util.lower(label(composer.util.deserialize(composition))))
 
         // encode error object
         const encodeError = error => ({
