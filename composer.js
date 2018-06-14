@@ -41,7 +41,6 @@ function main() {
         let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
         mask: { components: true, since: '0.4.0' },
         action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }], since: '0.4.0' },
-        composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition', optional: true }], since: '0.4.0' },
         repeat: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
         retry: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
         value: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
@@ -136,20 +135,6 @@ function main() {
             }
             const composition = { type: 'action', name }
             if (exec) composition.action = { exec }
-            return new Composition(composition)
-        },
-
-        // composition combinator
-        composition(name, options = {}) {
-            if (arguments.length > 2) throw new ComposerError('Too many arguments')
-            if (!isObject(options)) throw new ComposerError('Invalid argument', options)
-            name = parseActionName(name)
-            const composition = { type: 'composition', name }
-            if (options instanceof Composition) {
-                composition.composition = new Composition(options) // for backward compatibility
-            } else if (options.composition !== undefined) {
-                composition.composition = this.task(options.composition)
-            }
             return new Composition(composition)
         },
 
@@ -262,16 +247,14 @@ function main() {
             return label('')(composition)
         },
 
-        // recursively label and lower combinators to the desired set of combinators (including primitive combinators)
+        // recursively lower combinators to the desired set of combinators (including primitive combinators)
         lower(composition, combinators = []) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-            if (!Array.isArray(combinators) && typeof combinators !== 'boolean' && typeof combinators !== 'string') throw new ComposerError('Invalid argument', combinators)
-            if (combinators === false) return composition // no lowering
-            if (combinators === true || combinators === '') combinators = [] // maximal lowering
             if (typeof combinators === 'string') { // lower to combinators of specific composer version 
                 combinators = Object.keys(this.combinators).filter(key => semver.gte(combinators, this.combinators[key].since))
             }
+            if (!Array.isArray(combinators)) throw new ComposerError('Invalid argument', combinators)
 
             const lower = composition => {
                 composition = new Composition(composition) // copy
@@ -279,7 +262,7 @@ function main() {
                 while (combinators.indexOf(composition.type) < 0 && this[`_${composition.type}`]) {
                     const path = composition.path
                     composition = this[`_${composition.type}`](composition)
-                    if (path !== undefined) composition.path = path
+                    if (path !== undefined) composition.path = path // preserve path
                 }
                 // lower nested combinators
                 composition.visit(this.combinators, lower)
@@ -383,14 +366,11 @@ function main() {
                 this.composer = composer
             }
 
-            deploy(composition, combinators) {
-                if (arguments.length > 2) throw new ComposerError('Too many arguments')
-                if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-                if (composition.name === undefined) throw new ComposerError('Cannot deploy anonymous entity')
-                const obj = this.composer.encode(composition, combinators)
-                return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
+            deploy(name, composition, combinators) {
+                const actions = this.composer.encode(name, composition, combinators)
+                return actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
                     .then(() => this.actions.update(action)), Promise.resolve())
-                    .then(() => obj)
+                    .then(() => actions)
             }
         }
 
@@ -426,31 +406,16 @@ function main() {
                 return wsk
             },
 
-            // recursively encode composition into { composition, actions } by encoding nested compositions into actions and extracting nested action definitions
-            encode(composition, combinators = false) {
-                if (arguments.length > 2) throw new ComposerError('Too many arguments')
+            // recursively flatten composition into { composition, actions } by extracting embedded action definitions
+            flatten(composition) {
+                if (arguments.length > 1) throw new ComposerError('Too many arguments')
                 if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-
-                composition = this.lower(composition, combinators)
 
                 const actions = []
 
-                const encode = composition => {
+                const flatten = composition => {
                     composition = new Composition(composition) // copy
-                    composition.visit(this.combinators, encode)
-                    if (composition.type === 'composition' && composition.composition !== undefined) {
-                        let code = `const main=(${main})().server(`
-                        for (let plugin of plugins) {
-                            code += `{plugin:new(${plugin.constructor})()`
-                            if (plugin.configure) code += `,config:${JSON.stringify(plugin.configure())}`
-                            code += '},'
-                        }
-                        code = minify(`${code})`, { output: { max_line_len: 127 } }).code
-                        code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(encode(composition.composition), null, 4)}\n\n// do not edit below this point\n\n${code}` // invoke conductor on composition
-                        const action = { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition.composition }, { key: 'composer', value: version }] }
-                        actions.push({ name: composition.name, action })
-                        delete composition.composition
-                    }
+                    composition.visit(this.combinators, flatten)
                     if (composition.type === 'action' && composition.action) {
                         actions.push({ name: composition.name, action: composition.action })
                         delete composition.action
@@ -458,8 +423,34 @@ function main() {
                     return composition
                 }
 
-                composition = encode(composition)
+                composition = flatten(composition)
                 return { composition, actions }
+            },
+
+            // synthesize composition code
+            synthesize(composition) {
+                if (arguments.length > 1) throw new ComposerError('Too many arguments')
+                if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+                let code = `const main=(${main})().server(`
+                for (let plugin of plugins) {
+                    code += `{plugin:new(${plugin.constructor})()`
+                    if (plugin.configure) code += `,config:${JSON.stringify(plugin.configure())}`
+                    code += '},'
+                }
+                code = minify(`${code})`, { output: { max_line_len: 127 } }).code
+                code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(composition, null, 4)}\n\n// do not edit below this point\n\n${code}` // invoke conductor on composition
+                return { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition }, { key: 'composer', value: version }] }
+            },
+
+            // encode composition as an action table
+            encode(name, composition, combinators) {
+                if (arguments.length > 3) throw new ComposerError('Too many arguments')
+                name = parseActionName(name) // throws ComposerError if name is not valid
+                if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+                if (combinators) composition = this.lower(composition, combinators)
+                const table = this.flatten(composition)
+                table.actions.push({ name, action: this.synthesize(table.composition) })
+                return table.actions
             },
 
             // return composer version
@@ -491,10 +482,6 @@ function main() {
             async(node) {
                 const body = this.compile(node.body)
                 return [{ type: 'async', path: node.path, return: body.length + 2 }, ...body, { type: 'stop' }, { type: 'pass' }]
-            },
-
-            composition(node) {
-                return [{ type: 'composition', name: node.name, path: node.path }]
             },
 
             function(node) {
@@ -569,10 +556,6 @@ function main() {
 
             action({ p, node, index }) {
                 return { action: node.name, params: p.params, state: { $resume: p.s } }
-            },
-
-            composition(payload) {
-                return this.action(payload)
             },
 
             function({ p, node, index }) {

@@ -1,14 +1,13 @@
 const assert = require('assert')
 const composer = require('../composer')
 const name = 'TestAction'
-const compositionName = 'TestComposition'
 const wsk = composer.openwhisk({ ignore_certs: process.env.IGNORE_CERTS && process.env.IGNORE_CERTS !== 'false' && process.env.IGNORE_CERTS !== '0' })
 
 // deploy action
 const define = action => wsk.actions.delete(action.name).catch(() => { }).then(() => wsk.actions.create(action))
 
 // deploy and invoke composition
-const invoke = (composition, params = {}, blocking = true) => wsk.compositions.deploy(composer.composition(name, { composition })).then(() => wsk.actions.invoke({ name, params, blocking }))
+const invoke = (composition, params = {}, blocking = true) => wsk.compositions.deploy(name, composition).then(() => wsk.actions.invoke({ name, params, blocking }))
 
 describe('composer', function () {
     this.timeout(60000)
@@ -81,30 +80,6 @@ describe('composer', function () {
             it('too many arguments', function () {
                 try {
                     invoke(composer.action('foo', {}, 'foo'))
-                    assert.fail()
-                } catch (error) {
-                    assert.ok(error.message.startsWith('Too many arguments'))
-                }
-            })
-        })
-
-        describe('compositions', function () {
-            it('composition must return true', function () {
-                return invoke(composer.composition(compositionName, { composition: composer.action('isNotOne') }), { n: 0 }).then(activation => assert.deepEqual(activation.response.result, { value: true }))
-            })
-
-            it('invalid options', function () {
-                try {
-                    invoke(composer.composition(compositionName, 42))
-                    assert.fail()
-                } catch (error) {
-                    assert.ok(error.message.startsWith('Invalid argument'))
-                }
-            })
-
-            it('too many arguments', function () {
-                try {
-                    invoke(composer.composition(compositionName, {}, {}))
                     assert.fail()
                 } catch (error) {
                     assert.ok(error.message.startsWith('Too many arguments'))
