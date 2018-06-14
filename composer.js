@@ -41,15 +41,15 @@ function main() {
     // registered plugins
     const plugins = []
 
-    // composer
-    const composer = {
+    const composer = {}
+    Object.assign(composer, {
         // detect task type and create corresponding composition object
         task(task) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
-            if (task === null) return this.empty()
+            if (task === null) return composer.empty()
             if (task instanceof Composition) return task
-            if (typeof task === 'function') return this.function(task)
-            if (typeof task === 'string') return this.action(task)
+            if (typeof task === 'function') return composer.function(task)
+            if (typeof task === 'string') return composer.action(task)
             throw new ComposerError('Invalid argument', task)
         },
 
@@ -71,7 +71,7 @@ function main() {
         action(name, options = {}) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!isObject(options)) throw new ComposerError('Invalid argument', options)
-            name = this.util.canonical(name) // throws ComposerError if name is not valid
+            name = composer.util.canonical(name) // throws ComposerError if name is not valid
             let exec
             if (Array.isArray(options.sequence)) { // native sequence
                 exec = { kind: 'sequence', components: options.sequence.map(canonical) }
@@ -90,10 +90,12 @@ function main() {
             if (exec) composition.action = { exec }
             return new Composition(composition)
         },
-    }
 
-    // lowerer
-    const lowerer = {
+        util: {}
+    })
+
+    const lowerer = {}
+    Object.assign(lowerer, {
         empty() {
             return composer.sequence()
         },
@@ -103,7 +105,7 @@ function main() {
         },
 
         value({ value }) {
-            return this.literal({ value })
+            return lowerer.literal({ value })
         },
 
         literal({ value }) {
@@ -178,7 +180,7 @@ function main() {
                     composer.function('({ result }) => result.error !== undefined && count-- > 0')),
                 ({ result }) => result)
         },
-    }
+    })
 
     // recursively label combinators with the json path
     function label(composition) {
@@ -232,7 +234,7 @@ function main() {
         return { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition }, { key: 'composer', value: version }] }
     }
 
-    composer.util = {
+    Object.assign(composer.util, {
         // return the signatures of the combinators
         get combinators() {
             return combinators
@@ -242,7 +244,7 @@ function main() {
         deserialize(composition) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
             composition = new Composition(composition) // copy
-            composition.visit(composition => this.deserialize(composition))
+            composition.visit(composition => composer.util.deserialize(composition))
             return composition
         },
 
@@ -251,7 +253,7 @@ function main() {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
             if (typeof combinators === 'string') { // lower to combinators of specific composer version 
-                combinators = Object.keys(this.combinators).filter(key => semver.gte(combinators, this.combinators[key].since))
+                combinators = Object.keys(composer.util.combinators).filter(key => semver.gte(combinators, composer.util.combinators[key].since))
             }
             if (!Array.isArray(combinators)) throw new ComposerError('Invalid argument', combinators)
 
@@ -311,9 +313,9 @@ function main() {
         // encode composition as an action table
         encode(name, composition, combinators) {
             if (arguments.length > 3) throw new ComposerError('Too many arguments')
-            name = this.canonical(name) // throws ComposerError if name is not valid
+            name = composer.util.canonical(name) // throws ComposerError if name is not valid
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-            if (combinators) composition = this.lower(composition, combinators)
+            if (combinators) composition = composer.util.lower(composition, combinators)
             const table = flatten(composition)
             table.actions.push({ name, action: synthesize(table.composition) })
             return table.actions
@@ -353,7 +355,7 @@ function main() {
             wsk.compositions = new Compositions(wsk)
             return wsk
         },
-    }
+    })
 
     // composition class
     class Composition {
@@ -461,15 +463,16 @@ function main() {
 
     // runtime stuff
     function runtime() {
-        const compiler = {
+        const compiler = {}
+        Object.assign(compiler, {
             compile(node) {
                 if (arguments.length === 0) return [{ type: 'empty' }]
                 if (arguments.length === 1) return this[node.type](node)
-                return Array.prototype.reduce.call(arguments, (fsm, node) => { fsm.push(...this.compile(node)); return fsm }, [])
+                return Array.prototype.reduce.call(arguments, (fsm, node) => { fsm.push(...compiler.compile(node)); return fsm }, [])
             },
 
             sequence(node) {
-                return [{ type: 'pass', path: node.path }, ...this.compile(...node.components)]
+                return [{ type: 'pass', path: node.path }, ...compiler.compile(...node.components)]
             },
 
             action(node) {
@@ -477,7 +480,7 @@ function main() {
             },
 
             async(node) {
-                const body = this.compile(node.body)
+                const body = compiler.compile(node.body)
                 return [{ type: 'async', path: node.path, return: body.length + 2 }, ...body, { type: 'stop' }, { type: 'pass' }]
             },
 
@@ -486,49 +489,49 @@ function main() {
             },
 
             finally(node) {
-                const finalizer = this.compile(node.finalizer)
-                const fsm = [{ type: 'try', path: node.path }, ...this.compile(node.body), { type: 'exit' }, ...finalizer]
+                const finalizer = compiler.compile(node.finalizer)
+                const fsm = [{ type: 'try', path: node.path }, ...compiler.compile(node.body), { type: 'exit' }, ...finalizer]
                 fsm[0].catch = fsm.length - finalizer.length
                 return fsm
             },
 
             let(node) {
-                return [{ type: 'let', let: node.declarations, path: node.path }, ...this.compile(...node.components), { type: 'exit' }]
+                return [{ type: 'let', let: node.declarations, path: node.path }, ...compiler.compile(...node.components), { type: 'exit' }]
             },
 
             mask(node) {
-                return [{ type: 'let', let: null, path: node.path }, ...this.compile(...node.components), { type: 'exit' }]
+                return [{ type: 'let', let: null, path: node.path }, ...compiler.compile(...node.components), { type: 'exit' }]
             },
 
             try(node) {
-                const handler = [...this.compile(node.handler), { type: 'pass' }]
-                const fsm = [{ type: 'try', path: node.path }, ...this.compile(node.body), { type: 'exit' }, ...handler]
+                const handler = [...compiler.compile(node.handler), { type: 'pass' }]
+                const fsm = [{ type: 'try', path: node.path }, ...compiler.compile(node.body), { type: 'exit' }, ...handler]
                 fsm[0].catch = fsm.length - handler.length
                 fsm[fsm.length - handler.length - 1].next = handler.length
                 return fsm
             },
 
             if_nosave(node) {
-                const consequent = this.compile(node.consequent)
-                const alternate = [...this.compile(node.alternate), { type: 'pass' }]
-                const fsm = [{ type: 'pass', path: node.path }, ...this.compile(node.test), { type: 'choice', then: 1, else: consequent.length + 1 }, ...consequent, ...alternate]
+                const consequent = compiler.compile(node.consequent)
+                const alternate = [...compiler.compile(node.alternate), { type: 'pass' }]
+                const fsm = [{ type: 'pass', path: node.path }, ...compiler.compile(node.test), { type: 'choice', then: 1, else: consequent.length + 1 }, ...consequent, ...alternate]
                 fsm[fsm.length - alternate.length - 1].next = alternate.length
                 return fsm
             },
 
             while_nosave(node) {
-                const body = this.compile(node.body)
-                const fsm = [{ type: 'pass', path: node.path }, ...this.compile(node.test), { type: 'choice', then: 1, else: body.length + 1 }, ...body, { type: 'pass' }]
+                const body = compiler.compile(node.body)
+                const fsm = [{ type: 'pass', path: node.path }, ...compiler.compile(node.test), { type: 'choice', then: 1, else: body.length + 1 }, ...body, { type: 'pass' }]
                 fsm[fsm.length - 2].next = 2 - fsm.length
                 return fsm
             },
 
             dowhile_nosave(node) {
-                const fsm = [{ type: 'pass', path: node.path }, ...this.compile(node.body), ...this.compile(node.test), { type: 'choice', else: 1 }, { type: 'pass' }]
+                const fsm = [{ type: 'pass', path: node.path }, ...compiler.compile(node.body), ...compiler.compile(node.test), { type: 'choice', else: 1 }, { type: 'pass' }]
                 fsm[fsm.length - 2].then = 2 - fsm.length
                 return fsm
             },
-        }
+        })
 
         const openwhisk = require('openwhisk')
         let wsk
