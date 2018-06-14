@@ -1,7 +1,7 @@
 const assert = require('assert')
 const composer = require('../composer')
 const name = 'TestAction'
-const wsk = composer.openwhisk({ ignore_certs: process.env.IGNORE_CERTS && process.env.IGNORE_CERTS !== 'false' && process.env.IGNORE_CERTS !== '0' })
+const wsk = composer.util.openwhisk({ ignore_certs: process.env.IGNORE_CERTS && process.env.IGNORE_CERTS !== 'false' && process.env.IGNORE_CERTS !== '0' })
 
 // deploy action
 const define = action => wsk.actions.delete(action.name).catch(() => { }).then(() => wsk.actions.create(action))
@@ -175,7 +175,7 @@ describe('composer', function () {
                         "name": "echo"
                     }]
                 }
-                return invoke(composer.deserialize(json), { message: 'hi' }).then(activation => assert.deepEqual(activation.response.result, { message: 'hi' }))
+                return invoke(composer.util.deserialize(json), { message: 'hi' }).then(activation => assert.deepEqual(activation.response.result, { message: 'hi' }))
             })
         })
 

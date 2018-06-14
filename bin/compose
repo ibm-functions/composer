@@ -10,10 +10,10 @@ const argv = minimist(process.argv.slice(2), {
     boolean: ['insecure', 'encode', 'json', 'version', 'quiet'],
     alias: { auth: 'u', insecure: 'i', version: 'v' }
 })
-const composer = require(argv.composer || '../composer')
+const { util } = require(argv.composer || '../composer')
 
 if (argv.version) {
-    console.log(composer.version)
+    console.log(util.version)
     return
 }
 
@@ -48,8 +48,8 @@ try {
     let composition
     try {
         composition = require(path.resolve(filename))
-        if (filename.slice(filename.lastIndexOf('.')) === '.json') composition = composer.deserialize(composition)
-        if (typeof argv.lower === 'string') composition = composer.lower(composition, argv.lower || [])
+        if (filename.slice(filename.lastIndexOf('.')) === '.json') composition = util.deserialize(composition)
+        if (typeof argv.lower === 'string') composition = util.lower(composition, argv.lower || [])
     } catch (error) {
         console.error('Bad composition')
         if (!argv.quiet) console.log(error)
@@ -60,7 +60,7 @@ try {
         if (argv.apihost) options.apihost = argv.apihost
         if (argv.auth) options.api_key = argv.auth
         return Promise.resolve()
-            .then(() => composer.openwhisk(options).compositions.deploy(argv.deploy, composition))
+            .then(() => util.openwhisk(options).compositions.deploy(argv.deploy, composition))
             .then(actions => {
                 const names = actions.map(action => action.name)
                 console.log(`ok: created action${names.length > 1 ? 's' : ''} ${names}`)
@@ -83,11 +83,11 @@ try {
                 process.exit(5)
             })
     } else if (argv.encode) {
-        console.log(composer.synthesize(composer.flatten(composition).composition).exec.code)
+        console.log(util.synthesize(util.flatten(composition).composition).exec.code)
     } else if (argv.entity) {
-        console.log(JSON.stringify(composer.encode(argv.entity, composition).slice(-1)[0], null, 4))
+        console.log(JSON.stringify(util.encode(argv.entity, composition).slice(-1)[0], null, 4))
     } else if (argv.entities) {
-        console.log(JSON.stringify(composer.encode(argv.entities, composition), null, 4))
+        console.log(JSON.stringify(util.encode(argv.entities, composition), null, 4))
     } else {
         console.log(JSON.stringify(composition, null, 4))
     }

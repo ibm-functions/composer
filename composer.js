@@ -18,8 +18,16 @@
 
 function main() {
     const fs = require('fs')
+    const os = require('os')
+    const path = require('path')
     const util = require('util')
     const semver = require('semver')
+
+    let minify = x => x
+    try { minify = require('uglify-es').minify } catch (error) { }
+
+    // read composer version number
+    const version = require('./package.json').version
 
     const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
 
@@ -85,7 +93,7 @@ function main() {
     // registered plugins
     const plugins = []
 
-    // composer & lowerer
+    // composer
     const composer = {
         // detect task type and create corresponding composition object
         task(task) {
@@ -115,7 +123,7 @@ function main() {
         action(name, options = {}) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!isObject(options)) throw new ComposerError('Invalid argument', options)
-            name = parseActionName(name) // throws ComposerError if name is not valid
+            name = this.util.parseActionName(name) // throws ComposerError if name is not valid
             let exec
             if (Array.isArray(options.sequence)) { // native sequence
                 exec = { kind: 'sequence', components: options.sequence.map(parseActionName) }
@@ -220,7 +228,9 @@ function main() {
                     ({ result }) => result.error !== undefined && count-- > 0),
                 ({ result }) => result)
         },
+    }
 
+    composer.util = {
         combinators: {},
 
         // recursively deserialize composition
@@ -259,9 +269,9 @@ function main() {
             const lower = composition => {
                 composition = new Composition(composition) // copy
                 // repeatedly lower root combinator
-                while (combinators.indexOf(composition.type) < 0 && this[`_${composition.type}`]) {
+                while (combinators.indexOf(composition.type) < 0 && composer[`_${composition.type}`]) {
                     const path = composition.path
-                    composition = this[`_${composition.type}`](composition)
+                    composition = composer[`_${composition.type}`](composition)
                     if (path !== undefined) composition.path = path // preserve path
                 }
                 // lower nested combinators
@@ -275,43 +285,125 @@ function main() {
         // register plugin
         register(plugin) {
             if (plugin.combinators) init(plugin.combinators())
-            if (plugin.composer) Object.assign(this, plugin.composer({ ComposerError, Composition }))
+            if (plugin.composer) Object.assign(composer, plugin.composer({ ComposerError, Composition }))
             plugins.push(plugin)
-            return this
+            return composer
         },
-    }
 
-    /**
-     * Parses a (possibly fully qualified) resource name and validates it. If it's not a fully qualified name,
-     * then attempts to qualify it.
-     *
-     * Examples string to namespace, [package/]action name
-     *   foo => /_/foo
-     *   pkg/foo => /_/pkg/foo
-     *   /ns/foo => /ns/foo
-     *   /ns/pkg/foo => /ns/pkg/foo
-     */
-    function parseActionName(name) {
-        if (typeof name !== 'string') throw new ComposerError('Name must be a string')
-        if (name.trim().length == 0) throw new ComposerError('Name is not valid')
-        name = name.trim()
-        const delimiter = '/'
-        const parts = name.split(delimiter)
-        const n = parts.length
-        const leadingSlash = name[0] == delimiter
-        // no more than /ns/p/a
-        if (n < 1 || n > 4 || (leadingSlash && n == 2) || (!leadingSlash && n == 4)) throw new ComposerError('Name is not valid')
-        // skip leading slash, all parts must be non empty (could tighten this check to match EntityName regex)
-        parts.forEach(function (part, i) { if (i > 0 && part.trim().length == 0) throw new ComposerError('Name is not valid') })
-        const newName = parts.join(delimiter)
-        if (leadingSlash) return newName
-        else if (n < 3) return `${delimiter}_${delimiter}${newName}`
-        else return `${delimiter}${newName}`
+        /**
+         * Parses a (possibly fully qualified) resource name and validates it. If it's not a fully qualified name,
+         * then attempts to qualify it.
+         *
+         * Examples string to namespace, [package/]action name
+         *   foo => /_/foo
+         *   pkg/foo => /_/pkg/foo
+         *   /ns/foo => /ns/foo
+         *   /ns/pkg/foo => /ns/pkg/foo
+         */
+        parseActionName(name) {
+            if (typeof name !== 'string') throw new ComposerError('Name must be a string')
+            if (name.trim().length == 0) throw new ComposerError('Name is not valid')
+            name = name.trim()
+            const delimiter = '/'
+            const parts = name.split(delimiter)
+            const n = parts.length
+            const leadingSlash = name[0] == delimiter
+            // no more than /ns/p/a
+            if (n < 1 || n > 4 || (leadingSlash && n == 2) || (!leadingSlash && n == 4)) throw new ComposerError('Name is not valid')
+            // skip leading slash, all parts must be non empty (could tighten this check to match EntityName regex)
+            parts.forEach(function (part, i) { if (i > 0 && part.trim().length == 0) throw new ComposerError('Name is not valid') })
+            const newName = parts.join(delimiter)
+            if (leadingSlash) return newName
+            else if (n < 3) return `${delimiter}_${delimiter}${newName}`
+            else return `${delimiter}${newName}`
+        },
+
+        // recursively flatten composition into { composition, actions } by extracting embedded action definitions
+        flatten(composition) {
+            if (arguments.length > 1) throw new ComposerError('Too many arguments')
+            if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+
+            const actions = []
+
+            const flatten = composition => {
+                composition = new Composition(composition) // copy
+                composition.visit(this.combinators, flatten)
+                if (composition.type === 'action' && composition.action) {
+                    actions.push({ name: composition.name, action: composition.action })
+                    delete composition.action
+                }
+                return composition
+            }
+
+            composition = flatten(composition)
+            return { composition, actions }
+        },
+
+        // synthesize composition code
+        synthesize(composition) {
+            if (arguments.length > 1) throw new ComposerError('Too many arguments')
+            if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+            let code = `const main=(${main})().server(`
+            for (let plugin of plugins) {
+                code += `{plugin:new(${plugin.constructor})()`
+                if (plugin.configure) code += `,config:${JSON.stringify(plugin.configure())}`
+                code += '},'
+            }
+            code = minify(`${code})`, { output: { max_line_len: 127 } }).code
+            code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(composition, null, 4)}\n\n// do not edit below this point\n\n${code}` // invoke conductor on composition
+            return { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition }, { key: 'composer', value: version }] }
+        },
+
+        // encode composition as an action table
+        encode(name, composition, combinators) {
+            if (arguments.length > 3) throw new ComposerError('Too many arguments')
+            name = this.parseActionName(name) // throws ComposerError if name is not valid
+            if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+            if (combinators) composition = this.lower(composition, combinators)
+            const table = this.flatten(composition)
+            table.actions.push({ name, action: this.synthesize(table.composition) })
+            return table.actions
+        },
+
+        // return composer version
+        get version() {
+            return version
+        },
+
+        // return enhanced openwhisk client capable of deploying compositions
+        openwhisk(options) {
+            // try to extract apihost and key first from whisk property file file and then from process.env
+            let apihost
+            let api_key
+
+            try {
+                const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
+                const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
+
+                for (let line of lines) {
+                    let parts = line.trim().split('=')
+                    if (parts.length === 2) {
+                        if (parts[0] === 'APIHOST') {
+                            apihost = parts[1]
+                        } else if (parts[0] === 'AUTH') {
+                            api_key = parts[1]
+                        }
+                    }
+                }
+            } catch (error) { }
+
+            if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
+            if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
+
+            const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
+            wsk.compositions = new Compositions(wsk)
+            return wsk
+        },
     }
 
     // derive combinator methods from combinator table
     function init(combinators) {
-        Object.assign(composer.combinators, combinators)
+        Object.assign(composer.util.combinators, combinators)
         for (let type in combinators) {
             const combinator = combinators[type]
             // do not overwrite existing combinators
@@ -350,116 +442,18 @@ function main() {
 
     init(combinators)
 
-    // client-side stuff
-    function client() {
-        const os = require('os')
-        const path = require('path')
-        const minify = require('uglify-es').minify
-
-        // read composer version number
-        const version = require('./package.json').version
-
-        // management class for compositions
-        class Compositions {
-            constructor(wsk, composer) {
-                this.actions = wsk.actions
-                this.composer = composer
-            }
-
-            deploy(name, composition, combinators) {
-                const actions = this.composer.encode(name, composition, combinators)
-                return actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
-                    .then(() => this.actions.update(action)), Promise.resolve())
-                    .then(() => actions)
-            }
+    // management class for compositions
+    class Compositions {
+        constructor(wsk) {
+            this.actions = wsk.actions
         }
 
-        // client-side only methods
-        Object.assign(composer, {
-            // return enhanced openwhisk client capable of deploying compositions
-            openwhisk(options) {
-                // try to extract apihost and key first from whisk property file file and then from process.env
-                let apihost
-                let api_key
-
-                try {
-                    const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
-                    const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
-
-                    for (let line of lines) {
-                        let parts = line.trim().split('=')
-                        if (parts.length === 2) {
-                            if (parts[0] === 'APIHOST') {
-                                apihost = parts[1]
-                            } else if (parts[0] === 'AUTH') {
-                                api_key = parts[1]
-                            }
-                        }
-                    }
-                } catch (error) { }
-
-                if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
-                if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
-
-                const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
-                wsk.compositions = new Compositions(wsk, this)
-                return wsk
-            },
-
-            // recursively flatten composition into { composition, actions } by extracting embedded action definitions
-            flatten(composition) {
-                if (arguments.length > 1) throw new ComposerError('Too many arguments')
-                if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-
-                const actions = []
-
-                const flatten = composition => {
-                    composition = new Composition(composition) // copy
-                    composition.visit(this.combinators, flatten)
-                    if (composition.type === 'action' && composition.action) {
-                        actions.push({ name: composition.name, action: composition.action })
-                        delete composition.action
-                    }
-                    return composition
-                }
-
-                composition = flatten(composition)
-                return { composition, actions }
-            },
-
-            // synthesize composition code
-            synthesize(composition) {
-                if (arguments.length > 1) throw new ComposerError('Too many arguments')
-                if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-                let code = `const main=(${main})().server(`
-                for (let plugin of plugins) {
-                    code += `{plugin:new(${plugin.constructor})()`
-                    if (plugin.configure) code += `,config:${JSON.stringify(plugin.configure())}`
-                    code += '},'
-                }
-                code = minify(`${code})`, { output: { max_line_len: 127 } }).code
-                code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(composition, null, 4)}\n\n// do not edit below this point\n\n${code}` // invoke conductor on composition
-                return { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition }, { key: 'composer', value: version }] }
-            },
-
-            // encode composition as an action table
-            encode(name, composition, combinators) {
-                if (arguments.length > 3) throw new ComposerError('Too many arguments')
-                name = parseActionName(name) // throws ComposerError if name is not valid
-                if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-                if (combinators) composition = this.lower(composition, combinators)
-                const table = this.flatten(composition)
-                table.actions.push({ name, action: this.synthesize(table.composition) })
-                return table.actions
-            },
-
-            // return composer version
-            get version() {
-                return version
-            }
-        })
-
-        return composer
+        deploy(name, composition, combinators) {
+            const actions = composer.util.encode(name, composition, combinators)
+            return actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
+                .then(() => this.actions.update(action)), Promise.resolve())
+                .then(() => actions)
+        }
     }
 
     // server-side stuff
@@ -604,7 +598,7 @@ function main() {
         const finishers = []
 
         for ({ plugin, config } of arguments) {
-            composer.register(plugin)
+            composer.util.register(plugin)
             if (plugin.compiler) Object.assign(compiler, plugin.compiler())
             if (plugin.conductor) {
                 const r = plugin.conductor(config)
@@ -616,7 +610,7 @@ function main() {
             }
         }
 
-        const fsm = compiler.compile(composer.lower(composer.label(composer.deserialize(composition))))
+        const fsm = compiler.compile(composer.util.lower(composer.util.label(composer.util.deserialize(composition))))
 
         // encode error object
         const encodeError = error => ({
@@ -716,7 +710,7 @@ function main() {
         }
     }
 
-    return { client, server }
+    return { composer, server }
 }
 
-module.exports = main().client()
+module.exports = main().composer
