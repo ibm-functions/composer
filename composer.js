@@ -116,91 +116,92 @@ function main() {
             if (exec) composition.action = { exec }
             return new Composition(composition)
         },
+    }
 
-        // lowering
-
-        _empty() {
-            return this.sequence()
+    // lowerer
+    const lowerer = {
+        empty() {
+            return composer.sequence()
         },
 
-        _seq({ components }) {
-            return this.sequence(...components)
+        seq({ components }) {
+            return composer.sequence(...components)
         },
 
-        _value({ value }) {
+        value({ value }) {
             return this._literal({ value })
         },
 
-        _literal({ value }) {
-            return this.let({ value }, this.function('() => value'))
+        literal({ value }) {
+            return composer.let({ value }, composer.function('() => value'))
         },
 
-        _retain({ components }) {
-            return this.let(
+        retain({ components }) {
+            return composer.let(
                 { params: null },
-                this.finally(
+                composer.finally(
                     args => { params = args },
-                    this.mask(...components),
+                    composer.mask(...components),
                     result => ({ params, result })))
         },
 
-        _retain_catch({ components }) {
-            return this.seq(
-                this.retain(
-                    this.finally(
-                        this.seq(...components),
+        retain_catch({ components }) {
+            return composer.seq(
+                composer.retain(
+                    composer.finally(
+                        composer.seq(...components),
                         result => ({ result }))),
                 ({ params, result }) => ({ params, result: result.result }))
         },
 
-        _if({ test, consequent, alternate }) {
-            return this.let(
+        if({ test, consequent, alternate }) {
+            return composer.let(
                 { params: null },
-                this.finally(
+                composer.finally(
                     args => { params = args },
-                    this.if_nosave(
-                        this.mask(test),
-                        this.finally(() => params, this.mask(consequent)),
-                        this.finally(() => params, this.mask(alternate)))))
+                    composer.if_nosave(
+                        composer.mask(test),
+                        composer.finally(() => params, composer.mask(consequent)),
+                        composer.finally(() => params, composer.mask(alternate)))))
         },
 
-        _while({ test, body }) {
-            return this.let(
+        while({ test, body }) {
+            return composer.let(
                 { params: null },
-                this.finally(
+                composer.finally(
                     args => { params = args },
-                    this.while_nosave(
-                        this.mask(test),
-                        this.finally(() => params, this.mask(body), args => { params = args })),
+                    composer.while_nosave(
+                        composer.mask(test),
+                        composer.finally(() => params, composer.mask(body), args => { params = args })),
                     () => params))
         },
 
-        _dowhile({ body, test }) {
-            return this.let(
+        dowhile({ body, test }) {
+            return composer.let(
                 { params: null },
-                this.finally(
+                composer.finally(
                     args => { params = args },
-                    this.dowhile_nosave(
-                        this.finally(() => params, this.mask(body), args => { params = args }),
-                        this.mask(test)),
+                    composer.dowhile_nosave(
+                        composer.finally(() => params, composer.mask(body), args => { params = args }),
+                        composer.mask(test)),
                     () => params))
         },
 
-        _repeat({ count, components }) {
-            return this.let(
+        repeat({ count, components }) {
+            return composer.let(
                 { count },
-                this.while(
-                    this.function('() => count-- > 0'),
-                    this.mask(...components)))
+                composer.while(
+                    composer.function('() => count-- > 0'),
+                    composer.mask(...components)))
         },
 
-        _retry({ count, components }) {
-            return this.let(
+        retry({ count, components }) {
+            return composer.let(
                 { count },
                 params => ({ params }),
-                this.dowhile(
-                    this.finally(({ params }) => params, this.mask(this.retain_catch(...components))),
-                    this.function('({ result }) => result.error !== undefined && count-- > 0')),
+                composer.dowhile(
+                    composer.finally(({ params }) => params, composer.mask(composer.retain_catch(...components))),
+                    composer.function('({ result }) => result.error !== undefined && count-- > 0')),
                 ({ result }) => result)
         },
     }
@@ -244,9 +245,9 @@ function main() {
             const lower = composition => {
                 composition = new Composition(composition) // copy
                 // repeatedly lower root combinator
-                while (combinators.indexOf(composition.type) < 0 && composer[`_${composition.type}`]) {
+                while (combinators.indexOf(composition.type) < 0 && lowerer[composition.type]) {
                     const path = composition.path
-                    composition = composer[`_${composition.type}`](composition)
+                    composition = lowerer[composition.type](composition)
                     if (path !== undefined) composition.path = path // preserve path
                 }
                 // lower nested combinators
@@ -261,6 +262,7 @@ function main() {
         register(plugin) {
             if (plugin.combinators) init(plugin.combinators())
             if (plugin.composer) Object.assign(composer, plugin.composer({ ComposerError, Composition }))
+            if (plugin.lowerer) Object.assign(lowerer, plugin.lowerer({ composer, ComposerError, Composition }))
             plugins.push(plugin)
             return composer
         },
@@ -420,7 +422,7 @@ function main() {
                     if (argument === undefined && arg.optional && arg.type !== undefined) continue
                     switch (arg.type) {
                         case undefined:
-                            composition[arg._] = this.task(arg.optional ? argument || null : argument)
+                            composition[arg._] = composer.task(arg.optional ? argument || null : argument)
                             continue
                         case 'value':
                             if (typeof argument === 'function') throw new ComposerError('Invalid argument', argument)
