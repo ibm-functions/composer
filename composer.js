@@ -175,14 +175,14 @@ function main() {
                     () => params))
         },
 
-        _dowhile(composition) {
+        _dowhile({ body, test }) {
             return this.let(
                 { params: null },
                 this.finally(
                     args => { params = args },
                     this.dowhile_nosave(
-                        this.finally(() => params, this.mask(composition.body), args => { params = args }),
-                        this.mask(composition.test)),
+                        this.finally(() => params, this.mask(body), args => { params = args }),
+                        this.mask(test)),
                     () => params))
         },
 
