@@ -107,7 +107,7 @@ function main() {
         },
 
         value({ value }) {
-            return this._literal({ value })
+            return this.literal({ value })
         },
 
         literal({ value }) {
