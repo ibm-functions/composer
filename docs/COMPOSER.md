@@ -40,21 +40,30 @@ node samples/node-demo.js
 ```
 Alternatively, the `compose` command can deploy compositions and the OpenWhisk CLI can invoke compositions. See [COMPOSE.md](COMPOSE.md) for details.
 
-# Composer methods
+# Helper methods
 
 The `composer` object offers a number of combinator methods to define composition objects, e.g., `composer.if`. Combinators are documented in [COMBINATORS.md](COMBINATORS.md). It also offers a series of helper methods via the `composer.util` object.
 
-| Helper method | Description | Example |
+| Helper method  | Example |
 | --:| --- | --- |
-| [`deserialize`](#deserialize) | deserialization | `composer.util.deserialize(JSON.stringify(composition))` |
-| [`lower`](#lower) | lowering | `composer.util.lower(composer.if('authenticate', 'success', 'failure'), '0.4.0')` |
-| [`encode`](#encode) | code generation | `composer.util.encode('demo', composition, '0.4.0')` |
+| [`version`](#version) | `composer.util.version` |
+| [`deserialize`](#deserialize) | `composer.util.deserialize(JSON.stringify(composition))` |
+| [`canonical`](#canonical) | `composer.util.canonical('demo')` |
+| [`lower`](#lower) | `composer.util.lower(composer.if('authenticate', 'success', 'failure'), '0.4.0')` |
+| [`encode`](#encode) | `composer.util.encode('demo', composition, '0.4.0')` |
+| [`openwhisk`](#openwhisk-client) | `composer.util.openwhisk()` |
 
-Finally, the `composer` object object offers an extension to the [OpenWhisk Client for Javascript](https://github.com/apache/incubator-openwhisk-client-js) that supports [deploying](#deployment) compositions.
+## Version
+
+`composer.util.version` returns the version number for the composer module.
 
 ## Deserialize
 
 `composer.util.deserialize(composition)` recursively deserializes a serialized composition object. In other words, it recreates a `Composition` object from the input JSON dictionary.
+
+## Canonical
+
+`composer.util.canonical(name)` attempts to validate and expand the action name `name` to its canonical form.
 
 ## Lower
 
@@ -68,22 +77,20 @@ For instance, `composer.util.lower(composition, ['retry'])` will preserve any in
 
 The optional `combinators` parameter controls the optional lowering. See [lower](#lower) for details.
 
-# Deployment
+## Openwhisk client
 
 The `composer` object offers an extension to the [OpenWhisk Client for Javascript](https://github.com/apache/incubator-openwhisk-client-js) that supports deploying compositions.
 
-## Openwhisk client
-
-A client instance is obtained by invoking `composer.util.openwhisk([options])`, for instance with:
+An OpenWhisk client instance is obtained by invoking `composer.util.openwhisk([options])`, for instance with:
 ```javascript
-const wsk = composer.openwhisk({ ignore_certs: true })
+const wsk = composer.util.openwhisk({ ignore_certs: true })
 
 ```
 The specific OpenWhisk deployment to use may be specified via the optional `options` argument, environment variables, or the OpenWhisk property file. Options have priority over environment variables, which have priority over the OpenWhisk property file. Options and environment variables are documented [here](https://github.com/apache/incubator-openwhisk-client-js#constructor-options). The default path for the whisk property file is `$HOME/.wskprops`. It can be altered by setting the `WSK_CONFIG_FILE` environment variable.
 
 The `composer` module adds to the OpenWhisk client instance a new top-level category named `compositions` with a method named `deploy`.
 
-## Deploying compositions
+### Deploying compositions
 
 `wsk.compositions.deploy(name, composition, [combinators])` optionally lowers, encodes, and deploys the composition `composition`. More precisely, it successively deploys all the actions defined in `composition` as well as `composition` itself (encoded as a conductor action).
 
@@ -93,7 +100,7 @@ The `deploy` method returns a successful promise if all the actions were deploye
 
 The `deploy` method deletes the deployed actions before recreating them if necessary. As a result, default parameters, limits, and annotations on preexisting actions are lost.
 
-## Invoking, updating, and deleting compositions
+### Invoking, updating, and deleting compositions
 
 Since compositions are deployed as conductor actions, other management tasks for compositions can be achieved by invoking methods of `wsk.actions`. For example, to delete a composition named `demo`, use command:
 ```javascript

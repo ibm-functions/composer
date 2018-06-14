@@ -83,7 +83,7 @@ try {
                 process.exit(5)
             })
     } else if (argv.encode) {
-        console.log(util.synthesize(util.flatten(composition).composition).exec.code)
+        console.log(util.encode('noname', composition).slice(-1)[0].action.exec.code)
     } else if (argv.entity) {
         console.log(JSON.stringify(util.encode(argv.entity, composition).slice(-1)[0], null, 4))
     } else if (argv.entities) {
