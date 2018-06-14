@@ -608,12 +608,11 @@ function main() {
             composer.util.register(plugin)
             if (plugin.compiler) Object.assign(compiler, plugin.compiler())
             if (plugin.conductor) {
-                const r = plugin.conductor(config)
-                if (r._finish) {
-                    finishers.push(r._finish)
-                    delete r._finish
+                Object.assign(conductor, plugin.conductor(config))
+                if (conductor._finish) {
+                    finishers.push(conductor._finish)
+                    delete conductor._finish
                 }
-                Object.assign(conductor, r)
             }
         }
 
