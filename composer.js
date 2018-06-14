@@ -23,6 +23,7 @@ function main() {
     const semver = require('semver')
     const util = require('util')
 
+    // uglify-es is not part of the base image
     let minify = x => x
     try { minify = require('uglify-es').minify } catch (error) { }
 
@@ -31,31 +32,8 @@ function main() {
 
     const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
 
-    // default combinators
-    const combinators = {
-        empty: { since: '0.4.0' },
-        seq: { components: true, since: '0.4.0' },
-        sequence: { components: true, since: '0.4.0' },
-        if: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }], since: '0.4.0' },
-        if_nosave: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }], since: '0.4.0' },
-        while: { args: [{ _: 'test' }, { _: 'body' }], since: '0.4.0' },
-        while_nosave: { args: [{ _: 'test' }, { _: 'body' }], since: '0.4.0' },
-        dowhile: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
-        dowhile_nosave: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
-        try: { args: [{ _: 'body' }, { _: 'handler' }], since: '0.4.0' },
-        finally: { args: [{ _: 'body' }], components: true, since: '0.4.0' },
-        retain: { components: true, since: '0.4.0' },
-        retain_catch: { components: true, since: '0.4.0' },
-        let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
-        mask: { components: true, since: '0.4.0' },
-        action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }], since: '0.4.0' },
-        repeat: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
-        retry: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
-        value: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
-        literal: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
-        function: { args: [{ _: 'function', type: 'object' }], since: '0.4.0' },
-        async: { args: [{ _: 'body' }], since: '0.6.0' },
-    }
+    // combinator signatures
+    const combinators = {}
 
     // error class
     class ComposerError extends Error {
@@ -207,7 +185,10 @@ function main() {
     }
 
     composer.util = {
-        combinators: {},
+        // return the signatures of the combinators
+        get combinators() { 
+            return combinators
+        },
 
         // recursively deserialize composition
         deserialize(composition) {
@@ -217,7 +198,7 @@ function main() {
             return composition
         },
 
-        // label combinators with the json path
+        // recursively label combinators with the json path
         label(composition) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
@@ -443,7 +424,30 @@ function main() {
         }
     }
 
-    init(combinators)
+    init({
+        empty: { since: '0.4.0' },
+        seq: { components: true, since: '0.4.0' },
+        sequence: { components: true, since: '0.4.0' },
+        if: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }], since: '0.4.0' },
+        if_nosave: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }], since: '0.4.0' },
+        while: { args: [{ _: 'test' }, { _: 'body' }], since: '0.4.0' },
+        while_nosave: { args: [{ _: 'test' }, { _: 'body' }], since: '0.4.0' },
+        dowhile: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
+        dowhile_nosave: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
+        try: { args: [{ _: 'body' }, { _: 'handler' }], since: '0.4.0' },
+        finally: { args: [{ _: 'body' }], components: true, since: '0.4.0' },
+        retain: { components: true, since: '0.4.0' },
+        retain_catch: { components: true, since: '0.4.0' },
+        let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
+        mask: { components: true, since: '0.4.0' },
+        action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }], since: '0.4.0' },
+        repeat: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
+        retry: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
+        value: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
+        literal: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
+        function: { args: [{ _: 'function', type: 'object' }], since: '0.4.0' },
+        async: { args: [{ _: 'body' }], since: '0.6.0' },
+    })
 
     // management class for compositions
     class Compositions {
