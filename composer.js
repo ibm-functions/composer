@@ -604,7 +604,7 @@ function main() {
 
         const finishers = []
 
-        for ({ plugin, config } of arguments) {
+        for (let { plugin, config } of arguments) {
             composer.util.register(plugin)
             if (plugin.compiler) Object.assign(compiler, plugin.compiler())
             if (plugin.conductor) {
