@@ -119,8 +119,8 @@ function main() {
                 { params: null },
                 composer.finally(
                     args => { params = args },
-                    composer.mask(...components),
-                    result => ({ params, result })))
+                    composer.seq(composer.mask(...components),
+                        result => ({ params, result }))))
         },
 
         retain_catch({ components }) {
@@ -148,10 +148,10 @@ function main() {
                 { params: null },
                 composer.finally(
                     args => { params = args },
-                    composer.while_nosave(
+                    composer.seq(composer.while_nosave(
                         composer.mask(test),
-                        composer.finally(() => params, composer.mask(body), args => { params = args })),
-                    () => params))
+                        composer.finally(() => params, composer.seq(composer.mask(body), args => { params = args }))),
+                        () => params)))
         },
 
         dowhile({ body, test }) {
@@ -159,10 +159,10 @@ function main() {
                 { params: null },
                 composer.finally(
                     args => { params = args },
-                    composer.dowhile_nosave(
-                        composer.finally(() => params, composer.mask(body), args => { params = args }),
+                    composer.seq(composer.dowhile_nosave(
+                        composer.finally(() => params, composer.seq(composer.mask(body), args => { params = args })),
                         composer.mask(test)),
-                    () => params))
+                        () => params)))
         },
 
         repeat({ count, components }) {
@@ -186,7 +186,7 @@ function main() {
 
     composer.util = {
         // return the signatures of the combinators
-        get combinators() { 
+        get combinators() {
             return combinators
         },
 
@@ -301,7 +301,7 @@ function main() {
         synthesize(composition) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-            let code = `const main=(${main})().server(`
+            let code = `const main=(${main})().runtime(`
             for (let plugin of plugins) {
                 code += `{plugin:new(${plugin.constructor})()`
                 if (plugin.configure) code += `,config:${JSON.stringify(plugin.configure())}`
@@ -435,7 +435,7 @@ function main() {
         dowhile: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
         dowhile_nosave: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
         try: { args: [{ _: 'body' }, { _: 'handler' }], since: '0.4.0' },
-        finally: { args: [{ _: 'body' }], components: true, since: '0.4.0' },
+        finally: { args: [{ _: 'body' }, { _: 'finalizer' }], since: '0.4.0' },
         retain: { components: true, since: '0.4.0' },
         retain_catch: { components: true, since: '0.4.0' },
         let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
@@ -463,8 +463,8 @@ function main() {
         }
     }
 
-    // server-side stuff
-    function server() {
+    // runtime stuff
+    function runtime() {
         const compiler = {
             compile(node) {
                 if (arguments.length === 0) return [{ type: 'empty' }]
@@ -490,7 +490,7 @@ function main() {
             },
 
             finally(node) {
-                const finalizer = this.compile(...node.components)
+                const finalizer = this.compile(node.finalizer)
                 const fsm = [{ type: 'try', path: node.path }, ...this.compile(node.body), { type: 'exit' }, ...finalizer]
                 fsm[0].catch = fsm.length - finalizer.length
                 return fsm
@@ -714,7 +714,7 @@ function main() {
         }
     }
 
-    return { composer, server }
+    return { composer, runtime }
 }
 
 module.exports = main().composer

@@ -408,6 +408,15 @@ describe('composer', function () {
                     return invoke(composer.finally(() => ({ error: 'foo' }), params => ({ params })))
                         .then(activation => assert.deepEqual(activation.response.result, { params: { error: 'foo' } }))
                 })
+
+                it('too many arguments', function () {
+                    try {
+                        invoke(composer.finally('isNotOne', 'isNotOne', 'isNotOne'))
+                        assert.fail()
+                    } catch (error) {
+                        assert.ok(error.message.startsWith('Too many arguments'))
+                    }
+                })
             })
 
             describe('let', function () {
