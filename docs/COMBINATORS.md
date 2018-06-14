@@ -9,6 +9,7 @@ The `composer` module offers a number of combinators to define compositions:
 | [`literal` or `value`](#literal) | constant value | `composer.literal({ message: 'Hello, World!' })` |
 | [`empty`](#empty) | empty sequence | `composer.empty()`
 | [`sequence` or `seq`](#sequence) | sequence | `composer.sequence('hello', 'bye')` |
+| [`task`](#task) | single task | `composer.task('echo')`
 | [`let`](#let) | variable declarations | `composer.let({ count: 3, message: 'hello' }, ...)` |
 | [`mask`](#mask) | variable hiding | `composer.let({ n }, composer.while(_ => n-- > 0, composer.mask(composition)))` |
 | [`if` and `if_nosave`](#if) | conditional | `composer.if('authenticate', 'success', 'failure')` |
@@ -149,6 +150,10 @@ The input parameter object for the composition is the input parameter object of 
 If one of the components fails (i.e., returns an error object), the remainder of the sequence is not executed. The output parameter object for the composition is the error object produced by the failed component.
 
 An empty sequence behaves as a sequence with a single function `params => params`. The output parameter object for the empty sequence is its input parameter object unless it is an error object, in which case, as usual, the error object only contains the `error` field of the input parameter object.
+
+## Task
+
+`composer.task(composition)` is equivalent to `composer.sequence(composition)`.
 
 ## Let
 
