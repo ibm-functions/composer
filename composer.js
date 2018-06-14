@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-'use strict'
-
 function main() {
+    'use strict'
+
     const fs = require('fs')
     const os = require('os')
     const path = require('path')
-    const util = require('util')
     const semver = require('semver')
+    const util = require('util')
 
     let minify = x => x
     try { minify = require('uglify-es').minify } catch (error) { }
@@ -43,7 +43,7 @@ function main() {
         dowhile: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
         dowhile_nosave: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
         try: { args: [{ _: 'body' }, { _: 'handler' }], since: '0.4.0' },
-        finally: { args: [{ _: 'body' }, { _: 'finalizer' }], since: '0.4.0' },
+        finally: { args: [{ _: 'body' }], components: true, since: '0.4.0' },
         retain: { components: true, since: '0.4.0' },
         retain_catch: { components: true, since: '0.4.0' },
         let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
@@ -61,32 +61,6 @@ function main() {
     class ComposerError extends Error {
         constructor(message, argument) {
             super(message + (argument !== undefined ? '\nArgument: ' + util.inspect(argument) : ''))
-        }
-    }
-
-    // composition class
-    class Composition {
-        // weaker instanceof to tolerate multiple instances of this class
-        static [Symbol.hasInstance](instance) {
-            return instance.constructor && instance.constructor.name === Composition.name
-        }
-
-        // construct a composition object with the specified fields
-        constructor(composition) {
-            return Object.assign(this, composition)
-        }
-
-        // apply f to all fields of type composition
-        visit(combinators, f) {
-            const combinator = combinators[this.type]
-            if (combinator.components) {
-                this.components = this.components.map(f)
-            }
-            for (let arg of combinator.args || []) {
-                if (arg.type === undefined && this[arg._] !== undefined) {
-                    this[arg._] = f(this[arg._], arg._)
-                }
-            }
         }
     }
 
@@ -127,15 +101,12 @@ function main() {
             let exec
             if (Array.isArray(options.sequence)) { // native sequence
                 exec = { kind: 'sequence', components: options.sequence.map(parseActionName) }
-            }
-            if (typeof options.filename === 'string') { // read action code from file
+            } else if (typeof options.filename === 'string') { // read action code from file
                 exec = fs.readFileSync(options.filename, { encoding: 'utf8' })
-            }
-            if (typeof options.action === 'function') { // capture function
+            } else if (typeof options.action === 'function') { // capture function
                 exec = `const main = ${options.action}`
                 if (exec.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', options.action)
-            }
-            if (typeof options.action === 'string' || isObject(options.action)) {
+            } else if (typeof options.action === 'string' || isObject(options.action)) {
                 exec = options.action
             }
             if (typeof exec === 'string') {
@@ -152,80 +123,84 @@ function main() {
             return this.sequence()
         },
 
-        _seq(composition) {
-            return this.sequence(...composition.components)
+        _seq({ components }) {
+            return this.sequence(...components)
         },
 
-        _value(composition) {
-            return this._literal(composition)
+        _value({ value }) {
+            return this._literal({ value })
         },
 
-        _literal(composition) {
-            return this.let({ value: composition.value }, () => value)
+        _literal({ value }) {
+            return this.let({ value }, this.function('() => value'))
         },
 
-        _retain(composition) {
+        _retain({ components }) {
             return this.let(
                 { params: null },
-                args => { params = args },
-                this.mask(...composition.components),
-                result => ({ params, result }))
+                this.finally(
+                    args => { params = args },
+                    this.mask(...components),
+                    result => ({ params, result })))
         },
 
-        _retain_catch(composition) {
+        _retain_catch({ components }) {
             return this.seq(
                 this.retain(
                     this.finally(
-                        this.seq(...composition.components),
+                        this.seq(...components),
                         result => ({ result }))),
                 ({ params, result }) => ({ params, result: result.result }))
         },
 
-        _if(composition) {
+        _if({ test, consequent, alternate }) {
             return this.let(
                 { params: null },
-                args => { params = args },
-                this.if_nosave(
-                    this.mask(composition.test),
-                    this.seq(() => params, this.mask(composition.consequent)),
-                    this.seq(() => params, this.mask(composition.alternate))))
+                this.finally(
+                    args => { params = args },
+                    this.if_nosave(
+                        this.mask(test),
+                        this.finally(() => params, this.mask(consequent)),
+                        this.finally(() => params, this.mask(alternate)))))
         },
 
-        _while(composition) {
+        _while({ test, body }) {
             return this.let(
                 { params: null },
-                args => { params = args },
-                this.while_nosave(
-                    this.mask(composition.test),
-                    this.seq(() => params, this.mask(composition.body), args => { params = args })),
-                () => params)
+                this.finally(
+                    args => { params = args },
+                    this.while_nosave(
+                        this.mask(test),
+                        this.finally(() => params, this.mask(body), args => { params = args })),
+                    () => params))
         },
 
         _dowhile(composition) {
             return this.let(
                 { params: null },
-                args => { params = args },
-                this.dowhile_nosave(
-                    this.seq(() => params, this.mask(composition.body), args => { params = args }),
-                    this.mask(composition.test)),
-                () => params)
+                this.finally(
+                    args => { params = args },
+                    this.dowhile_nosave(
+                        this.finally(() => params, this.mask(composition.body), args => { params = args }),
+                        this.mask(composition.test)),
+                    () => params))
         },
 
-        _repeat(composition) {
+        _repeat({ count, components }) {
             return this.let(
-                { count: composition.count },
+                { count },
                 this.while(
-                    () => count-- > 0,
-                    this.mask(this.seq(...composition.components))))
+                    this.function('() => count-- > 0'),
+                    this.mask(...components)))
         },
 
-        _retry(composition) {
+        _retry({ count, components }) {
             return this.let(
-                { count: composition.count },
+                { count },
                 params => ({ params }),
                 this.dowhile(
-                    this.finally(({ params }) => params, this.mask(this.retain_catch(...composition.components))),
-                    ({ result }) => result.error !== undefined && count-- > 0),
+                    this.finally(({ params }) => params, this.mask(this.retain_catch(...components))),
+                    this.function('({ result }) => result.error !== undefined && count-- > 0')),
                 ({ result }) => result)
         },
     }
@@ -237,7 +212,7 @@ function main() {
         deserialize(composition) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
             composition = new Composition(composition) // copy
-            composition.visit(this.combinators, composition => this.deserialize(composition))
+            composition.visit(composition => this.deserialize(composition))
             return composition
         },
 
@@ -250,7 +225,7 @@ function main() {
                 composition = new Composition(composition) // copy
                 composition.path = path + (name !== undefined ? (array === undefined ? `.${name}` : `[${name}]`) : '')
                 // label nested combinators
-                composition.visit(this.combinators, label(composition.path))
+                composition.visit(label(composition.path))
                 return composition
             }
 
@@ -275,7 +250,7 @@ function main() {
                     if (path !== undefined) composition.path = path // preserve path
                 }
                 // lower nested combinators
-                composition.visit(this.combinators, lower)
+                composition.visit(lower)
                 return composition
             }
 
@@ -327,7 +302,7 @@ function main() {
 
             const flatten = composition => {
                 composition = new Composition(composition) // copy
-                composition.visit(this.combinators, flatten)
+                composition.visit(flatten)
                 if (composition.type === 'action' && composition.action) {
                     actions.push({ name: composition.name, action: composition.action })
                     delete composition.action
@@ -399,6 +374,32 @@ function main() {
             wsk.compositions = new Compositions(wsk)
             return wsk
         },
+    }
+
+    // composition class
+    class Composition {
+        // weaker instanceof to tolerate multiple instances of this class
+        static [Symbol.hasInstance](instance) {
+            return instance.constructor && instance.constructor.name === Composition.name
+        }
+
+        // construct a composition object with the specified fields
+        constructor(composition) {
+            return Object.assign(this, composition)
+        }
+
+        // apply f to all fields of type composition
+        visit(f) {
+            const combinator = composer.util.combinators[this.type]
+            if (combinator.components) {
+                this.components = this.components.map(f)
+            }
+            for (let arg of combinator.args || []) {
+                if (arg.type === undefined && this[arg._] !== undefined) {
+                    this[arg._] = f(this[arg._], arg._)
+                }
+            }
+        }
     }
 
     // derive combinator methods from combinator table
@@ -483,7 +484,7 @@ function main() {
             },
 
             finally(node) {
-                const finalizer = this.compile(node.finalizer)
+                const finalizer = this.compile(...node.components)
                 const fsm = [{ type: 'try', path: node.path }, ...this.compile(node.body), { type: 'exit' }, ...finalizer]
                 fsm[0].catch = fsm.length - finalizer.length
                 return fsm
@@ -636,8 +637,6 @@ function main() {
 
         // run function f on current stack
         function run(f, p) {
-            this.require = require
-
             // handle let/mask pairs
             const view = []
             let n = 0
