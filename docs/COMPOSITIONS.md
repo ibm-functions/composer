@@ -39,8 +39,7 @@ Javascript functions can be viewed as simple, anonymous actions that do not need
 ```javascript
 composer.if('getUserNameAndPassword', params => ({ key = btoa(params.user + ':' + params.password) }), 'authenticate')
 ```
-
-Compositions may be nested inside compositions in two ways. First, combinators can be nested, e.g.,
+Combinators can be nested, e.g.,
 ```javascript
 composer.if('isEven', 'half', composer.sequence('triple', 'increment'))
 ```
@@ -61,14 +60,6 @@ composer.if(
 )
 ```
 Deploying such a composition deploys the embedded actions.
-
-A composition can also include the definition of another composition:
-```javascript
-composer.if('isEven', 'half', composer.composition('tripleAndIncrement', { composition: composer.sequence('triple', 'increment') }))
-```
-In this example, the `composer.sequence('triple', 'increment')` composition is given the name `tripleAndIncrement` and the enclosing composition references the `tripleAndIncrement` composition by name. In other words, deploying this composition actually deploys two compositions:
-- a composition named `tripleAndIncrement` defined as `composer.sequence('triple', 'increment')`, and
-- a composition defined as `composer.if('isEven', 'half', 'tripleAndIncrement')` whose name will be specified as deployment time.
 
 ## Serialization and deserialization
 

@@ -7,7 +7,6 @@ The `composer` module offers a number of combinators to define compositions:
 | [`action`](#action) | action | `composer.action('echo')` |
 | [`function`](#function) | function | `composer.function(({ x, y }) => ({ product: x * y }))` |
 | [`literal` or `value`](#literal) | constant value | `composer.literal({ message: 'Hello, World!' })` |
-| [`composition`](#composition) | named composition | `composer.composition('myCompositionName', myComposition)` |
 | [`empty`](#empty) | empty sequence | `composer.empty()`
 | [`sequence` or `seq`](#sequence) | sequence | `composer.sequence('hello', 'bye')` |
 | [`let`](#let) | variable declarations | `composer.let({ count: 3, message: 'hello' }, ...)` |
@@ -136,25 +135,6 @@ composer.sequence(
 JSON values cannot represent functions. Applying `composer.literal` to a value of type `'function'` will result in an error. Functions embedded in a `value` of type `'object'`, e.g., `{ f: p => p, n: 42 }` will be silently omitted from the JSON dictionary. In other words, `composer.literal({ f: p => p, n: 42 })` will output `{ n: 42 }`.
 
 In general, a function can be embedded in a composition either by using the `composer.function` combinator, or by embedding the source code for the function as a string and later using `eval` to evaluate the function code.
-
-## Composition
-
-`composition(name, [options])` invokes the composition named `name` possibly also defining this composition.
-
-The optional `options` dictionary makes it possible to provide a definition for the composition.
-```javascript
-// specify the code for the composition
-composer.composition('tripleAndIncrement', { composition: composer.sequence('triple', 'increment') })
-```
-Composition definitions may be nested.
-```javascript
-composer.if('isEven', 'half', composer.composition('tripleAndIncrement', { composition: composer.sequence('triple', 'increment') }))
-```
-In this example, the `composer.sequence('triple', 'increment')` composition is given the name `tripleAndIncrement` and the enclosing composition references the `tripleAndIncrement` composition by name. In particular, deploying this composition actually deploys two compositions:
-- a composition named `tripleAndIncrement` defined as `composer.sequence('triple', 'increment')`, and
-- a composition defined as `composer.if('isEven', 'half', 'tripleAndIncrement')` whose name will be specified as deployment time.
-
-Importantly, the behavior of the second composition would be altered if we redefine the `tripleAndIncrement` composition to do something else, since it refers to the composition by name.
 
 ## Empty
 

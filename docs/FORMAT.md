@@ -45,7 +45,6 @@ The field names and types typically match the combinator method signatures:
 | `action` | name:string, action:optional object |
 | `function` | function:object |
 | `literal` or `value` | value:json value |
-| `composition` | name:string, composition:optional composition |
 | `empty` |
 | `sequence` or `seq` | components:array of compositions |
 | `let` | declarations:object, components:array of compositions |
