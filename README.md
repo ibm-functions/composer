@@ -46,12 +46,14 @@ compositions should continue to run fine without redeployment.
 Composer is distributed as Node.js package. To install this package, use the
 Node Package Manager:
 ```
+npm install @ibm-functions/composer
+```
+We recommend to also install the package globally (with `-g` option) if you intend to
+use the `compose` command to define and deploy compositions.
+```
 npm -g install @ibm-functions/composer
 ```
-We recommend to install the package globally (with `-g` option) if you intend to
-use the `compose` command to define and deploy compositions. Use a local install
-(without `-g` option) if you intend to use `node` instead. The two installations
-can coexist. Shell embeds the Composer package, so there is no need to install
+Shell embeds the Composer package, so there is no need to install
 Composer explicitly when using Shell.
 
 ## Defining a composition
