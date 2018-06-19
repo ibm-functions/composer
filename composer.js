@@ -347,6 +347,12 @@ function main() {
 
         // construct a composition object with the specified fields
         constructor(composition) {
+            if (!isObject(composition) || composer.util.combinators[composition.type] === undefined) throw new ComposerError('Invalid argument', composition)
+            const combinator = composer.util.combinators[composition.type]
+            if (combinator.components && composition.components === undefined)throw new ComposerError('Invalid argument', composition)
+            for (let arg of combinator.args || []) {
+                if (!arg.optional && composition[arg._] === undefined) throw new ComposerError('Invalid argument', composition)
+            }
             return Object.assign(this, composition)
         }
 
@@ -371,7 +377,7 @@ function main() {
             const combinator = combinators[type]
             // do not overwrite existing combinators
             composer[type] = composer[type] || function () {
-                const composition = new Composition({ type })
+                const composition = { type }
                 const skip = combinator.args && combinator.args.length || 0
                 if (!combinator.components && (arguments.length > skip)) {
                     throw new ComposerError('Too many arguments')
@@ -398,7 +404,7 @@ function main() {
                 if (combinator.components) {
                     composition.components = Array.prototype.slice.call(arguments, skip).map(obj => composer.task(obj))
                 }
-                return composition
+                return new Composition(composition)
             }
         }
     }

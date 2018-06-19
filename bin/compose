@@ -47,8 +47,7 @@ try {
     const filename = argv._[0]
     let composition
     try {
-        composition = require(path.resolve(filename))
-        if (filename.slice(filename.lastIndexOf('.')) === '.json') composition = util.deserialize(composition)
+        composition = util.deserialize(require(path.resolve(filename)))
         if (typeof argv.lower === 'string') composition = util.lower(composition, argv.lower || [])
     } catch (error) {
         console.error('Bad composition')
