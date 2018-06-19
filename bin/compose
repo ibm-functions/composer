@@ -2,19 +2,18 @@
 
 'use strict'
 
-const fs = require('fs')
-const vm = require('vm')
 const minimist = require('minimist')
-let composer = require('../composer')
+const path = require('path')
 
 const argv = minimist(process.argv.slice(2), {
-    string: ['apihost', 'auth', 'deploy', 'lower', 'entity', 'entities', 'string'],
+    string: ['apihost', 'auth', 'deploy', 'lower', 'entity', 'entities', 'composer'],
     boolean: ['insecure', 'encode', 'json', 'version', 'quiet'],
     alias: { auth: 'u', insecure: 'i', version: 'v' }
 })
+const { util } = require(argv.composer || '../composer')
 
 if (argv.version) {
-    console.log(composer.version)
+    console.log(util.version)
     return
 }
 
@@ -40,31 +39,17 @@ if (argv._.length !== 1 || count > 1 || argv.deploy === '' || argv.entity === ''
     console.error('  -i, --insecure         bypass certificate checking')
     console.error('  -v, --version          output the composer version')
     console.error('  --quiet                omit detailed diagnostic messages')
-    console.error('  --plugin PLUGIN        register a composer plugin')
+    console.error('  --composer COMPOSER    instantiate a custom composer module')
     process.exit(127)
 }
 
 try {
-    switch (typeof argv.plugin) {
-        case 'string':
-            composer = composer.register(require(argv.plugin))
-            break
-        case 'object':
-            for (let plugin of argv.plugin) composer = composer.register(require(plugin))
-    }
     const filename = argv._[0]
-    let source
-    try {
-        source = fs.readFileSync(filename, { encoding: 'utf8' })
-    } catch (error) {
-        console.error('File not found')
-        if (!argv.quiet) console.log(error)
-        process.exit(6)
-    }
     let composition
     try {
-        composition = filename.slice(filename.lastIndexOf('.')) === '.js' ? vm.runInNewContext(source, { composer, require, console, process }) : composer.deserialize(JSON.parse(source))
-        if (typeof argv.lower === 'string') composition = composer.lower(composition, argv.lower)
+        composition = require(path.resolve(filename))
+        if (filename.slice(filename.lastIndexOf('.')) === '.json') composition = util.deserialize(composition)
+        if (typeof argv.lower === 'string') composition = util.lower(composition, argv.lower || [])
     } catch (error) {
         console.error('Bad composition')
         if (!argv.quiet) console.log(error)
@@ -75,9 +60,9 @@ try {
         if (argv.apihost) options.apihost = argv.apihost
         if (argv.auth) options.api_key = argv.auth
         return Promise.resolve()
-            .then(() => composer.openwhisk(options).compositions.deploy(composer.composition(argv.deploy, composition), false))
-            .then(obj => {
-                const names = obj.actions.map(action => action.name)
+            .then(() => util.openwhisk(options).compositions.deploy(argv.deploy, composition))
+            .then(actions => {
+                const names = actions.map(action => action.name)
                 console.log(`ok: created action${names.length > 1 ? 's' : ''} ${names}`)
             })
             .catch(error => {
@@ -98,11 +83,11 @@ try {
                 process.exit(5)
             })
     } else if (argv.encode) {
-        console.log(composer.encode(composer.composition('anonymous', composition), false).actions.slice(-1)[0].action.exec.code)
+        console.log(util.encode('noname', composition).slice(-1)[0].action.exec.code)
     } else if (argv.entity) {
-        console.log(JSON.stringify(composer.encode(composer.composition(argv.entity, composition), false).actions.slice(-1)[0], null, 4))
+        console.log(JSON.stringify(util.encode(argv.entity, composition).slice(-1)[0], null, 4))
     } else if (argv.entities) {
-        console.log(JSON.stringify(composer.encode(composer.composition(argv.entities, composition), false).actions, null, 4))
+        console.log(JSON.stringify(util.encode(argv.entities, composition), null, 4))
     } else {
         console.log(JSON.stringify(composition, null, 4))
     }

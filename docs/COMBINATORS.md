@@ -7,9 +7,9 @@ The `composer` module offers a number of combinators to define compositions:
 | [`action`](#action) | action | `composer.action('echo')` |
 | [`function`](#function) | function | `composer.function(({ x, y }) => ({ product: x * y }))` |
 | [`literal` or `value`](#literal) | constant value | `composer.literal({ message: 'Hello, World!' })` |
-| [`composition`](#composition) | named composition | `composer.composition('myCompositionName', myComposition)` |
 | [`empty`](#empty) | empty sequence | `composer.empty()`
 | [`sequence` or `seq`](#sequence) | sequence | `composer.sequence('hello', 'bye')` |
+| [`task`](#task) | single task | `composer.task('echo')`
 | [`let`](#let) | variable declarations | `composer.let({ count: 3, message: 'hello' }, ...)` |
 | [`mask`](#mask) | variable hiding | `composer.let({ n }, composer.while(_ => n-- > 0, composer.mask(composition)))` |
 | [`if` and `if_nosave`](#if) | conditional | `composer.if('authenticate', 'success', 'failure')` |
@@ -20,6 +20,7 @@ The `composer` module offers a number of combinators to define compositions:
 | [`finally`](#finally) | finalization | `composer.finally('tryThis', 'doThatAlways')` |
 | [`retry`](#retry) | error recovery | `composer.retry(3, 'connect')` |
 | [`retain` and `retain_catch`](#retain) | persistence | `composer.retain('validateInput')` |
+| [`async`](#async) | asynchronous invocation | `composer.async('sendMessage')` |
 
 The `action`, `function`, and `literal` combinators construct compositions respectively from actions, functions, and constant values. The other combinators combine existing compositions to produce new compositions.
 
@@ -32,7 +33,7 @@ Where a composition is expected, the following shorthands are permitted:
 
 ## Primitive combinators
 
-Some of these combinators are _derived_ combinators: they are equivalent to combinations of other combinators. The `composer` module offers a `composer.lower` method (see [COMPOSER.md](#COMPOSER.md)) that can eliminate derived combinators from a composition, producing an equivalent composition made only of _primitive_ combinators. The primitive combinators are: `action`, `function`, `composition`, `sequence`, `let`, `mask`, `if_nosave`, `while_nosave`, `dowhile_nosave`, `try`, and `finally`.
+Some of these combinators are _derived_ combinators: they are equivalent to combinations of other combinators. The `composer` module offers a `composer.lower` method (see [COMPOSER.md](#COMPOSER.md)) that can eliminate derived combinators from a composition, producing an equivalent composition made only of _primitive_ combinators.
 
 ## Action
 
@@ -136,19 +137,6 @@ JSON values cannot represent functions. Applying `composer.literal` to a value o
 
 In general, a function can be embedded in a composition either by using the `composer.function` combinator, or by embedding the source code for the function as a string and later using `eval` to evaluate the function code.
 
-## Composition
-
-`composition(name, composition)` returns a composition consisting of the invocation of the composition named `name` and of the declaration of the composition named `name` defined to be `composition`.
-
-```javascript
-composer.if('isEven', 'half', composer.composition('tripleAndIncrement', composer.sequence('triple', 'increment')))
-```
-In this example, the `composer.sequence('triple', 'increment')` composition is given the name `tripleAndIncrement` and the enclosing composition references the `tripleAndIncrement` composition by name. In particular, deploying this composition actually deploys two compositions:
-- a composition named `tripleAndIncrement` defined as `composer.sequence('triple', 'increment')`, and
-- a composition defined as `composer.if('isEven', 'half', 'tripleAndIncrement')` whose name will be specified as deployment time.
-
-Importantly, the behavior of the second composition would be altered if we redefine the `tripleAndIncrement` composition to do something else, since it refers to the composition by name.
-
 ## Empty
 
 `composer.empty()` is a shorthand for the empty sequence `composer.sequence()`. It is typically used to make it clear that a composition, e.g., a branch of an `if` combinator, is intentionally doing nothing.
@@ -162,6 +150,10 @@ The input parameter object for the composition is the input parameter object of 
 If one of the components fails (i.e., returns an error object), the remainder of the sequence is not executed. The output parameter object for the composition is the error object produced by the failed component.
 
 An empty sequence behaves as a sequence with a single function `params => params`. The output parameter object for the empty sequence is its input parameter object unless it is an error object, in which case, as usual, the error object only contains the `error` field of the input parameter object.
+
+## Task
+
+`composer.task(composition)` is equivalent to `composer.sequence(composition)`.
 
 ## Let
 
@@ -266,3 +258,7 @@ The _finalizer_ is invoked in sequence after _body_ even if _body_ returns an er
 `composer.retain(body)` runs _body_ on the input parameter object producing an object with two fields `params` and `result` such that `params` is the input parameter object of the composition and `result` is the output parameter object of _body_.
 
 If _body_ fails, the output of the `retain` combinator is only the error object (i.e., the input parameter object is not preserved). In constrast, the `retain_catch` combinator always outputs `{ params, result }`, even if `result` is an error result.
+
+## Async
+
+`composer.async(body)` runs the _body_ composition asynchronously. It spawns _body_ but does not wait for it to execute. It immediately returns a dictionary with a single field named `activationId` identifying the invocation of _body_.

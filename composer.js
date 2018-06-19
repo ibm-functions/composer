@@ -14,40 +14,22 @@
  * limitations under the License.
  */
 
-'use strict'
-
 function main() {
+    'use strict'
+
     const fs = require('fs')
-    const util = require('util')
+    const os = require('os')
+    const path = require('path')
     const semver = require('semver')
+    const util = require('util')
+
+    // read composer version number
+    const version = require('./package.json').version
 
     const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
 
-    // default combinators
-    const combinators = {
-        empty: { since: '0.4.0' },
-        seq: { components: true, since: '0.4.0' },
-        sequence: { components: true, since: '0.4.0' },
-        if: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }], since: '0.4.0' },
-        if_nosave: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }], since: '0.4.0' },
-        while: { args: [{ _: 'test' }, { _: 'body' }], since: '0.4.0' },
-        while_nosave: { args: [{ _: 'test' }, { _: 'body' }], since: '0.4.0' },
-        dowhile: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
-        dowhile_nosave: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
-        try: { args: [{ _: 'body' }, { _: 'handler' }], since: '0.4.0' },
-        finally: { args: [{ _: 'body' }, { _: 'finalizer' }], since: '0.4.0' },
-        retain: { components: true, since: '0.4.0' },
-        retain_catch: { components: true, since: '0.4.0' },
-        let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
-        mask: { components: true, since: '0.4.0' },
-        action: { args: [{ _: 'name', type: 'string' }, { _: 'options', type: 'object', optional: true }], since: '0.4.0' },
-        composition: { args: [{ _: 'name', type: 'string' }, { _: 'composition' }, { _: 'options', type: 'object', optional: true }], since: '0.4.0' },
-        repeat: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
-        retry: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
-        value: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
-        literal: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
-        function: { args: [{ _: 'function', type: 'object' }], since: '0.4.0' },
-    }
+    // combinator signatures
+    const combinators = {}
 
     // error class
     class ComposerError extends Error {
@@ -56,44 +38,18 @@ function main() {
         }
     }
 
-    // composition class
-    class Composition {
-        // weaker instanceof to tolerate multiple instances of this class
-        static [Symbol.hasInstance](instance) {
-            return instance.constructor && instance.constructor.name === Composition.name
-        }
-
-        // construct a composition object with the specified fields
-        constructor(composition) {
-            return Object.assign(this, composition)
-        }
-
-        // apply f to all fields of type composition
-        visit(combinators, f) {
-            const combinator = combinators[this.type]
-            if (combinator.components) {
-                this.components = this.components.map(f)
-            }
-            for (let arg of combinator.args || []) {
-                if (arg.type === undefined) {
-                    this[arg._] = f(this[arg._], arg._)
-                }
-            }
-        }
-    }
-
     // registered plugins
     const plugins = []
 
-    // composer & lowerer
-    const composer = {
+    const composer = {}
+    Object.assign(composer, {
         // detect task type and create corresponding composition object
         task(task) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
-            if (task === null) return this.empty()
+            if (task === null) return composer.empty()
             if (task instanceof Composition) return task
-            if (typeof task === 'function') return this.function(task)
-            if (typeof task === 'string') return this.action(task)
+            if (typeof task === 'function') return composer.function(task)
+            if (typeof task === 'string') return composer.action(task)
             throw new ComposerError('Invalid argument', task)
         },
 
@@ -111,23 +67,20 @@ function main() {
             return new Composition({ type: 'function', function: { exec: fun } })
         },
 
-        // enhanced action combinator: mangle name, capture code
+        // action combinator
         action(name, options = {}) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!isObject(options)) throw new ComposerError('Invalid argument', options)
-            name = parseActionName(name) // throws ComposerError if name is not valid
+            name = composer.util.canonical(name) // throws ComposerError if name is not valid
             let exec
             if (Array.isArray(options.sequence)) { // native sequence
-                exec = { kind: 'sequence', components: options.sequence.map(parseActionName) }
-            }
-            if (typeof options.filename === 'string') { // read action code from file
+                exec = { kind: 'sequence', components: options.sequence.map(canonical) }
+            } else if (typeof options.filename === 'string') { // read action code from file
                 exec = fs.readFileSync(options.filename, { encoding: 'utf8' })
-            }
-            if (typeof options.action === 'function') { // capture function
+            } else if (typeof options.action === 'function') { // capture function
                 exec = `const main = ${options.action}`
                 if (exec.indexOf('[native code]') !== -1) throw new ComposerError('Cannot capture native function', options.action)
-            }
-            if (typeof options.action === 'string' || isObject(options.action)) {
+            } else if (typeof options.action === 'string' || isObject(options.action)) {
                 exec = options.action
             }
             if (typeof exec === 'string') {
@@ -135,150 +88,166 @@ function main() {
             }
             const composition = { type: 'action', name }
             if (exec) composition.action = { exec }
-            if (options.async) composition.async = true
             return new Composition(composition)
         },
+    })
 
-        // enhanced composition combinator: mangle name
-        composition(name, composition, options = {}) {
-            if (arguments.length > 3) throw new ComposerError('Too many arguments')
-            if (!isObject(options)) throw new ComposerError('Invalid argument', options)
-            name = parseActionName(name)
-            const obj = { type: 'composition', name, composition: this.task(composition) }
-            if (options.async) obj.async = true
-            return new Composition(obj)
+    const lowerer = {
+        empty() {
+            return composer.sequence()
         },
 
-        // lowering
-
-        _empty() {
-            return this.sequence()
+        seq({ components }) {
+            return composer.sequence(...components)
         },
 
-        _seq(composition) {
-            return this.sequence(...composition.components)
+        value({ value }) {
+            return composer.literal(value)
         },
 
-        _value(composition) {
-            return this._literal(composition)
+        literal({ value }) {
+            return composer.let({ value }, composer.function('() => value'))
         },
 
-        _literal(composition) {
-            return this.let({ value: composition.value }, () => value)
-        },
-
-        _retain(composition) {
-            return this.let(
+        retain({ components }) {
+            return composer.let(
                 { params: null },
-                args => { params = args },
-                this.mask(...composition.components),
-                result => ({ params, result }))
+                composer.finally(
+                    args => { params = args },
+                    composer.seq(composer.mask(...components),
+                        result => ({ params, result }))))
         },
 
-        _retain_catch(composition) {
-            return this.seq(
-                this.retain(
-                    this.finally(
-                        this.seq(...composition.components),
+        retain_catch({ components }) {
+            return composer.seq(
+                composer.retain(
+                    composer.finally(
+                        composer.seq(...components),
                         result => ({ result }))),
                 ({ params, result }) => ({ params, result: result.result }))
         },
 
-        _if(composition) {
-            return this.let(
+        if({ test, consequent, alternate }) {
+            return composer.let(
                 { params: null },
-                args => { params = args },
-                this.if_nosave(
-                    this.mask(composition.test),
-                    this.seq(() => params, this.mask(composition.consequent)),
-                    this.seq(() => params, this.mask(composition.alternate))))
+                composer.finally(
+                    args => { params = args },
+                    composer.if_nosave(
+                        composer.mask(test),
+                        composer.finally(() => params, composer.mask(consequent)),
+                        composer.finally(() => params, composer.mask(alternate)))))
         },
 
-        _while(composition) {
-            return this.let(
+        while({ test, body }) {
+            return composer.let(
                 { params: null },
-                args => { params = args },
-                this.while_nosave(
-                    this.mask(composition.test),
-                    this.seq(() => params, this.mask(composition.body), args => { params = args })),
-                () => params)
+                composer.finally(
+                    args => { params = args },
+                    composer.seq(composer.while_nosave(
+                        composer.mask(test),
+                        composer.finally(() => params, composer.seq(composer.mask(body), args => { params = args }))),
+                        () => params)))
         },
 
-        _dowhile(composition) {
-            return this.let(
+        dowhile({ body, test }) {
+            return composer.let(
                 { params: null },
-                args => { params = args },
-                this.dowhile_nosave(
-                    this.seq(() => params, this.mask(composition.body), args => { params = args }),
-                    this.mask(composition.test)),
-                () => params)
+                composer.finally(
+                    args => { params = args },
+                    composer.seq(composer.dowhile_nosave(
+                        composer.finally(() => params, composer.seq(composer.mask(body), args => { params = args })),
+                        composer.mask(test)),
+                        () => params)))
         },
 
-        _repeat(composition) {
-            return this.let(
-                { count: composition.count },
-                this.while(
-                    () => count-- > 0,
-                    this.mask(this.seq(...composition.components))))
+        repeat({ count, components }) {
+            return composer.let(
+                { count },
+                composer.while(
+                    composer.function('() => count-- > 0'),
+                    composer.mask(...components)))
         },
 
-        _retry(composition) {
-            return this.let(
-                { count: composition.count },
+        retry({ count, components }) {
+            return composer.let(
+                { count },
                 params => ({ params }),
-                this.dowhile(
-                    this.finally(({ params }) => params, this.mask(this.retain_catch(...composition.components))),
-                    ({ result }) => result.error !== undefined && count-- > 0),
+                composer.dowhile(
+                    composer.finally(({ params }) => params, composer.mask(composer.retain_catch(...components))),
+                    composer.function('({ result }) => result.error !== undefined && count-- > 0')),
                 ({ result }) => result)
         },
+    }
 
-        combinators: {},
+    // recursively flatten composition into { composition, actions } by extracting embedded action definitions
+    function flatten(composition) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+
+        const actions = []
+
+        const flatten = composition => {
+            composition = new Composition(composition) // copy
+            composition.visit(flatten)
+            if (composition.type === 'action' && composition.action) {
+                actions.push({ name: composition.name, action: composition.action })
+                delete composition.action
+            }
+            return composition
+        }
+
+        composition = flatten(composition)
+        return { composition, actions }
+    }
+
+    // synthesize composition code
+    function synthesize(composition) {
+        if (arguments.length > 1) throw new ComposerError('Too many arguments')
+        if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+        let code = `const main=(${main})().runtime(`
+        for (let plugin of plugins) {
+            code += `{plugin:new(${plugin.constructor})()`
+            if (plugin.configure) code += `,config:${JSON.stringify(plugin.configure())}`
+            code += '},'
+        }
+        code = require('uglify-es').minify(`${code})`, { output: { max_line_len: 127 } }).code
+        code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(composition, null, 4)}\n\n// do not edit below this point\n\n${code}` // invoke conductor on composition
+        return { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition }, { key: 'composer', value: version }] }
+    }
+
+    composer.util = {
+        // return the signatures of the combinators
+        get combinators() {
+            return combinators
+        },
 
         // recursively deserialize composition
         deserialize(composition) {
             if (arguments.length > 1) throw new ComposerError('Too many arguments')
             composition = new Composition(composition) // copy
-            composition.visit(this.combinators, composition => this.deserialize(composition))
+            composition.visit(composition => composer.util.deserialize(composition))
             return composition
         },
 
-        // label combinators with the json path
-        label(composition) {
-            if (arguments.length > 1) throw new ComposerError('Too many arguments')
-            if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-
-            const label = path => (composition, name, array) => {
-                composition = new Composition(composition) // copy
-                composition.path = path + (name !== undefined ? (array === undefined ? `.${name}` : `[${name}]`) : '')
-                // label nested combinators
-                composition.visit(this.combinators, label(composition.path))
-                return composition
-            }
-
-            return label('')(composition)
-        },
-
-        // recursively label and lower combinators to the desired set of combinators (including primitive combinators)
+        // recursively lower combinators to the desired set of combinators (including primitive combinators)
         lower(composition, combinators = []) {
             if (arguments.length > 2) throw new ComposerError('Too many arguments')
             if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-            if (!Array.isArray(combinators) && typeof combinators !== 'boolean' && typeof combinators !== 'string') throw new ComposerError('Invalid argument', combinators)
-            if (combinators === false) return composition // no lowering
-            if (combinators === true || combinators === '') combinators = [] // maximal lowering
             if (typeof combinators === 'string') { // lower to combinators of specific composer version 
-                combinators = Object.keys(this.combinators).filter(key => semver.gte(combinators, this.combinators[key].since))
+                combinators = Object.keys(composer.util.combinators).filter(key => semver.gte(combinators, composer.util.combinators[key].since))
             }
+            if (!Array.isArray(combinators)) throw new ComposerError('Invalid argument', combinators)
 
             const lower = composition => {
                 composition = new Composition(composition) // copy
                 // repeatedly lower root combinator
-                while (combinators.indexOf(composition.type) < 0 && this[`_${composition.type}`]) {
+                while (combinators.indexOf(composition.type) < 0 && lowerer[composition.type]) {
                     const path = composition.path
-                    composition = this[`_${composition.type}`](composition)
-                    if (path !== undefined) composition.path = path
+                    composition = lowerer[composition.type](composition)
+                    if (path !== undefined) composition.path = path // preserve path
                 }
                 // lower nested combinators
-                composition.visit(this.combinators, lower)
+                composition.visit(lower)
                 return composition
             }
 
@@ -288,43 +257,116 @@ function main() {
         // register plugin
         register(plugin) {
             if (plugin.combinators) init(plugin.combinators())
-            if (plugin.composer) Object.assign(this, plugin.composer({ ComposerError, Composition }))
+            if (plugin.composer) Object.assign(composer, plugin.composer({ composer, ComposerError, Composition }))
+            if (plugin.lowerer) Object.assign(lowerer, plugin.lowerer({ composer, ComposerError, Composition }))
             plugins.push(plugin)
-            return this
+            return composer
+        },
+
+        /**
+         * Parses a (possibly fully qualified) resource name and validates it. If it's not a fully qualified name,
+         * then attempts to qualify it.
+         *
+         * Examples string to namespace, [package/]action name
+         *   foo => /_/foo
+         *   pkg/foo => /_/pkg/foo
+         *   /ns/foo => /ns/foo
+         *   /ns/pkg/foo => /ns/pkg/foo
+         */
+        canonical(name) {
+            if (typeof name !== 'string') throw new ComposerError('Name must be a string')
+            if (name.trim().length == 0) throw new ComposerError('Name is not valid')
+            name = name.trim()
+            const delimiter = '/'
+            const parts = name.split(delimiter)
+            const n = parts.length
+            const leadingSlash = name[0] == delimiter
+            // no more than /ns/p/a
+            if (n < 1 || n > 4 || (leadingSlash && n == 2) || (!leadingSlash && n == 4)) throw new ComposerError('Name is not valid')
+            // skip leading slash, all parts must be non empty (could tighten this check to match EntityName regex)
+            parts.forEach(function (part, i) { if (i > 0 && part.trim().length == 0) throw new ComposerError('Name is not valid') })
+            const newName = parts.join(delimiter)
+            if (leadingSlash) return newName
+            else if (n < 3) return `${delimiter}_${delimiter}${newName}`
+            else return `${delimiter}${newName}`
+        },
+
+        // encode composition as an action table
+        encode(name, composition, combinators) {
+            if (arguments.length > 3) throw new ComposerError('Too many arguments')
+            name = composer.util.canonical(name) // throws ComposerError if name is not valid
+            if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+            if (combinators) composition = composer.util.lower(composition, combinators)
+            const table = flatten(composition)
+            table.actions.push({ name, action: synthesize(table.composition) })
+            return table.actions
+        },
+
+        // return composer version
+        get version() {
+            return version
+        },
+
+        // return enhanced openwhisk client capable of deploying compositions
+        openwhisk(options) {
+            // try to extract apihost and key first from whisk property file file and then from process.env
+            let apihost
+            let api_key
+
+            try {
+                const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
+                const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
+
+                for (let line of lines) {
+                    let parts = line.trim().split('=')
+                    if (parts.length === 2) {
+                        if (parts[0] === 'APIHOST') {
+                            apihost = parts[1]
+                        } else if (parts[0] === 'AUTH') {
+                            api_key = parts[1]
+                        }
+                    }
+                }
+            } catch (error) { }
+
+            if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
+            if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
+
+            const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
+            wsk.compositions = new Compositions(wsk)
+            return wsk
         },
     }
 
-    /**
-     * Parses a (possibly fully qualified) resource name and validates it. If it's not a fully qualified name,
-     * then attempts to qualify it.
-     *
-     * Examples string to namespace, [package/]action name
-     *   foo => /_/foo
-     *   pkg/foo => /_/pkg/foo
-     *   /ns/foo => /ns/foo
-     *   /ns/pkg/foo => /ns/pkg/foo
-     */
-    function parseActionName(name) {
-        if (typeof name !== 'string') throw new ComposerError('Name must be a string')
-        if (name.trim().length == 0) throw new ComposerError('Name is not valid')
-        name = name.trim()
-        const delimiter = '/'
-        const parts = name.split(delimiter)
-        const n = parts.length
-        const leadingSlash = name[0] == delimiter
-        // no more than /ns/p/a
-        if (n < 1 || n > 4 || (leadingSlash && n == 2) || (!leadingSlash && n == 4)) throw new ComposerError('Name is not valid')
-        // skip leading slash, all parts must be non empty (could tighten this check to match EntityName regex)
-        parts.forEach(function (part, i) { if (i > 0 && part.trim().length == 0) throw new ComposerError('Name is not valid') })
-        const newName = parts.join(delimiter)
-        if (leadingSlash) return newName
-        else if (n < 3) return `${delimiter}_${delimiter}${newName}`
-        else return `${delimiter}${newName}`
+    // composition class
+    class Composition {
+        // weaker instanceof to tolerate multiple instances of this class
+        static [Symbol.hasInstance](instance) {
+            return instance.constructor && instance.constructor.name === Composition.name
+        }
+
+        // construct a composition object with the specified fields
+        constructor(composition) {
+            return Object.assign(this, composition)
+        }
+
+        // apply f to all fields of type composition
+        visit(f) {
+            const combinator = composer.util.combinators[this.type]
+            if (combinator.components) {
+                this.components = this.components.map(f)
+            }
+            for (let arg of combinator.args || []) {
+                if (arg.type === undefined && this[arg._] !== undefined) {
+                    this[arg._] = f(this[arg._], arg._)
+                }
+            }
+        }
     }
 
     // derive combinator methods from combinator table
     function init(combinators) {
-        Object.assign(composer.combinators, combinators)
+        Object.assign(composer.util.combinators, combinators)
         for (let type in combinators) {
             const combinator = combinators[type]
             // do not overwrite existing combinators
@@ -340,8 +382,7 @@ function main() {
                     if (argument === undefined && arg.optional && arg.type !== undefined) continue
                     switch (arg.type) {
                         case undefined:
-                            composition[arg._] = this.task(arg.optional ? argument || null : argument)
-                            if (arg.named && composition[arg._].name === undefined) throw new ComposerError('Invalid argument', argument)
+                            composition[arg._] = composer.task(arg.optional ? argument || null : argument)
                             continue
                         case 'value':
                             if (typeof argument === 'function') throw new ComposerError('Invalid argument', argument)
@@ -355,144 +396,83 @@ function main() {
                     }
                 }
                 if (combinator.components) {
-                    composition.components = Array.prototype.slice.call(arguments, skip).map(obj => {
-                        const task = composer.task(obj)
-                        if (combinator.components.named && task.name === undefined) throw new ComposerError('Invalid argument', obj)
-                        return task
-                    })
+                    composition.components = Array.prototype.slice.call(arguments, skip).map(obj => composer.task(obj))
                 }
                 return composition
             }
         }
     }
 
-    init(combinators)
+    init({
+        empty: { since: '0.4.0' },
+        seq: { components: true, since: '0.4.0' },
+        sequence: { components: true, since: '0.4.0' },
+        if: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }], since: '0.4.0' },
+        if_nosave: { args: [{ _: 'test' }, { _: 'consequent' }, { _: 'alternate', optional: true }], since: '0.4.0' },
+        while: { args: [{ _: 'test' }, { _: 'body' }], since: '0.4.0' },
+        while_nosave: { args: [{ _: 'test' }, { _: 'body' }], since: '0.4.0' },
+        dowhile: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
+        dowhile_nosave: { args: [{ _: 'body' }, { _: 'test' }], since: '0.4.0' },
+        try: { args: [{ _: 'body' }, { _: 'handler' }], since: '0.4.0' },
+        finally: { args: [{ _: 'body' }, { _: 'finalizer' }], since: '0.4.0' },
+        retain: { components: true, since: '0.4.0' },
+        retain_catch: { components: true, since: '0.4.0' },
+        let: { args: [{ _: 'declarations', type: 'object' }], components: true, since: '0.4.0' },
+        mask: { components: true, since: '0.4.0' },
+        action: { args: [{ _: 'name', type: 'string' }, { _: 'action', type: 'object', optional: true }], since: '0.4.0' },
+        repeat: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
+        retry: { args: [{ _: 'count', type: 'number' }], components: true, since: '0.4.0' },
+        value: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
+        literal: { args: [{ _: 'value', type: 'value' }], since: '0.4.0' },
+        function: { args: [{ _: 'function', type: 'object' }], since: '0.4.0' },
+        async: { args: [{ _: 'body' }], since: '0.6.0' },
+    })
 
-    // client-side stuff
-    function client() {
-        const os = require('os')
-        const path = require('path')
-        const minify = require('uglify-es').minify
-
-        // read composer version number
-        const version = require('./package.json').version
-
-        // management class for compositions
-        class Compositions {
-            constructor(wsk, composer) {
-                this.actions = wsk.actions
-                this.composer = composer
-            }
-
-            deploy(composition, combinators) {
-                if (arguments.length > 2) throw new ComposerError('Too many arguments')
-                if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-                if (composition.name === undefined) throw new ComposerError('Cannot deploy anonymous entity')
-                const obj = this.composer.encode(composition, combinators)
-                return obj.actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
-                    .then(() => this.actions.update(action)), Promise.resolve())
-                    .then(() => obj)
-            }
+    // management class for compositions
+    class Compositions {
+        constructor(wsk) {
+            this.actions = wsk.actions
         }
 
-        // client-side only methods
-        Object.assign(composer, {
-            // return enhanced openwhisk client capable of deploying compositions
-            openwhisk(options) {
-                // try to extract apihost and key first from whisk property file file and then from process.env
-                let apihost
-                let api_key
-
-                try {
-                    const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
-                    const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
-
-                    for (let line of lines) {
-                        let parts = line.trim().split('=')
-                        if (parts.length === 2) {
-                            if (parts[0] === 'APIHOST') {
-                                apihost = parts[1]
-                            } else if (parts[0] === 'AUTH') {
-                                api_key = parts[1]
-                            }
-                        }
-                    }
-                } catch (error) { }
-
-                if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
-                if (process.env.__OW_API_KEY) api_key = process.env.__OW_API_KEY
-
-                const wsk = require('openwhisk')(Object.assign({ apihost, api_key }, options))
-                wsk.compositions = new Compositions(wsk, this)
-                return wsk
-            },
-
-            // recursively encode composition into { composition, actions } by encoding nested compositions into actions and extracting nested action definitions
-            encode(composition, combinators = []) { // lower non-primitive combinators by default
-                if (arguments.length > 2) throw new ComposerError('Too many arguments')
-                if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
-
-                composition = this.lower(composition, combinators)
-
-                const actions = []
-
-                const encode = composition => {
-                    composition = new Composition(composition) // copy
-                    composition.visit(this.combinators, encode)
-                    if (composition.type === 'composition') {
-                        let code = `const main=(${main})().server(`
-                        for (let plugin of plugins) {
-                            code += `{plugin:new(${plugin.constructor})()`
-                            if (plugin.configure) code += `,config:${JSON.stringify(plugin.configure())}`
-                            code += '},'
-                        }
-                        code = minify(`${code})`, { output: { max_line_len: 127 } }).code
-                        code = `// generated by composer v${version}\n\nconst composition = ${JSON.stringify(encode(composition.composition), null, 4)}\n\n// do not edit below this point\n\n${code}` // invoke conductor on composition
-                        composition.action = { exec: { kind: 'nodejs:default', code }, annotations: [{ key: 'conductor', value: composition.composition }, { key: 'composer', value: version }] }
-                        delete composition.composition
-                        composition.type = 'action'
-                    }
-                    if (composition.type === 'action' && composition.action) {
-                        actions.push({ name: composition.name, action: composition.action })
-                        delete composition.action
-                    }
-                    return composition
-                }
-
-                composition = encode(composition)
-                return { composition, actions }
-            },
-
-            // return composer version
-            get version() {
-                return version
-            }
-        })
-
-        return composer
+        deploy(name, composition, combinators) {
+            const actions = composer.util.encode(name, composition, combinators)
+            return actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
+                .then(() => this.actions.update(action)), Promise.resolve())
+                .then(() => actions)
+        }
     }
 
-    // server-side stuff
-    function server() {
-        function chain(front, back) {
-            front.slice(-1)[0].next = 1
-            front.push(...back)
-            return front
+    // runtime stuff
+    function runtime() {
+        // recursively label combinators with the json path
+        function label(composition) {
+            if (arguments.length > 1) throw new ComposerError('Too many arguments')
+            if (!(composition instanceof Composition)) throw new ComposerError('Invalid argument', composition)
+
+            const label = path => (composition, name, array) => {
+                composition = new Composition(composition) // copy
+                composition.path = path + (name !== undefined ? (array === undefined ? `.${name}` : `[${name}]`) : '')
+                // label nested combinators
+                composition.visit(label(composition.path))
+                return composition
+            }
+
+            return label('')(composition)
         }
 
+        // compile ast to fsm
         const compiler = {
-            compile(node) {
-                if (arguments.length === 0) return [{ type: 'empty' }]
-                if (arguments.length === 1) return this[node.type](node)
-                return Array.prototype.map.call(arguments, node => this.compile(node)).reduce(chain)
-            },
-
             sequence(node) {
-                return chain([{ type: 'pass', path: node.path }], this.compile(...node.components))
+                return [{ type: 'pass', path: node.path }, ...compile(...node.components)]
             },
 
             action(node) {
-                return [{ type: 'action', name: node.name, async: node.async, path: node.path }]
+                return [{ type: 'action', name: node.name, path: node.path }]
+            },
+
+            async(node) {
+                const body = compile(node.body)
+                return [{ type: 'async', path: node.path, return: body.length + 2 }, ...body, { type: 'stop' }, { type: 'pass' }]
             },
 
             function(node) {
@@ -500,62 +480,54 @@ function main() {
             },
 
             finally(node) {
-                var body = this.compile(node.body)
-                const finalizer = this.compile(node.finalizer)
-                var fsm = [[{ type: 'try', path: node.path }], body, [{ type: 'exit' }], finalizer].reduce(chain)
+                const finalizer = compile(node.finalizer)
+                const fsm = [{ type: 'try', path: node.path }, ...compile(node.body), { type: 'exit' }, ...finalizer]
                 fsm[0].catch = fsm.length - finalizer.length
                 return fsm
             },
 
             let(node) {
-                var body = this.compile(...node.components)
-                return [[{ type: 'let', let: node.declarations, path: node.path }], body, [{ type: 'exit' }]].reduce(chain)
+                return [{ type: 'let', let: node.declarations, path: node.path }, ...compile(...node.components), { type: 'exit' }]
             },
 
             mask(node) {
-                var body = this.compile(...node.components)
-                return [[{ type: 'let', let: null, path: node.path }], body, [{ type: 'exit' }]].reduce(chain)
+                return [{ type: 'let', let: null, path: node.path }, ...compile(...node.components), { type: 'exit' }]
             },
 
             try(node) {
-                var body = this.compile(node.body)
-                const handler = chain(this.compile(node.handler), [{ type: 'pass' }])
-                var fsm = [[{ type: 'try', path: node.path }], body, [{ type: 'exit' }]].reduce(chain)
-                fsm[0].catch = fsm.length
-                fsm.slice(-1)[0].next = handler.length
-                fsm.push(...handler)
+                const handler = [...compile(node.handler), { type: 'pass' }]
+                const fsm = [{ type: 'try', path: node.path }, ...compile(node.body), { type: 'exit' }, ...handler]
+                fsm[0].catch = fsm.length - handler.length
+                fsm[fsm.length - handler.length - 1].next = handler.length
                 return fsm
             },
 
             if_nosave(node) {
-                var consequent = this.compile(node.consequent)
-                var alternate = chain(this.compile(node.alternate), [{ type: 'pass' }])
-                var fsm = [[{ type: 'pass', path: node.path }], this.compile(node.test), [{ type: 'choice', then: 1, else: consequent.length + 1 }]].reduce(chain)
-                consequent.slice(-1)[0].next = alternate.length
-                fsm.push(...consequent)
-                fsm.push(...alternate)
+                const consequent = compile(node.consequent)
+                const alternate = [...compile(node.alternate), { type: 'pass' }]
+                const fsm = [{ type: 'pass', path: node.path }, ...compile(node.test), { type: 'choice', then: 1, else: consequent.length + 1 }, ...consequent, ...alternate]
+                fsm[fsm.length - alternate.length - 1].next = alternate.length
                 return fsm
             },
 
             while_nosave(node) {
-                var consequent = this.compile(node.body)
-                var alternate = [{ type: 'pass' }]
-                var fsm = [[{ type: 'pass', path: node.path }], this.compile(node.test), [{ type: 'choice', then: 1, else: consequent.length + 1 }]].reduce(chain)
-                consequent.slice(-1)[0].next = 1 - fsm.length - consequent.length
-                fsm.push(...consequent)
-                fsm.push(...alternate)
+                const body = compile(node.body)
+                const fsm = [{ type: 'pass', path: node.path }, ...compile(node.test), { type: 'choice', then: 1, else: body.length + 1 }, ...body, { type: 'pass' }]
+                fsm[fsm.length - 2].next = 2 - fsm.length
                 return fsm
             },
 
             dowhile_nosave(node) {
-                var test = this.compile(node.test)
-                var fsm = [[{ type: 'pass', path: node.path }], this.compile(node.body), test, [{ type: 'choice', then: 1, else: 2 }]].reduce(chain)
-                fsm.slice(-1)[0].then = 1 - fsm.length
-                fsm.slice(-1)[0].else = 1
-                var alternate = [{ type: 'pass' }]
-                fsm.push(...alternate)
+                const fsm = [{ type: 'pass', path: node.path }, ...compile(node.body), ...compile(node.test), { type: 'choice', else: 1 }, { type: 'pass' }]
+                fsm[fsm.length - 2].then = 2 - fsm.length
                 return fsm
             },
+        }
+
+        function compile(node) {
+            if (arguments.length === 0) return [{ type: 'empty' }]
+            if (arguments.length === 1) return compiler[node.type](node)
+            return Array.prototype.reduce.call(arguments, (fsm, node) => { fsm.push(...compile(node)); return fsm }, [])
         }
 
         const openwhisk = require('openwhisk')
@@ -580,19 +552,6 @@ function main() {
             },
 
             action({ p, node, index }) {
-                if (node.async) {
-                    if (!wsk) wsk = openwhisk({ ignore_certs: true })
-                    return wsk.actions.invoke({ name: node.name, params: p.params })
-                        .catch(error => {
-                            console.error(error)
-                            return { error: `An exception was caught at state ${index} (see log for details)` }
-                        })
-                        .then(result => {
-                            p.params = result
-                            inspect(p)
-                            return step(p)
-                        })
-                }
                 return { action: node.name, params: p.params, state: { $resume: p.s } }
             },
 
@@ -617,24 +576,43 @@ function main() {
 
             pass({ p, node, index }) {
             },
+
+            async({ p, node, index, inspect, step }) {
+                if (!wsk) wsk = openwhisk({ ignore_certs: true })
+                p.params.$resume = { state: p.s.state }
+                p.s.state = index + node.return
+                return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params: p.params })
+                    .catch(error => {
+                        console.error(error)
+                        return { error: `An exception was caught at state ${index} (see log for details)` }
+                    })
+                    .then(result => {
+                        p.params = result
+                        inspect(p)
+                        return step(p)
+                    })
+            },
+
+            stop({ p, node, index, inspect, step }) {
+                p.s.state = -1
+            },
         }
 
         const finishers = []
 
-        for ({ plugin, config } of arguments) {
-            composer.register(plugin)
-            if (plugin.compiler) Object.assign(compiler, plugin.compiler())
+        for (let { plugin, config } of arguments) {
+            composer.util.register(plugin)
+            if (plugin.compiler) Object.assign(compiler, plugin.compiler({ compile }))
             if (plugin.conductor) {
-                const r = plugin.conductor(config)
-                if (r._finish) {
-                    finishers.push(r._finish)
-                    delete r._finish
+                Object.assign(conductor, plugin.conductor(config))
+                if (conductor._finish) {
+                    finishers.push(conductor._finish)
+                    delete conductor._finish
                 }
-                Object.assign(conductor, r)
             }
         }
 
-        const fsm = compiler.compile(composer.lower(composer.label(composer.deserialize(composition))))
+        const fsm = compile(composer.util.lower(label(composer.util.deserialize(composition))))
 
         // encode error object
         const encodeError = error => ({
@@ -651,17 +629,15 @@ function main() {
             if (!isObject(p.params)) p.params = { value: p.params }
             if (p.params.error !== undefined) {
                 p.params = { error: p.params.error } // discard all fields but the error field
-                p.s.state = undefined // abort unless there is a handler in the stack
+                p.s.state = -1 // abort unless there is a handler in the stack
                 while (p.s.stack.length > 0) {
-                    if (typeof (p.s.state = p.s.stack.shift().catch) === 'number') break
+                    if ((p.s.state = p.s.stack.shift().catch || -1) >= 0) break
                 }
             }
         }
 
         // run function f on current stack
         function run(f, p) {
-            this.require = require
-
             // handle let/mask pairs
             const view = []
             let n = 0
@@ -699,7 +675,7 @@ function main() {
 
         function step(p) {
             // final state, return composition result
-            if (p.s.state === undefined) {
+            if (p.s.state < 0 || p.s.state >= fsm.length) {
                 console.log(`Entering final state`)
                 console.log(JSON.stringify(p.params))
                 return finishers.reduce((promise, _finish) => promise.then(() => _finish(p)), Promise.resolve())
@@ -709,8 +685,8 @@ function main() {
             // process one state
             const node = fsm[p.s.state] // json definition for index state
             if (node.path !== undefined) console.log(`Entering composition${node.path}`)
-            const index = p.s.state // save current state for logging purposes
-            p.s.state = node.next === undefined ? undefined : p.s.state + node.next // default next state
+            const index = p.s.state // current state
+            p.s.state = p.s.state + (node.next || 1) // default next state
             return conductor[node.type]({ p, index, node, inspect, step }) || step(p)
         }
 
@@ -724,9 +700,8 @@ function main() {
                 if (!isObject(params.$resume)) return badRequest('The type of optional $resume parameter must be object')
                 const resuming = params.$resume.stack
                 Object.assign(p.s, params.$resume)
-                if (resuming) p.s.state = params.$resume.state // undef
-                if (p.s.state !== undefined && typeof p.s.state !== 'number') return badRequest('The type of optional $resume.state parameter must be number')
-                if (!Array.isArray(p.s.stack)) return badRequest('The type of $resume.stack must be an array')
+                if (typeof p.s.state !== 'number') return badRequest('The type of optional $resume.state parameter must be number')
+                if (!Array.isArray(p.s.stack)) return badRequest('The type of optional $resume.stack parameter must be an array')
                 delete params.$resume
                 if (resuming) inspect(p) // handle error objects when resuming
             }
@@ -735,7 +710,7 @@ function main() {
         }
     }
 
-    return { client, server }
+    return { composer, runtime }
 }
 
-module.exports = main().client()
+module.exports = main().composer
