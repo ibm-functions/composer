@@ -347,6 +347,7 @@ function main() {
 
         // construct a composition object with the specified fields
         constructor(composition) {
+            if (!isObject(composition) || composer.util.combinators[composition.type] === undefined) throw new ComposerError('Invalid argument', composition)
             return Object.assign(this, composition)
         }
 
