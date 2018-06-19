@@ -1,14 +1,13 @@
 const assert = require('assert')
 const composer = require('../composer')
 const name = 'TestAction'
-const compositionName = 'TestComposition'
-const wsk = composer.openwhisk({ ignore_certs: process.env.IGNORE_CERTS && process.env.IGNORE_CERTS !== 'false' && process.env.IGNORE_CERTS !== '0' })
+const wsk = composer.util.openwhisk({ ignore_certs: process.env.IGNORE_CERTS && process.env.IGNORE_CERTS !== 'false' && process.env.IGNORE_CERTS !== '0' })
 
 // deploy action
 const define = action => wsk.actions.delete(action.name).catch(() => { }).then(() => wsk.actions.create(action))
 
 // deploy and invoke composition
-const invoke = (task, params = {}, blocking = true) => wsk.compositions.deploy(composer.composition(name, task)).then(() => wsk.actions.invoke({ name, params, blocking }))
+const invoke = (composition, params = {}, blocking = true) => wsk.compositions.deploy(name, composition).then(() => wsk.actions.invoke({ name, params, blocking }))
 
 describe('composer', function () {
     this.timeout(60000)
@@ -21,7 +20,6 @@ describe('composer', function () {
             .then(() => define({ name: 'isEven', action: 'function main({n}) { return { value: n % 2 == 0 } }' }))
     })
 
-
     describe('blocking invocations', function () {
         describe('actions', function () {
             it('action must return true', function () {
@@ -33,7 +31,7 @@ describe('composer', function () {
             })
 
             it('action must return activationId', function () {
-                return invoke(composer.action('isNotOne', { async: true }), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
+                return invoke(composer.async('isNotOne'), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
             })
 
             it('action name must parse to fully qualified', function () {
@@ -82,43 +80,6 @@ describe('composer', function () {
             it('too many arguments', function () {
                 try {
                     invoke(composer.action('foo', {}, 'foo'))
-                    assert.fail()
-                } catch (error) {
-                    assert.ok(error.message.startsWith('Too many arguments'))
-                }
-            })
-        })
-
-        describe('compositions', function () {
-            it('composition must return true', function () {
-                return invoke(composer.composition(compositionName, composer.action('isNotOne')), { n: 0 }).then(activation => assert.deepEqual(activation.response.result, { value: true }))
-            })
-
-            it('action must return activationId', function () {
-                return invoke(composer.composition(compositionName, composer.action('isNotOne'), { async: true }), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
-            })
-
-            it('invalid argument', function () {
-                try {
-                    invoke(composer.composition(compositionName, 42))
-                    assert.fail()
-                } catch (error) {
-                    assert.ok(error.message.startsWith('Invalid argument'))
-                }
-            })
-
-            it('invalid options', function () {
-                try {
-                    invoke(composer.composition(compositionName, 'foo', 42))
-                    assert.fail()
-                } catch (error) {
-                    assert.ok(error.message.startsWith('Invalid argument'))
-                }
-            })
-
-            it('too many arguments', function () {
-                try {
-                    invoke(composer.composition(compositionName, 'foo', {}, 'foo'))
                     assert.fail()
                 } catch (error) {
                     assert.ok(error.message.startsWith('Too many arguments'))
@@ -214,7 +175,7 @@ describe('composer', function () {
                         "name": "echo"
                     }]
                 }
-                return invoke(composer.deserialize(json), { message: 'hi' }).then(activation => assert.deepEqual(activation.response.result, { message: 'hi' }))
+                return invoke(composer.util.deserialize(json), { message: 'hi' }).then(activation => assert.deepEqual(activation.response.result, { message: 'hi' }))
             })
         })
 
