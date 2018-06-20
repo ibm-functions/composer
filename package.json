@@ -30,6 +30,7 @@
     "openwhisk"
   ],
   "dependencies": {
+    "app-module-path": "^2.2.0",
     "minimist": "^1.2.0",
     "openwhisk": "^3.11.0",
     "semver": "^5.3.0",
