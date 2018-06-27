@@ -10,7 +10,7 @@ const argv = minimist(process.argv.slice(2), {
     boolean: ['insecure', 'encode', 'json', 'version', 'quiet'],
     alias: { auth: 'u', insecure: 'i', version: 'v' }
 })
-const { util } = require(argv.composer || '../composer')
+let { util } = require(argv.composer || '../composer')
 
 if (argv.version) {
     console.log(util.version)
@@ -21,6 +21,7 @@ let count = 0
 if (argv.json) count++
 if (argv.encode) count++
 if (argv.entity) count++
+if (argv.entities) count++
 if (typeof argv.deploy !== 'undefined') count++
 
 if (argv._.length !== 1 || count > 1 || argv.deploy === '' || argv.entity === '' || argv.entities === '') {
@@ -47,7 +48,12 @@ try {
     const filename = argv._[0]
     let composition
     try {
-        composition = util.deserialize(require(path.resolve(filename)))
+        composition = require(path.resolve(filename))
+        if (composition.constructor && composition.constructor.name === 'Composition') {
+            util = composition.constructor.composer.util
+        } else {
+            composition = util.deserialize(composition)
+        }
         if (typeof argv.lower === 'string') composition = util.lower(composition, argv.lower || [])
     } catch (error) {
         console.error('Bad composition')
@@ -59,10 +65,10 @@ try {
         if (argv.apihost) options.apihost = argv.apihost
         if (argv.auth) options.api_key = argv.auth
         return Promise.resolve()
-            .then(() => util.openwhisk(options).compositions.deploy(argv.deploy, composition))
+            .then(() => util.frontend(options).compositions.deploy({ name: argv.deploy, composition }))
             .then(actions => {
                 const names = actions.map(action => action.name)
-                console.log(`ok: created action${names.length > 1 ? 's' : ''} ${names}`)
+                console.log(`ok: created ${names}`)
             })
             .catch(error => {
                 if (error.constructor && error.constructor.name === 'OpenWhiskError') {
