@@ -304,7 +304,7 @@ composer.util = {
     },
 
     // return enhanced openwhisk client capable of deploying compositions
-    frontend(options) {
+    openwhisk(options) {
         // try to extract apihost and key first from whisk property file file and then from process.env
         let apihost
         let api_key
@@ -374,8 +374,10 @@ composer.util = {
 
     get lowerer() {
         return lowerer
-    }
+    },
 }
+
+composer.util.frontend = composer.util.openwhisk
 
 // composition class
 class Composition {
@@ -442,7 +444,7 @@ class Compositions {
         this.actions = wsk.actions
     }
 
-    deploy(name, composition, combinators) {
+    deploy({ name, composition, combinators }) {
         const actions = composer.util.encode(name, composition, combinators)
         return actions.reduce((promise, action) => promise.then(() => this.actions.delete(action).catch(() => { }))
             .then(() => this.actions.update(action)), Promise.resolve())

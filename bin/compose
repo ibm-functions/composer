@@ -65,7 +65,7 @@ try {
         if (argv.apihost) options.apihost = argv.apihost
         if (argv.auth) options.api_key = argv.auth
         return Promise.resolve()
-            .then(() => util.frontend(options).compositions.deploy(argv.deploy, composition))
+            .then(() => util.frontend(options).compositions.deploy({ name: argv.deploy, composition }))
             .then(actions => {
                 const names = actions.map(action => action.name)
                 console.log(`ok: created ${names}`)

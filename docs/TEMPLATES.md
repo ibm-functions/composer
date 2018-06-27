@@ -77,7 +77,7 @@ composer.apply('payload', p => { p.n++ })
 
 ```
 compose example.js --deploy example
-ok: created action /_/example
+ok: created /_/example
 ```
 ```
 wsk action invoke example -r -p payload '{"n":1,"p":42}'

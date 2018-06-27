@@ -1,13 +1,13 @@
 const assert = require('assert')
 const composer = require('../composer')
 const name = 'TestAction'
-const wsk = composer.util.frontend({ ignore_certs: process.env.IGNORE_CERTS && process.env.IGNORE_CERTS !== 'false' && process.env.IGNORE_CERTS !== '0' })
+const wsk = composer.util.openwhisk({ ignore_certs: process.env.IGNORE_CERTS && process.env.IGNORE_CERTS !== 'false' && process.env.IGNORE_CERTS !== '0' })
 
 // deploy action
 const define = action => wsk.actions.delete(action.name).catch(() => { }).then(() => wsk.actions.create(action))
 
 // deploy and invoke composition
-const invoke = (composition, params = {}, blocking = true) => wsk.compositions.deploy(name, composition).then(() => wsk.actions.invoke({ name, params, blocking }))
+const invoke = (composition, params = {}, blocking = true) => wsk.compositions.deploy({ name, composition }).then(() => wsk.actions.invoke({ name, params, blocking }))
 
 describe('composer', function () {
     this.timeout(60000)

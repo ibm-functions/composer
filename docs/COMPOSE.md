@@ -199,7 +199,7 @@ The `--deploy` option makes it possible to deploy a composition (Javascript or J
 compose demo.js --deploy demo
 ```
 ```
-ok: created actions /_/authenticate,/_/success,/_/failure,/_/demo
+ok: created /_/authenticate,/_/success,/_/failure,/_/demo
 ```
 Or:
 ```
@@ -207,7 +207,7 @@ compose demo.js > demo.json
 compose demo.json --deploy demo
 ```
 ```
-ok: created actions /_/authenticate,/_/success,/_/failure,/_/demo
+ok: created /_/authenticate,/_/success,/_/failure,/_/demo
 ```
 The `compose` command synthesizes and deploys a conductor action that implements the
 composition with the given name. It also deploys the composed actions for which
