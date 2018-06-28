@@ -71,17 +71,15 @@ try {
                 console.log(`ok: created ${names}`)
             })
             .catch(error => {
-                if (error.constructor && error.constructor.name === 'OpenWhiskError') {
-                    switch (error.statusCode) {
-                        case 401:
-                            console.error('Authentication failure')
-                            if (!argv.quiet) console.log(error)
-                            process.exit(2)
-                        case 403:
-                            console.error('Authorization failure')
-                            if (!argv.quiet) console.log(error)
-                            process.exit(3)
-                    }
+                switch (error.statusCode) {
+                    case 401:
+                        console.error('Authentication failure')
+                        if (!argv.quiet) console.log(error)
+                        process.exit(2)
+                    case 403:
+                        console.error('Authorization failure')
+                        if (!argv.quiet) console.log(error)
+                        process.exit(3)
                 }
                 console.error('Server error')
                 if (!argv.quiet) console.log(error)
