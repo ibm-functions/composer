@@ -17,6 +17,12 @@ if (argv.version) {
     return
 }
 
+try {
+    const { addPath } = require('app-module-path')
+    addPath(path.join(path.dirname(require.resolve('../composer')), 'module'))
+    if (argv.composer) addPath(path.join(path.dirname(require.resolve(argv.composer)), 'module'))
+} catch (error) { }
+
 let count = 0
 if (argv.json) count++
 if (argv.encode) count++
