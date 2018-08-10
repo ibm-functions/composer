@@ -1,33 +1,143 @@
 {
-    "type": "if",
-    "test": {
-        "type": "action",
-        "name": "/_/authenticate",
-        "action": {
-            "exec": {
-                "kind": "nodejs:default",
-                "code": "const main = function ({ password }) { return { value: password === 'abc123' } }"
+    "composition": {
+        "type": "let",
+        "declarations": {
+            "params": null
+        },
+        "components": [
+            {
+                "type": "finally",
+                "body": {
+                    "type": "function",
+                    "function": {
+                        "exec": {
+                            "kind": "nodejs:default",
+                            "code": "args => { params = args }"
+                        }
+                    }
+                },
+                "finalizer": {
+                    "type": "if_nosave",
+                    "test": {
+                        "type": "mask",
+                        "components": [
+                            {
+                                "type": "action",
+                                "name": "/_/authenticate",
+                                "path": ".test"
+                            }
+                        ]
+                    },
+                    "consequent": {
+                        "type": "finally",
+                        "body": {
+                            "type": "function",
+                            "function": {
+                                "exec": {
+                                    "kind": "nodejs:default",
+                                    "code": "() => params"
+                                }
+                            }
+                        },
+                        "finalizer": {
+                            "type": "mask",
+                            "components": [
+                                {
+                                    "type": "action",
+                                    "name": "/_/success",
+                                    "path": ".consequent"
+                                }
+                            ]
+                        }
+                    },
+                    "alternate": {
+                        "type": "finally",
+                        "body": {
+                            "type": "function",
+                            "function": {
+                                "exec": {
+                                    "kind": "nodejs:default",
+                                    "code": "() => params"
+                                }
+                            }
+                        },
+                        "finalizer": {
+                            "type": "mask",
+                            "components": [
+                                {
+                                    "type": "action",
+                                    "name": "/_/failure",
+                                    "path": ".alternate"
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        ],
+        "path": ""
+    },
+    "ast": {
+        "type": "if",
+        "test": {
+            "type": "action",
+            "name": "/_/authenticate",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "const main = function ({ password }) { return { value: password === 'abc123' } }"
+                }
+            }
+        },
+        "consequent": {
+            "type": "action",
+            "name": "/_/success",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "const main = function () { return { message: 'success' } }"
+                }
+            }
+        },
+        "alternate": {
+            "type": "action",
+            "name": "/_/failure",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "const main = function () { return { message: 'failure' } }"
+                }
             }
         }
     },
-    "consequent": {
-        "type": "action",
-        "name": "/_/success",
-        "action": {
-            "exec": {
-                "kind": "nodejs:default",
-                "code": "const main = function () { return { message: 'success' } }"
+    "version": "0.7.0",
+    "actions": [
+        {
+            "name": "/_/authenticate",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "const main = function ({ password }) { return { value: password === 'abc123' } }"
+                }
+            }
+        },
+        {
+            "name": "/_/success",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "const main = function () { return { message: 'success' } }"
+                }
+            }
+        },
+        {
+            "name": "/_/failure",
+            "action": {
+                "exec": {
+                    "kind": "nodejs:default",
+                    "code": "const main = function () { return { message: 'failure' } }"
+                }
             }
         }
-    },
-    "alternate": {
-        "type": "action",
-        "name": "/_/failure",
-        "action": {
-            "exec": {
-                "kind": "nodejs:default",
-                "code": "const main = function () { return { message: 'failure' } }"
-            }
-        }
-    }
+    ]
 }
