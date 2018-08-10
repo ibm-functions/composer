@@ -35,7 +35,6 @@ $ANSIBLE_CMD openwhisk.yml -e cli_installation_mode=remote -e limit_invocations_
 docker images
 docker ps
 
-cat $WHISKDIR/whisk.properties
 curl -s -k https://172.17.0.1 | jq .
 curl -s -k https://172.17.0.1/api/v1 | jq .
 
