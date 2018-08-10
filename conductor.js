@@ -205,7 +205,7 @@ function main (composition) {
     async ({ p, node, index, inspect, step }) {
       p.params.$resume = { state: p.s.state, stack: [{ marker: true }].concat(p.s.stack) }
       p.s.state = index + node.return
-      if (!wsk) wsk = openwhisk()
+      if (!wsk) wsk = openwhisk({ ignore_certs: true })
       return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params: p.params })
         .then(response => ({ method: 'async', activationId: response.activationId, sessionId: p.s.session }), error => {
           console.error(error) // invoke failed
