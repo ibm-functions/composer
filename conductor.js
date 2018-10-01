@@ -19,7 +19,7 @@
 'use strict'
 
 const fs = require('fs')
-const { minify } = require('uglify-es')
+const { minify } = require('terser')
 const openwhisk = require('openwhisk')
 const os = require('os')
 const path = require('path')
@@ -223,8 +223,8 @@ function main (composition) {
     }
   }
 
-  function finish (q) { // using p here causes issues with minimist!
-    return q.params.error ? q.params : { params: q.params }
+  function finish (p) {
+    return p.params.error ? p.params : { params: p.params }
   }
 
   const internalError = error => Promise.reject(error) // terminate composition execution and record error
