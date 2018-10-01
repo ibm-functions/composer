@@ -5,17 +5,18 @@
   "homepage": "https://github.com/ibm-functions/composer",
   "main": "composer.js",
   "scripts": {
-    "test": "mocha"
+    "test": "standard && mocha"
   },
   "bin": {
-    "compose": "./bin/compose"
+    "compose": "./bin/compose.js",
+    "deploy": "./bin/deploy.js"
   },
   "files": [
     "bin/",
     "composer.js",
+    "conductor.js",
     "docs/*.md",
-    "samples/",
-    "test/"
+    "samples/"
   ],
   "repository": {
     "type": "git",
@@ -26,17 +27,19 @@
     "functions",
     "serverless",
     "composer",
-    "bluemix",
     "openwhisk"
   ],
   "dependencies": {
     "minimist": "^1.2.0",
     "openwhisk": "^3.11.0",
+    "openwhisk-fqn": "^0.0.2",
     "semver": "^5.3.0",
-    "uglify-es": "^3.3.9"
+    "terser": "^3.8.2"
   },
   "devDependencies": {
-    "mocha": "^5.2.0"
+    "mocha": "^5.2.0",
+    "pre-commit": "^1.2.2",
+    "standard": "^12.0.1"
   },
   "author": {
     "name": "Olivier Tardieu",
