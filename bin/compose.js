@@ -48,9 +48,9 @@ Module._resolveFilename = function (request, parent) {
   }
 }
 
-if (argv._.length !== 1) {
+if (argv._.length !== 1 || path.extname(argv._[0]) !== '.js') {
   console.error('Usage:')
-  console.error('  compose composition.js[on] [flags]')
+  console.error('  compose composition.js [flags]')
   console.error('Flags:')
   console.error('  --ast                  only output the ast for the composition')
   console.error('  -v, --version          output the composer version')
