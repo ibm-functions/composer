@@ -14,13 +14,13 @@ git clone --depth=1 https://github.com/apache/incubator-openwhisk.git openwhisk
 cd openwhisk
 ./tools/travis/setup.sh
 
+cp $SCRIPTDIR/runtimes.json $WHISKDIR/ansible/files
+
 # Pull down images
 docker pull openwhisk/controller
 docker tag openwhisk/controller ${IMAGE_PREFIX}/controller
 docker pull openwhisk/invoker
 docker tag openwhisk/invoker ${IMAGE_PREFIX}/invoker
-docker pull openwhisk/nodejs6action
-docker tag openwhisk/nodejs6action ${IMAGE_PREFIX}/nodejs6action
 
 # Deploy OpenWhisk
 cd $WHISKDIR/ansible
@@ -32,13 +32,9 @@ $ANSIBLE_CMD initdb.yml
 $ANSIBLE_CMD wipe.yml
 $ANSIBLE_CMD openwhisk.yml -e cli_installation_mode=remote -e limit_invocations_per_minute=600
 
-# Deploy Redis
-docker run -d -p 6379:6379 --name redis redis:3.2
-
 docker images
 docker ps
 
-cat $WHISKDIR/whisk.properties
 curl -s -k https://172.17.0.1 | jq .
 curl -s -k https://172.17.0.1/api/v1 | jq .
 
