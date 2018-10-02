@@ -1,7 +1,7 @@
 {
   "name": "@ibm-functions/composer",
   "version": "0.7.0",
-  "description": "Composer is an IBM Cloud Functions programming model for composing individual functions into larger applications.",
+  "description": "Composer is a new programming model for composing cloud functions built on Apache OpenWhisk.",
   "homepage": "https://github.com/ibm-functions/composer",
   "main": "composer.js",
   "scripts": {
@@ -23,7 +23,6 @@
     "url": "https://github.com/ibm-functions/composer.git"
   },
   "keywords": [
-    "ibm",
     "functions",
     "serverless",
     "composer",
@@ -33,7 +32,6 @@
     "minimist": "^1.2.0",
     "openwhisk": "^3.11.0",
     "openwhisk-fqn": "^0.0.2",
-    "semver": "^5.3.0",
     "terser": "^3.8.2"
   },
   "devDependencies": {
