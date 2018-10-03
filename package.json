@@ -1,6 +1,6 @@
 {
   "name": "@ibm-functions/composer",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Composer is a new programming model for composing cloud functions built on Apache OpenWhisk.",
   "homepage": "https://github.com/ibm-functions/composer",
   "main": "composer.js",
