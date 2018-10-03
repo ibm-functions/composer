@@ -31,7 +31,6 @@
   "dependencies": {
     "minimist": "^1.2.0",
     "openwhisk": "^3.11.0",
-    "openwhisk-fqn": "^0.0.2",
     "terser": "^3.8.2"
   },
   "devDependencies": {
