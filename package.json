@@ -15,6 +15,7 @@
     "bin/",
     "composer.js",
     "conductor.js",
+    "fqn.js",
     "docs/*.md",
     "samples/"
   ],
