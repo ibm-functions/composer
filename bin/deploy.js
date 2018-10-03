@@ -18,7 +18,7 @@
 
 const composer = require('../composer')
 const conductor = require('../conductor')
-const fqn = require('openwhisk-fqn')
+const fqn = require('../fqn')
 const fs = require('fs')
 const json = require('../package.json')
 const minimist = require('minimist')

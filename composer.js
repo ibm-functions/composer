@@ -17,7 +17,7 @@
 
 'use strict'
 
-const fqn = require('openwhisk-fqn')
+const fqn = require('./fqn')
 const fs = require('fs')
 const util = require('util')
 
