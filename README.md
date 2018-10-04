@@ -17,7 +17,7 @@
 #
 -->
 
-# @ibm-functions/composer
+# Apache OpenWhisk Composer
 
 [![Travis](https://travis-ci.org/ibm-functions/composer.svg?branch=master)](https://travis-ci.org/ibm-functions/composer)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -44,7 +44,10 @@ This repository includes:
 
 ## Installation
 
-Composer is distributed as Node.js package. To install this package, use the
+Composer is distributed as Node.js package. The package is currently named `@ibm-functions/composer`,
+but will soon be available as `@openwhisk-composer`. Until we have our first official Apache release of
+composer, please continue to use the latest release of `@ibm-functions/composer`.
+To install this package, use the
 Node Package Manager:
 ```
 npm install -g @ibm-functions/composer
