@@ -24,6 +24,8 @@
 [![Join
 Slack](https://img.shields.io/badge/join-slack-9B69A0.svg)](http://slack.openwhisk.org/)
 
+Note that this module **cannot be released** until the IP clearance at https://issues.apache.org/jira/browse/INCUBATOR-222 is done. It shouldn't have been imported here before that, but it's probably ok to continue working here until that's fixed.
+
 Composer is a new programming model for composing cloud functions built on
 [Apache OpenWhisk](https://github.com/apache/incubator-openwhisk). With
 Composer, developers can build even more serverless applications including using
