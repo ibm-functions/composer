@@ -44,13 +44,10 @@ This repository includes:
 
 ## Installation
 
-Composer is distributed as Node.js package. The package is currently named `@ibm-functions/composer`,
-but will soon be available as `@openwhisk-composer`. Until we have our first official Apache release of
-composer, please continue to use the latest release of `@ibm-functions/composer`.
-To install this package, use the
+Composer is distributed as Node.js package. To install this package, use the
 Node Package Manager:
 ```
-npm install -g @ibm-functions/composer
+npm install -g openwhisk-composer
 ```
 We recommend to install the package globally (with `-g` option) if you intend to
 use the `compose` and `deploy` commands to compile and deploy compositions.
@@ -60,7 +57,7 @@ use the `compose` and `deploy` commands to compile and deploy compositions.
 A composition is typically defined by means of a Javascript expression as
 illustrated in [samples/demo.js](samples/demo.js):
 ```javascript
-const composer = require('@ibm-functions/composer')
+const composer = require('openwhisk-composer')
 
 module.exports = composer.if(
     composer.action('authenticate', { action: function ({ password }) { return { value: password === 'abc123' } } }),
