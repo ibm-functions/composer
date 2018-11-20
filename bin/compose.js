@@ -39,7 +39,7 @@ Module._resolveFilename = function (request, parent) {
     try {
       return _resolveFilename(request, parent)
     } catch (error) {
-      return require.resolve(request.replace(request.startsWith(json.name + '/') ? json.name : json.name.substring(0, json.name.indexOf('/')), '..'))
+      return require.resolve(request.replace(json.name, '..'))
     }
   } else {
     return _resolveFilename(request, parent)
