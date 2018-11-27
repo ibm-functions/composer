@@ -25,6 +25,11 @@ SCRIPTDIR=$(cd $(dirname "$0") && pwd)
 ROOTDIR="$SCRIPTDIR/.."
 WHISKDIR="$ROOTDIR/openwhisk"
 
+# Prefetch docker images
+docker pull openwhisk/controller &
+docker pull openwhisk/invoker &
+docker pull openwhisk/nodejs6action &
+
 # Clone OpenWhisk
 cd $ROOTDIR
 git clone --depth=1 https://github.com/apache/incubator-openwhisk.git openwhisk
