@@ -153,7 +153,11 @@ function main (composition) {
 
   function compile (parent, node) {
     if (arguments.length === 1) return [{ parent, type: 'empty' }]
-    if (arguments.length === 2) return Object.assign(compiler[node.type](node.path || parent, node), { path: node.path })
+    if (arguments.length === 2) {
+      const fsm = compiler[node.type](node.path || parent, node)
+      if (node.path !== undefined) fsm[0].path = node.path
+      return fsm
+    }
     return Array.prototype.slice.call(arguments, 1).reduce((fsm, node) => { fsm.push(...compile(parent, node)); return fsm }, [])
   }
 
