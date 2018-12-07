@@ -58,6 +58,12 @@ the sequence is not executed. Moreover, if the sequence is enclosed in an error
 handling composition like a `composer.try(sequence, handler)` combinator, the
 execution continues with the error handler.
 
+### Reserved parameter name
+
+The field name `$composer` is reserved for composer internal use. Compositions
+and composed actions should not expect or return parameter objects with a
+top-level field named `$composer`.
+
 ## Data flow
 
 The invocation of a composition triggers a series of computations (possibly
