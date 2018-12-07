@@ -182,7 +182,7 @@ function main (composition) {
     },
 
     action ({ p, node, index }) {
-      return { method: 'action', action: node.name, params: p.params, state: { $resume: p.s } }
+      return { method: 'action', action: node.name, params: p.params, state: { $composer: p.s } }
     },
 
     function ({ p, node, index }) {
@@ -208,7 +208,7 @@ function main (composition) {
     },
 
     async ({ p, node, index, inspect, step }) {
-      p.params.$resume = { state: p.s.state, stack: [{ marker: true }].concat(p.s.stack) }
+      p.params.$composer = { state: p.s.state, stack: [{ marker: true }].concat(p.s.stack) }
       p.s.state = index + node.return
       if (!wsk) wsk = openwhisk({ ignore_certs: true })
       return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params: p.params })
@@ -303,19 +303,19 @@ function main (composition) {
   // do invocation
   return (params) => {
     // extract parameters
-    const $resume = params.$resume || {}
-    delete params.$resume
-    $resume.session = $resume.session || process.env.__OW_ACTIVATION_ID
+    const $composer = params.$composer || {}
+    delete params.$composer
+    $composer.session = $composer.session || process.env.__OW_ACTIVATION_ID
 
     // current state
-    const p = { s: Object.assign({ state: 0, stack: [], resuming: true }, $resume), params }
+    const p = { s: Object.assign({ state: 0, stack: [], resuming: true }, $composer), params }
 
     // step and catch all errors
     return Promise.resolve().then(() => {
       if (typeof p.s.state !== 'number') return internalError('state parameter is not a number')
       if (!Array.isArray(p.s.stack)) return internalError('stack parameter is not an array')
 
-      if ($resume.resuming) inspect(p) // handle error objects when resuming
+      if ($composer.resuming) inspect(p) // handle error objects when resuming
 
       return step(p)
     }).catch(error => {
