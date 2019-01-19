@@ -26,14 +26,17 @@ The `composer` module offers a number of combinators to define compositions:
 | [`action`](#action) | named action | `composer.action('echo')` |
 | [`async`](#async) | asynchronous invocation | `composer.async('compress', 'upload')` |
 | [`dowhile` and `dowhile_nosave`](#dowhile) | loop at least once | `composer.dowhile('fetchData', 'needMoreData')` |
+| [`dynamic`](#dynamic) | dynamic invocation | `composer.dynamic()`
 | [`empty`](#empty) | empty sequence | `composer.empty()`
 | [`finally`](#finally) | finalization | `composer.finally('tryThis', 'doThatAlways')` |
 | [`function`](#function) | Javascript function | `composer.function(({ x, y }) => ({ product: x * y }))` |
 | [`if` and `if_nosave`](#if) | conditional | `composer.if('authenticate', 'success', 'failure')` |
 | [`let`](#let) | variable declarations | `composer.let({ count: 3, message: 'hello' }, ...)` |
 | [`literal` or `value`](#literal) | constant value | `composer.literal({ message: 'Hello, World!' })` |
+| [`map`](#map) | parallel map | `composer.map('validate', 'compute')` |
 | [`mask`](#mask) | variable hiding | `composer.let({ n }, composer.while(_ => n-- > 0, composer.mask(composition)))` |
 | [`merge`](#merge) | data augmentation | `composer.merge('hash')` |
+| [`parallel` or `par`](#parallel) | parallel composition | `composer.parallel('compress', 'hash')` |
 | [`repeat`](#repeat) | counted loop | `composer.repeat(3, 'hello')` |
 | [`retain` and `retain_catch`](#retain) | persistence | `composer.retain('validateInput')` |
 | [`retry`](#retry) | error recovery | `composer.retry(3, 'connect')` |
@@ -425,3 +428,70 @@ composer.seq(composer.retain(composition_1, composition_2, ...), ({ params, resu
 compositions asynchronously. It invokes the sequence but does not wait for it to
 execute. It immediately returns a dictionary that includes a field named
 `activationId` with the activation id for the sequence invocation.
+
+The spawned sequence operates on a copy of the execution context for the parent
+composition. Variables declared in the parent are defined for the child and are
+initialized with the parent values at the time of the `async`. But mutations or
+later declarations in the parent are not visible in the child and vice versa.
+
+## Parallel
+
+Parallel combinators require access to a Redis instance as discussed
+[here](../README.md#parallel-compositions-with-redis).
+
+`composer.parallel(composition_1, composition_2, ...)` and its synonymous
+`composer.par(composition_1, composition_2, ...)` invoke a series of
+compositions (possibly empty) in parallel.
+
+This combinator runs _composition_1_, _composition_2_, ... in parallel and waits
+for all of these compositions to complete.
+
+The input parameter object for the composition is the input parameter object for
+every branch in the composition. The output parameter object for the composition
+has a single field named `value` of type array. The elements of the array are
+the output parameter objects for the branches in order.
+
+The `composer.let` variables in scope at the `parallel` combinator are in scope
+in the branches. But each branch has its own copy of the execution context.
+Variable mutations in one branch are not reflected in other branches or in the
+parent composition.
+
+## Map
+
+Parallel combinators require access to a Redis instance as discussed
+[here](../README.md#parallel-compositions-with-redis).
+
+`composer.map(composition_1, composition_2, ...)` makes multiple parallel
+invocations of a sequence of compositions.
+
+The input parameter object for the `map` combinator should include an array of
+named _value_. The `map` combinator spawns one sequence for each element of this
+array. The input parameter object for the nth instance of the sequence is the
+nth array element if it is a dictionary or an object with a single field named
+`value` with the nth array element as the field value. Fields on the input
+parameter object other than the `value` field are discarded. These sequences run
+in parallel. The `map` combinator waits for all the sequences to complete. The
+output parameter object for the composition has a single field named `value` of
+type array. The elements of the array are the output parameter objects for the
+branches in order.
+
+The `composer.let` variables in scope at the `map` combinator are in scope in
+the branches. But each branch has its own copy of the execution context.
+Variable mutations in one branch are not reflected in other branches or in the
+parent composition.
+
+## Dynamic
+
+`composer.dynamic()` invokes an action specified by means of the input parameter
+object.
+
+The input parameter object for the `dynamic` combinator must be a dictionary
+including the following three fields:
+- a field `type` with string value `"action"`,
+- a field `name` of type string,
+- a field `params` of type dictionary.
+Other fields of the input parameter object are ignored.
+
+The `dynamic` combinator invokes the action named _name_ with the input
+parameter object _params_. The output parameter object for the composition is
+the output parameter object of the action invocation.
