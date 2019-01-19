@@ -414,4 +414,20 @@ describe('composer', function () {
   describe('composer.merge', function () {
     check('merge')
   })
+
+  describe('composer.parallel', function () {
+    check('parallel')
+  })
+
+  describe('composer.par', function () {
+    check('par')
+  })
+
+  describe('composer.map', function () {
+    check('map')
+  })
+
+  describe('composer.dynamic', function () {
+    check('dynamic', 0)
+  })
 })
