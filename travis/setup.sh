@@ -50,6 +50,9 @@ $ANSIBLE_CMD initdb.yml
 $ANSIBLE_CMD wipe.yml
 $ANSIBLE_CMD openwhisk.yml -e cli_installation_mode=remote -e limit_invocations_per_minute=600
 
+# Deploy Redis
+docker run -d -p 6379:6379 --name redis redis:4.0
+
 # Log configuration
 docker images
 docker ps

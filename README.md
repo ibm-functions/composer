@@ -65,12 +65,12 @@ module.exports = composer.if(
     composer.action('failure', { action: function () { return { message: 'failure' } } }))
 ```
 Compositions compose actions using [combinator](docs/COMBINATORS.md) methods.
-These methods implement the typical control-flow constructs of a sequential
-imperative programming language. This example composition composes three actions
-named `authenticate`, `success`, and `failure` using the `composer.if`
-combinator, which implements the usual conditional construct. It take three
-actions (or compositions) as parameters. It invokes the first one and, depending
-on the result of this invocation, invokes either the second or third action.
+These methods implement the typical control-flow constructs of an imperative
+programming language. This example composition composes three actions named
+`authenticate`, `success`, and `failure` using the `composer.if` combinator,
+which implements the usual conditional construct. It take three actions (or
+compositions) as parameters. It invokes the first one and, depending on the
+result of this invocation, invokes either the second or third action.
 
  This composition includes the definitions of the three composed actions. If the
  actions are defined and deployed elsewhere, the composition code can be shorten
@@ -142,6 +142,49 @@ Compositions are implemented by means of OpenWhisk conductor actions. The
 [documentation of conductor
 actions](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md)
 explains execution traces in greater details.
+
+While composer does not limit in principle the length of a composition,
+OpenWhisk deployments typically enforce a limit on the number of action
+invocations in a composition as well as an upper bound on the rate of
+invocation. These limits may result in compositions failing to execute to
+completion.
+
+## Parallel compositions with Redis
+
+Composer offers parallel combinators that make it possible to run actions or
+compositions in parallel, for example:
+```javascript
+composer.parallel('checkInventory', 'detectFraud')
+```
+
+The width of parallel compositions is not in principle limited by composer, but
+issuing many concurrent invocations may hit OpenWhisk limits leading to
+failures: failure to execute a branch of a parallel composition or failure to
+complete the parallel composition.
+
+These combinators require access to a Redis instance to hold intermediate
+results of parallel compositions. The Redis credentials may be specified at
+invocation time or earlier by means of default parameters or package bindings.
+The required parameter is named `$composer`. It is a dictionary with a `redis`
+field of type dictionary. The `redis` dictionary specifies the `uri` for the
+Redis instance and optionally a certificate as a base64-encoded string to enable
+tls connections. Hence, the input parameter object for our order-processing
+example should be:
+```json
+{
+    "$composer": {
+        "redis": {
+            "uri": "redis://...",
+            "ca": "optional base64 encoded tls certificate"
+        }
+    },
+    "order": { ... }
+}
+```
+
+The intent is to store intermediate results in Redis as the parallel composition
+is progressing. Redis entries are deleted after completion and, as an added
+safety, expire after twenty-four hours.
 
 # Disclaimer
 

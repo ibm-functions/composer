@@ -25,12 +25,14 @@ _compositions_. An example composition is described in
 
 ## Control flow
 
-Compositions can express the control flow of typical a sequential imperative
-programming language: sequences, conditionals, loops, structured error handling.
-This control flow is specified using _combinator_ methods such as:
+Compositions can express the control flow of typical imperative programming
+language: sequences, conditionals, loops, structured error handling. This
+control flow is specified using _combinator_ methods such as:
 - `composer.sequence(firstAction, secondAction)`
 - `composer.if(conditionAction, consequentAction, alternateAction)`
 - `composer.try(bodyAction, handlerAction)`
+
+Parallel constructs are also available.
 
 Combinators are described in [COMBINATORS.md](COMBINATORS.md).
 

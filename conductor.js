@@ -83,9 +83,78 @@ class Compositions {
 // runtime code
 function main (composition) {
   const openwhisk = require('openwhisk')
+  const redis = require('redis')
+  const uuid = require('uuid').v4
   let wsk
+  let db
+  const expiration = 86400 // expire redis key after a day
+
+  function live (id) { return `composer/fork/${id}` }
+  function done (id) { return `composer/join/${id}` }
+
+  function createRedisClient (p) {
+    const client = redis.createClient(p.s.redis.uri, p.s.redis.ca ? { tls: { ca: Buffer.from(p.s.redis.ca, 'base64').toString('binary') } } : {})
+    const noop = () => { }
+    let handler = noop
+    client.on('error', error => handler(error))
+    require('redis-commands').list.forEach(f => {
+      client[`${f}Async`] = function () {
+        let failed = false
+        return new Promise((resolve, reject) => {
+          handler = error => {
+            handler = noop
+            failed = true
+            reject(error)
+          }
+          client[f](...arguments, (error, result) => {
+            handler = noop
+            return error ? reject(error) : resolve(result)
+          })
+        }).catch(error => {
+          if (failed) client.end(true)
+          return Promise.reject(error)
+        })
+      }
+    })
+    return client
+  }
 
   const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
+
+  function fork ({ p, node, index }, array, it) {
+    const saved = p.params // save params
+    p.s.state = index + node.return // return state
+    p.params = { value: [] } // return value
+    if (array.length === 0) return
+    if (typeof p.s.redis !== 'object' || typeof p.s.redis.uri !== 'string' || (typeof p.s.redis.ca !== 'string' && typeof p.s.redis.ca !== 'undefined')) {
+      p.params = { error: 'Parallel combinator requires a properly configured redis instance' }
+      console.error(p.params.error)
+      return
+    }
+    const stack = [{ marker: true }].concat(p.s.stack)
+    const barrierId = uuid()
+    console.log(`barrierId: ${barrierId}, spawning: ${array.length}`)
+    if (!wsk) wsk = openwhisk({ ignore_certs: true })
+    if (!db) db = createRedisClient(p)
+    return db.lpushAsync(live(barrierId), 42) // push marker
+      .then(() => db.expireAsync(live(barrierId), expiration))
+      .then(() => Promise.all(array.map((item, position) => {
+        const params = it(saved, item) // obtain combinator-specific params for branch invocation
+        params.$composer.stack = stack
+        params.$composer.redis = p.s.redis
+        params.$composer.join = { barrierId, position, count: array.length }
+        return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params }) // invoke branch
+          .then(({ activationId }) => { console.log(`barrierId: ${barrierId}, spawned position: ${position} with activationId: ${activationId}`) })
+      }))).then(() => collect(p, barrierId), error => {
+        console.error(error.body || error)
+        p.params = { error: `Parallel combinator failed to invoke a composition at AST node root${node.parent} (see log for details)` }
+        return db.delAsync(live(barrierId), done(barrierId)) // delete keys
+          .then(() => {
+            inspect(p)
+            return step(p)
+          })
+      })
+  }
 
   // compile ast to fsm
   const compiler = {
@@ -148,6 +217,23 @@ function main (composition) {
       const fsm = [{ parent, type: 'pass' }, ...compile(parent, node.body), ...compile(parent, node.test), { parent, type: 'choice', else: 1 }, { parent, type: 'pass' }]
       fsm[fsm.length - 2].then = 2 - fsm.length
       return fsm
+    },
+
+    parallel (parent, node) {
+      const tasks = node.components.map(task => [...compile(parent, task), { parent, type: 'stop' }])
+      const fsm = [{ parent, type: 'parallel' }, ...tasks.reduce((acc, cur) => { acc.push(...cur); return acc }, []), { parent, type: 'pass' }]
+      fsm[0].return = fsm.length - 1
+      fsm[0].tasks = tasks.reduce((acc, cur) => { acc.push(acc[acc.length - 1] + cur.length); return acc }, [1]).slice(0, -1)
+      return fsm
+    },
+
+    map (parent, node) {
+      const tasks = compile(parent, ...node.components)
+      return [{ parent, type: 'map', return: tasks.length + 2 }, ...tasks, { parent, type: 'stop' }, { parent, type: 'pass' }]
+    },
+
+    dynamic (parent, node) {
+      return [{ parent, type: 'dynamic' }]
     }
   }
 
@@ -208,7 +294,7 @@ function main (composition) {
     },
 
     async ({ p, node, index, inspect, step }) {
-      p.params.$composer = { state: p.s.state, stack: [{ marker: true }].concat(p.s.stack) }
+      p.params.$composer = { state: p.s.state, stack: [{ marker: true }].concat(p.s.stack), redis: p.s.redis }
       p.s.state = index + node.return
       if (!wsk) wsk = openwhisk({ ignore_certs: true })
       return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params: p.params })
@@ -225,11 +311,59 @@ function main (composition) {
 
     stop ({ p, node, index, inspect, step }) {
       p.s.state = -1
+    },
+
+    parallel ({ p, node, index }) {
+      return fork({ p, node, index }, node.tasks, (input, branch) => {
+        const params = Object.assign({}, input) // clone
+        params.$composer = { state: index + branch }
+        return params
+      })
+    },
+
+    map ({ p, node, index }) {
+      return fork({ p, node, index }, p.params.value || [], (input, branch) => {
+        const params = isObject(branch) ? branch : { value: branch } // wrap
+        params.$composer = { state: index + 1 }
+        return params
+      })
+    },
+
+    dynamic ({ p, node, index }) {
+      if (p.params.type !== 'action' || typeof p.params.name !== 'string' || typeof p.params.params !== 'object') {
+        p.params = { error: `Incorrect use of the dynamic combinator at AST node root${node.parent}` }
+        inspect(p)
+      } else {
+        return { method: 'action', action: p.params.name, params: p.params.params, state: { $composer: p.s } }
+      }
     }
   }
 
   function finish (p) {
     return p.params.error ? p.params : { params: p.params }
+  }
+
+  function collect (p, barrierId) {
+    if (!db) db = createRedisClient(p)
+    const timeout = Math.max(Math.floor((process.env.__OW_DEADLINE - new Date()) / 1000) - 5, 1)
+    console.log(`barrierId: ${barrierId}, waiting with timeout: ${timeout}s`)
+    return db.brpopAsync(done(barrierId), timeout) // pop marker
+      .then(marker => {
+        console.log(`barrierId: ${barrierId}, done waiting`)
+        if (marker !== null) {
+          return db.lrangeAsync(done(barrierId), 0, -1)
+            .then(result => result.map(JSON.parse).map(({ position, params }) => { p.params.value[position] = params }))
+            .then(() => db.delAsync(live(barrierId), done(barrierId))) // delete keys
+            .then(() => {
+              inspect(p)
+              return step(p)
+            })
+        } else { // timeout
+          p.s.collect = barrierId
+          console.log(`barrierId: ${barrierId}, handling timeout`)
+          return { method: 'action', action: '/whisk.system/utils/echo', params: p.params, state: { $composer: p.s } }
+        }
+      })
   }
 
   const internalError = error => Promise.reject(error) // terminate composition execution and record error
@@ -288,6 +422,14 @@ function main (composition) {
     if (p.s.state < 0 || p.s.state >= fsm.length) {
       console.log(`Entering final state`)
       console.log(JSON.stringify(p.params))
+      if (p.s.join) {
+        if (!db) db = createRedisClient(p)
+        return db.lpushxAsync(live(p.s.join.barrierId), JSON.stringify({ position: p.s.join.position, params: p.params })).then(count => { // push only if marker is present
+          return (count > p.s.join.count ? db.renameAsync(live(p.s.join.barrierId), done(p.s.join.barrierId)) : Promise.resolve())
+        }).then(() => {
+          p.params = { method: 'join', sessionId: p.s.session, barrierId: p.s.join.barrierId, position: p.s.join.position }
+        })
+      }
       return
     }
 
@@ -314,6 +456,12 @@ function main (composition) {
     return Promise.resolve().then(() => {
       if (typeof p.s.state !== 'number') return internalError('state parameter is not a number')
       if (!Array.isArray(p.s.stack)) return internalError('stack parameter is not an array')
+
+      if (p.s.collect) { // waiting on parallel branches
+        const barrierId = p.s.collect
+        delete p.s.collect
+        return collect(p, barrierId)
+      }
 
       if ($composer.resuming) inspect(p) // handle error objects when resuming
 
