@@ -186,6 +186,27 @@ The intent is to store intermediate results in Redis as the parallel composition
 is progressing. Redis entries are deleted after completion and, as an added
 safety, expire after twenty-four hours.
 
+# OpenWhisk SSL configuration
+
+Additional configuration is required when using an OpenWhisk instance with
+self-signed certificates to disable SSL certificate validation. The input
+parameter object must contain a parameter of type dictionary named `$composer`.
+This dictionary must contain a dictionary named `openwhisk`. The `openwhisk`
+dictionary must contain a field named `ignore_certs` with value `true`:
+```json
+{
+    "$composer": {
+        "openwhisk": {
+            "ignore_certs": true
+        }
+    },
+    ...
+}
+```
+
+This explicit SSL configuration is currently only necessary when using parallel
+combinators or the `async` combinator.
+
 # Disclaimer
 
 Apache OpenWhisk Composer is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.

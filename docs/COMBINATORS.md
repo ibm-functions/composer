@@ -424,6 +424,9 @@ composer.seq(composer.retain(composition_1, composition_2, ...), ({ params, resu
 
 ## Async
 
+The `async` combinator may require an SSL configuration as discussed
+[here](../README.md#openwhisk-ssl-configuration).
+
 `composer.async(composition_1, composition_2, ...)` runs a sequence of
 compositions asynchronously. It invokes the sequence but does not wait for it to
 execute. It immediately returns a dictionary that includes a field named
@@ -438,6 +441,9 @@ later declarations in the parent are not visible in the child and vice versa.
 
 Parallel combinators require access to a Redis instance as discussed
 [here](../README.md#parallel-compositions-with-redis).
+
+Parallel combinators may require an SSL configuration as discussed
+[here](../README.md#openwhisk-ssl-configuration).
 
 `composer.parallel(composition_1, composition_2, ...)` and its synonymous
 `composer.par(composition_1, composition_2, ...)` invoke a series of
@@ -467,6 +473,9 @@ parent composition.
 
 Parallel combinators require access to a Redis instance as discussed
 [here](../README.md#parallel-compositions-with-redis).
+
+Parallel combinators may require an SSL configuration as discussed
+[here](../README.md#openwhisk-ssl-configuration).
 
 `composer.map(composition_1, composition_2, ...)` makes multiple parallel
 invocations of a sequence of compositions.
