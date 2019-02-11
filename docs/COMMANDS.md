@@ -110,6 +110,10 @@ If the `--apihost` flag is absent, the environment variable `__OW_API_HOST` is
 used in its place. If neither is available, the `deploy` command extracts the
 `APIHOST` key from the whisk property file for the current user.
 
+If the `--insecure` flag is set or the environment variable `__OW_IGNORE_CERTS`
+is set to `true`, the `deploy` command ignores SSL certificates validation
+failures.
+
 If the `--auth` flag is absent, the environment variable `__OW_API_KEY` is used
 in its place. If neither is available, the `deploy` command extracts the `AUTH`
 key from the whisk property file for the current user.
