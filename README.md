@@ -68,7 +68,7 @@ Compositions compose actions using [combinator](docs/COMBINATORS.md) methods.
 These methods implement the typical control-flow constructs of an imperative
 programming language. This example composition composes three actions named
 `authenticate`, `success`, and `failure` using the `composer.if` combinator,
-which implements the usual conditional construct. It take three actions (or
+which implements the usual conditional construct. It takes three actions (or
 compositions) as parameters. It invokes the first one and, depending on the
 result of this invocation, invokes either the second or third action.
 
@@ -168,7 +168,7 @@ invocation time or earlier by means of default parameters or package bindings.
 The required parameter is named `$composer`. It is a dictionary with a `redis`
 field of type dictionary. The `redis` dictionary specifies the `uri` for the
 Redis instance and optionally a certificate as a base64-encoded string to enable
-tls connections. Hence, the input parameter object for our order-processing
+TLS connections. Hence, the input parameter object for our order-processing
 example should be:
 ```json
 {

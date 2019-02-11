@@ -451,6 +451,13 @@ every branch in the composition. The output parameter object for the composition
 has a single field named `value` of type array. The elements of the array are
 the output parameter objects for the branches in order.
 
+Error results from the branches are included in the array of results like normal
+results. In particular, an error result from a branch does not interrupt the
+parallel execution of the other branches. Moreover, since errors results are
+nested inside an output parameter object with a single `value` field, an error
+from a branch does not trigger the execution of the current error handler. The
+caller should walk the array and decide if and how to handle errors.
+
 The `composer.let` variables in scope at the `parallel` combinator are in scope
 in the branches. But each branch has its own copy of the execution context.
 Variable mutations in one branch are not reflected in other branches or in the
@@ -474,6 +481,13 @@ in parallel. The `map` combinator waits for all the sequences to complete. The
 output parameter object for the composition has a single field named `value` of
 type array. The elements of the array are the output parameter objects for the
 branches in order.
+
+Error results from the branches are included in the array of results like normal
+results. In particular, an error result from a branch does not interrupt the
+parallel execution of the other branches. Moreover, since errors results are
+nested inside an output parameter object with a single `value` field, an error
+from a branch does not trigger the execution of the current error handler. The
+caller should walk the array and decide if and how to handle errors.
 
 The `composer.let` variables in scope at the `map` combinator are in scope in
 the branches. But each branch has its own copy of the execution context.
