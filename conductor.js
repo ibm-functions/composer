@@ -41,6 +41,7 @@ module.exports = function (options) {
   // try to extract apihost and key first from whisk property file file and then from process.env
   let apihost
   let apikey
+  let ignorecerts
 
   try {
     const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
@@ -60,8 +61,9 @@ module.exports = function (options) {
 
   if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
   if (process.env.__OW_API_KEY) apikey = process.env.__OW_API_KEY
+  if (process.env.__OW_IGNORE_CERTS) ignorecerts = process.env.__OW_IGNORE_CERTS
 
-  const wsk = openwhisk(Object.assign({ apihost, api_key: apikey }, options))
+  const wsk = openwhisk(Object.assign({ apihost, api_key: apikey, ignore_certs: ignorecerts }, options))
   wsk.compositions = new Compositions(wsk)
   return wsk
 }
@@ -134,7 +136,7 @@ function main (composition) {
     const stack = [{ marker: true }].concat(p.s.stack)
     const barrierId = uuid()
     console.log(`barrierId: ${barrierId}, spawning: ${array.length}`)
-    if (!wsk) wsk = openwhisk({ ignore_certs: true })
+    if (!wsk) wsk = openwhisk(p.s.openwhisk)
     if (!db) db = createRedisClient(p)
     return db.lpushAsync(live(barrierId), 42) // push marker
       .then(() => db.expireAsync(live(barrierId), expiration))
@@ -296,7 +298,7 @@ function main (composition) {
     async ({ p, node, index, inspect, step }) {
       p.params.$composer = { state: p.s.state, stack: [{ marker: true }].concat(p.s.stack), redis: p.s.redis }
       p.s.state = index + node.return
-      if (!wsk) wsk = openwhisk({ ignore_certs: true })
+      if (!wsk) wsk = openwhisk(p.s.openwhisk)
       return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params: p.params })
         .then(response => ({ method: 'async', activationId: response.activationId, sessionId: p.s.session }), error => {
           console.error(error) // invoke failed

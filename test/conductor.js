@@ -23,7 +23,7 @@ const assert = require('assert')
 const composer = require('../composer')
 const conductor = require('../conductor')
 const name = 'TestAction'
-const wsk = conductor({ ignore_certs: process.env.IGNORE_CERTS && process.env.IGNORE_CERTS !== 'false' && process.env.IGNORE_CERTS !== '0' })
+const wsk = conductor()
 
 // deploy action
 const define = action => wsk.actions.delete(action.name).catch(() => { }).then(() => wsk.actions.create(action))
@@ -36,6 +36,9 @@ const invoke = (composition, params = {}, blocking = true) => wsk.compositions.d
 // redis configuration
 const redis = process.env.REDIS ? { uri: process.env.REDIS } : false
 if (process.env.REDIS && process.env.REDIS_CA) redis.ca = process.env.REDIS_CA
+
+// openwhisk configuration
+const openwhisk = process.env.__OW_IGNORE_CERTS ? { ignore_certs: true } : {}
 
 describe('composer', function () {
   let n, x, y // dummy variables
@@ -63,7 +66,7 @@ describe('composer', function () {
       })
 
       it('action must return activationId', function () {
-        return invoke(composer.async('isNotOne'), { n: 1 }).then(activation => assert.ok(activation.response.result.activationId))
+        return invoke(composer.async('isNotOne'), { n: 1, $composer: { openwhisk } }).then(activation => assert.ok(activation.response.result.activationId))
       })
 
       it('action name must parse to fully qualified', function () {
@@ -321,17 +324,17 @@ describe('composer', function () {
       describe('parallel', function () {
         const test = redis ? it : it.skip
         test('parallel', function () {
-          return invoke(composer.parallel('TripleAndIncrement', 'DivideByTwo'), { n: 42, $composer: { redis } })
+          return invoke(composer.parallel('TripleAndIncrement', 'DivideByTwo'), { n: 42, $composer: { redis, openwhisk } })
             .then(activation => assert.deepStrictEqual(activation.response.result, { value: [{ n: 127 }, { n: 21 }] }))
         })
 
         test('par', function () {
-          return invoke(composer.par('DivideByTwo', 'TripleAndIncrement', 'isEven'), { n: 42, $composer: { redis } })
+          return invoke(composer.par('DivideByTwo', 'TripleAndIncrement', 'isEven'), { n: 42, $composer: { redis, openwhisk } })
             .then(activation => assert.deepStrictEqual(activation.response.result, { value: [{ n: 21 }, { n: 127 }, { value: true }] }))
         })
 
         test('map', function () {
-          return invoke(composer.map('TripleAndIncrement', 'DivideByTwo'), { value: [{ n: 3 }, { n: 5 }, { n: 7 }], $composer: { redis } })
+          return invoke(composer.map('TripleAndIncrement', 'DivideByTwo'), { value: [{ n: 3 }, { n: 5 }, { n: 7 }], $composer: { redis, openwhisk } })
             .then(activation => assert.deepStrictEqual(activation.response.result, { value: [{ n: 5 }, { n: 8 }, { n: 11 }] }))
         })
       })
