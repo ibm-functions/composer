@@ -63,8 +63,8 @@ class Compositions {
     this.actions = wsk.actions
   }
 
-  deploy (composition, overwrite) {
-    const actions = (composition.actions || []).concat(conductor.generate(composition))
+  deploy (composition, overwrite, debug) {
+    const actions = (composition.actions || []).concat(conductor.generate(composition, debug))
     return actions.reduce((promise, action) => promise.then(() => overwrite && this.actions.delete(action).catch(() => { }))
       .then(() => this.actions.create(action)), Promise.resolve())
       .then(() => actions)
