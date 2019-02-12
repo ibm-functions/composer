@@ -76,6 +76,17 @@ function main (composition) {
 
   const isObject = obj => typeof obj === 'object' && obj !== null && !Array.isArray(obj)
 
+  const needleOptions = (/needle<([^>]*)>/.exec(process.env.DEBUG || '') || [])[1]
+
+  function invoke (req) {
+    try {
+      if (needleOptions) req = Object.assign({}, req, JSON.parse(needleOptions))
+    } catch (err) {
+      console.err(`Ignoring invalid needle options: ${needleOptions}`)
+    }
+    return wsk.actions.invoke(req)
+  }
+
   function fork ({ p, node, index }, array, it) {
     const saved = p.params // save params
     p.s.state = index + node.return // return state
@@ -99,7 +110,7 @@ function main (composition) {
         params.$composer.redis = p.s.redis
         params.$composer.openwhisk = p.s.openwhisk
         params.$composer.join = { barrierId, position, count: array.length }
-        return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params }) // invoke branch
+        return invoke({ name: process.env.__OW_ACTION_NAME, params }) // invoke branch
           .then(({ activationId }) => { console.log(`barrierId: ${barrierId}, spawned position: ${position} with activationId: ${activationId}`) })
       }))).then(() => collect(p, barrierId), error => {
         console.error(error.body || error)
@@ -253,7 +264,7 @@ function main (composition) {
       p.params.$composer = { state: p.s.state, stack: [{ marker: true }].concat(p.s.stack), redis: p.s.redis, openwhisk: p.s.openwhisk }
       p.s.state = index + node.return
       if (!wsk) wsk = openwhisk(p.s.openwhisk)
-      return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params: p.params })
+      return invoke({ name: process.env.__OW_ACTION_NAME, params: p.params })
         .then(response => ({ method: 'async', activationId: response.activationId, sessionId: p.s.session }), error => {
           console.error(error) // invoke failed
           return { error: `Async combinator failed to invoke composition at AST node root${node.parent} (see log for details)` }
