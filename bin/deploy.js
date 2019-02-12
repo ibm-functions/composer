@@ -25,7 +25,7 @@ const minimist = require('minimist')
 const path = require('path')
 
 const argv = minimist(process.argv.slice(2), {
-  string: ['apihost', 'auth', 'source', 'annotation', 'annotation-file'],
+  string: ['apihost', 'auth', 'source', 'annotation', 'annotation-file', 'debug'],
   boolean: ['insecure', 'version', 'overwrite'],
   alias: { auth: 'u', insecure: 'i', version: 'v', annotation: 'a', 'annotation-file': 'A', overwrite: 'w' }
 })
@@ -46,6 +46,7 @@ if (argv._.length !== 2 || path.extname(argv._[1]) !== '.json') {
   console.error('  -u, --auth KEY                    authorization KEY')
   console.error('  -v, --version                     output the composer version')
   console.error('  -w, --overwrite                   overwrite actions if already defined')
+  console.error('  --debug LIST                      comma-separated list of debug flags')
   process.exit(1)
 }
 let composition
@@ -85,7 +86,7 @@ try {
   console.error(error)
   process.exit(400 - 256) // Bad Request
 }
-client(options).compositions.deploy(composition, argv.overwrite)
+client(options).compositions.deploy(composition, argv.overwrite, argv.debug)
   .then(actions => {
     const names = actions.map(action => action.name)
     console.log(`ok: created action${actions.length > 1 ? 's' : ''} ${names}`)
