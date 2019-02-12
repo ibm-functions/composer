@@ -24,6 +24,7 @@ const Module = require('module')
 const path = require('path')
 
 const argv = minimist(process.argv.slice(2), {
+  string: ['debug'],
   boolean: ['version', 'ast', 'js'],
   alias: { version: 'v' }
 })
@@ -54,6 +55,7 @@ if (argv._.length !== 1 || path.extname(argv._[0]) !== '.js') {
   console.error('  --ast                  only output the ast for the composition')
   console.error('  --js                   output the conductor action code for the composition')
   console.error('  -v, --version          output the composer version')
+  console.error('  --debug LIST           comma-separated list of debug flags (when using --js flag)')
   process.exit(1)
 }
 
@@ -67,7 +69,7 @@ try {
   process.exit(422 - 256) // Unprocessable Entity
 }
 if (argv.js) {
-  console.log(conductor.generate(composition).action.exec.code)
+  console.log(conductor.generate(composition, argv.debug).action.exec.code)
 } else {
   if (argv.ast) composition = composition.ast
   console.log(JSON.stringify(composition, null, 4))
