@@ -133,3 +133,13 @@ default parameters, limits, blocking invocation, web export. Execution
 and
 [limits](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md#limits)
 of compositions follow from conductor actions.
+
+The conductor action code for a composition may be obtained by means of the
+`generate` method of the `conductor` module or using the `compose` command with
+the `--js` flag. The conductor action code may be deployed using, e.g., the
+OpenWhisk CLI.
+```
+compose demo.js --js > demo-conductor.js
+wsk action create demo demo-conductor.js -a conductor true
+```
+The `conductor` annotation must be set on conductor actions.

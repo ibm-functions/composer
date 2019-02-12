@@ -20,7 +20,10 @@
 # Composer Package
 
 The Composer package consists of:
-* the [composer](../composer.js) Node.js module for authoring compositions,
+* the [composer](../composer.js) module for authoring compositions,
+* the [conductor](../conductor.js) module for generating conductor actions from
+  compositions,
+* the [client](../client.js) module for deploying compositions to openwhisk,
 * the [compose](../bin/compose.js) and [deploy](../bin/deploy.js) commands for
   managing compositions from the command line.
 
