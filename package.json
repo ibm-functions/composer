@@ -13,6 +13,7 @@
   },
   "files": [
     "bin/",
+    "client.js",
     "composer.js",
     "conductor.js",
     "fqn.js",

@@ -17,7 +17,7 @@
 'use strict'
 
 const composer = require('../composer')
-const conductor = require('../conductor')
+const client = require('../client')
 const fqn = require('../fqn')
 const fs = require('fs')
 const json = require('../package.json')
@@ -85,7 +85,7 @@ try {
   console.error(error)
   process.exit(400 - 256) // Bad Request
 }
-conductor(options).compositions.deploy(composition, argv.overwrite)
+client(options).compositions.deploy(composition, argv.overwrite)
   .then(actions => {
     const names = actions.map(action => action.name)
     console.log(`ok: created action${actions.length > 1 ? 's' : ''} ${names}`)

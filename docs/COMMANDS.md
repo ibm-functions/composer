@@ -39,6 +39,7 @@ Usage:
   compose composition.js [flags]
 Flags:
   --ast                  only output the ast for the composition
+  --js                   output the conductor action code for the composition
   -v, --version          output the composer version
 ```
 The `compose` command takes a Javascript module that exports a composition
@@ -49,6 +50,9 @@ compose demo.js > demo.json
 ```
 If the `--ast` option is specified, the `compose` command only outputs a JSON
 representation of the Abstract Syntax Tree for the composition.
+
+If the `--js` option is specified, the `compose` command outputs the conductor
+action code for the composition.
 
 # Deploy
 
