@@ -96,6 +96,7 @@ function main (composition) {
         const params = it(saved, item) // obtain combinator-specific params for branch invocation
         params.$composer.stack = stack
         params.$composer.redis = p.s.redis
+        params.$composer.openwhisk = p.s.openwhisk
         params.$composer.join = { barrierId, position, count: array.length }
         return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params }) // invoke branch
           .then(({ activationId }) => { console.log(`barrierId: ${barrierId}, spawned position: ${position} with activationId: ${activationId}`) })
@@ -248,7 +249,7 @@ function main (composition) {
     },
 
     async ({ p, node, index, inspect, step }) {
-      p.params.$composer = { state: p.s.state, stack: [{ marker: true }].concat(p.s.stack), redis: p.s.redis }
+      p.params.$composer = { state: p.s.state, stack: [{ marker: true }].concat(p.s.stack), redis: p.s.redis, openwhisk: p.s.openwhisk }
       p.s.state = index + node.return
       if (!wsk) wsk = openwhisk(p.s.openwhisk)
       return wsk.actions.invoke({ name: process.env.__OW_ACTION_NAME, params: p.params })
