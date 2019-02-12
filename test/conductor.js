@@ -21,9 +21,8 @@
 
 const assert = require('assert')
 const composer = require('../composer')
-const conductor = require('../conductor')
+const wsk = require('../client')()
 const name = 'TestAction'
-const wsk = conductor()
 
 // deploy action
 const define = action => wsk.actions.delete(action.name).catch(() => { }).then(() => wsk.actions.create(action))

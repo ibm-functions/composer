@@ -17,13 +17,14 @@
 'use strict'
 
 const composer = require('../composer')
+const conductor = require('../conductor')
 const json = require('../package.json')
 const minimist = require('minimist')
 const Module = require('module')
 const path = require('path')
 
 const argv = minimist(process.argv.slice(2), {
-  boolean: ['version', 'ast'],
+  boolean: ['version', 'ast', 'js'],
   alias: { version: 'v' }
 })
 
@@ -51,6 +52,7 @@ if (argv._.length !== 1 || path.extname(argv._[0]) !== '.js') {
   console.error('  compose composition.js [flags]')
   console.error('Flags:')
   console.error('  --ast                  only output the ast for the composition')
+  console.error('  --js                   output the conductor action code for the composition')
   console.error('  -v, --version          output the composer version')
   process.exit(1)
 }
@@ -64,5 +66,9 @@ try {
   console.error(error)
   process.exit(422 - 256) // Unprocessable Entity
 }
-if (argv.ast) composition = composition.ast
-console.log(JSON.stringify(composition, null, 4))
+if (argv.js) {
+  console.log(conductor.generate(composition).action.exec.code)
+} else {
+  if (argv.ast) composition = composition.ast
+  console.log(JSON.stringify(composition, null, 4))
+}
