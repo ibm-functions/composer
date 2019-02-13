@@ -41,6 +41,7 @@ Flags:
   --ast                  only output the ast for the composition
   --js                   output the conductor action code for the composition
   -v, --version          output the composer version
+  --debug LIST           comma-separated list of debug flags (when using --js flag)
 ```
 The `compose` command takes a Javascript module that exports a composition
 object (for example [demo.js](../samples/demo.js)) and compiles this object to a
@@ -70,6 +71,7 @@ Flags:
   -u, --auth KEY                    authorization KEY
   -v, --version                     output the composer version
   -w, --overwrite                   overwrite actions if already defined
+  --debug LIST                      comma-separated list of debug flags
 ```
 The `deploy` command deploys a JSON-encoded composition with the given name.
 ```
@@ -124,3 +126,15 @@ key from the whisk property file for the current user.
 
 The default path for the whisk property file is `$HOME/.wskprops`. It can be
 altered by setting the `WSK_CONFIG_FILE` environment variable.
+
+### Debug flag
+
+The `--debug` flag takes a comma-separated list of debugging options.
+
+The `needle` option activates `needle` verbose logging.
+
+The `needle<defaults>` option enables overriding `needle` default parameters.
+The specified `defaults` must be be a json dictionary, as for example in:
+```
+deploy demo demo.json --debug needle<{"connection":"keep-alive","open_timeout":60000}>
+```
