@@ -20,6 +20,14 @@ node_js:
   - 6
 services:
   - docker
+
+notifications:
+  email: false
+  webhooks:
+    urls:
+      # travis2slack webhook to enable DMs on openwhisk-team.slack.com to PR authors with TravisCI results
+      secure: e87H+wvZkwk6LWi4BDNQY1JncgPJ88oOAIJksIl/4DgxjIiX/gak0gLZYfTIqmLSG9ips86qdsSm1d/qMd7EPlLrUcF/PPx5uiwjXbO3aDbgfA/kVkJkQtWFhVhAckmWNJbyJwQfrcFqguDdF+iBD16nMZBGljRSLWuz+gBOsb9gOvLM5wg5m9nZICsUgsdX/Mu4Ib4TdYAW5Sf+evp/5BhyvrycQ6UA+NCAGhQmzI/Tnf8X4zsz8q6OZxcHT8L5b2ucxxGqleplaMzBlir3ADQ7F8QWEIFj4aVmW7VHe2Bloi4g/03zb4nFFn+cFbw4LTZqtHAOZ5fzIMWmKrWWnRi5tOdea1UimWqZ33S2H/M0R6YYIlhdvZXGSAPgGEyfd/BsLtXFah4J8V3odJOHf2QTxPWLucJj3Sjhc9DDqXWo6d+bRP58VfS2HsRDb2pfC2zLCoUa8OMjqPdLVXIH6qbaCVX20KKkz3YNS1xsWmIRvnYaKOAFx4KQDX6o/UoER7gwEJOEgbmCqGIpvAaOsP55N7mGCfOK4m2J1kONsGHUbL2/13hA2AI66P6QS8ohb4JXS5d6F9JZljl/U95qOgT2avD6BtzpUGnMXL5pbUfNXFp+GBneBwzaEE22q6OPVd7PVrHmPFH2tzp3/fmkceeoxrDA45zyaZMevO9gcvM=
+
 env:
   global:
     - __OW_IGNORE_CERTS=true
