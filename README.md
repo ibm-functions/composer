@@ -103,12 +103,12 @@ OpenWhisk CLI:
 wsk action invoke demo -p password passw0rd
 ```
 ```
-ok: invoked /_/demo with id 4f91f9ed0d874aaa91f9ed0d87baaa07
+ok: invoked /_/demo with id 09ca3c7f8b68489c8a3c7f8b68b89cdc
 ```
 The result of this invocation is the result of the last action in the
 composition, in this case the `failure` action since the password in incorrect:
 ```
-wsk activation result 4f91f9ed0d874aaa91f9ed0d87baaa07
+wsk activation result 09ca3c7f8b68489c8a3c7f8b68b89cdc
 ```
 ```json
 {
@@ -121,20 +121,21 @@ This invocation creates a trace, i.e., a series of activation records:
 ```
 wsk activation list
 ```
-```
-activations
-fd89b99a90a1462a89b99a90a1d62a8e demo
-eaec119273d94087ac119273d90087d0 failure
-3624ad829d4044afa4ad829d40e4af60 demo
-a1f58ade9b1e4c26b58ade9b1e4c2614 authenticate
-3624ad829d4044afa4ad829d40e4af60 demo
-4f91f9ed0d874aaa91f9ed0d87baaa07 demo
-```
-The entry with the earliest start time (`4f91f9ed0d874aaa91f9ed0d87baaa07`)
+<pre>
+Datetime            Activation ID                    Kind     Start Duration   Status  Entity
+2019-03-15 16:43:22 e6bea73bf75f4eb7bea73bf75fdeb703 nodejs:6 warm  1ms        success guest/demo:0.0.1
+2019-03-15 16:43:21 7efb6b7354c3472cbb6b7354c3272c98 nodejs:6 cold  31ms       success guest/failure:0.0.1
+2019-03-15 16:43:21 377cd080f0674e9cbcd080f0679e9c1d nodejs:6 warm  2ms        success guest/demo:0.0.1
+2019-03-15 16:43:20 5dceeccbdc7a4caf8eeccbdc7a9caf18 nodejs:6 cold  29ms       success guest/authenticate:0.0.1
+2019-03-15 16:43:19 66355a1f012d4ea2b55a1f012dcea264 nodejs:6 cold  104ms      success guest/demo:0.0.1
+2019-03-15 16:43:19 09ca3c7f8b68489c8a3c7f8b68b89cdc sequence warm  3.144s     success guest/demo:0.0.1
+</pre>
+
+The entry with the earliest start time (`09ca3c7f8b68489c8a3c7f8b68b89cdc`)
 summarizes the invocation of the composition while other entries record later
 activations caused by the composition invocation. There is one entry for each
-invocation of a composed action (`a1f58ade9b1e4c26b58ade9b1e4c2614` and
-`eaec119273d94087ac119273d90087d0`). The remaining entries record the beginning
+invocation of a composed action (`5dceeccbdc7a4caf8eeccbdc7a9caf18` and
+`7efb6b7354c3472cbb6b7354c3272c98`). The remaining entries record the beginning
 and end of the composition as well as the transitions between the composed
 actions.
 
