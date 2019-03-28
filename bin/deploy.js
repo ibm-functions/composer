@@ -25,9 +25,9 @@ const minimist = require('minimist')
 const path = require('path')
 
 const argv = minimist(process.argv.slice(2), {
-  string: ['apihost', 'auth', 'source', 'annotation', 'annotation-file', 'debug'],
+  string: ['apihost', 'auth', 'source', 'annotation', 'annotation-file', 'debug', 'kind'],
   boolean: ['insecure', 'version', 'overwrite'],
-  alias: { auth: 'u', insecure: 'i', version: 'v', annotation: 'a', 'annotation-file': 'A', overwrite: 'w' }
+  alias: { auth: 'u', insecure: 'i', version: 'v', annotation: 'a', 'annotation-file': 'A', overwrite: 'w', timeout: 't' }
 })
 
 if (argv.version) {
@@ -43,6 +43,8 @@ if (argv._.length !== 2 || path.extname(argv._[1]) !== '.json') {
   console.error('  -A, --annotation-file KEY=FILE    add KEY annotation with FILE content')
   console.error('  --apihost HOST                    API HOST')
   console.error('  -i, --insecure                    bypass certificate checking')
+  console.error('  --kind KIND                       the KIND of the conductor action runtime')
+  console.error('  -t, --timeout LIMIT               the timeout LIMIT in milliseconds for the conductor action')
   console.error('  -u, --auth KEY                    authorization KEY')
   console.error('  -v, --version                     output the composer version')
   console.error('  -w, --overwrite                   overwrite actions if already defined')
@@ -86,7 +88,10 @@ try {
   console.error(error)
   process.exit(400 - 256) // Bad Request
 }
-client(options).compositions.deploy(composition, argv.overwrite, argv.debug)
+if (typeof argv.timeout !== 'undefined' && typeof argv.timeout !== 'number') {
+  throw Error('Timeout must be a number')
+}
+client(options).compositions.deploy(composition, argv.overwrite, argv.debug, argv.kind, argv.timeout)
   .then(actions => {
     const names = actions.map(action => action.name)
     console.log(`ok: created action${actions.length > 1 ? 's' : ''} ${names}`)
