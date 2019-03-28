@@ -18,14 +18,15 @@
 
 const composer = require('../composer')
 const conductor = require('../conductor')
+const fs = require('fs')
 const json = require('../package.json')
 const minimist = require('minimist')
 const Module = require('module')
 const path = require('path')
 
 const argv = minimist(process.argv.slice(2), {
-  string: ['debug'],
-  boolean: ['version', 'ast', 'js'],
+  string: ['debug', 'o'],
+  boolean: ['version', 'ast', 'js', 'file'],
   alias: { version: 'v' }
 })
 
@@ -53,7 +54,9 @@ if (argv._.length !== 1 || path.extname(argv._[0]) !== '.js') {
   console.error('  compose composition.js [flags]')
   console.error('Flags:')
   console.error('  --ast                  only output the ast for the composition')
+  console.error('  --file                 write output to .json file with path and name matching input file')
   console.error('  --js                   output the conductor action code for the composition')
+  console.error('  -o FILE                write output to FILE')
   console.error('  -v, --version          output the composer version')
   console.error('  --debug LIST           comma-separated list of debug flags (when using --js flag)')
   process.exit(1)
@@ -72,5 +75,13 @@ if (argv.js) {
   console.log(conductor.generate(composition, argv.debug).action.exec.code)
 } else {
   if (argv.ast) composition = composition.ast
-  console.log(JSON.stringify(composition, null, 4))
+  composition = JSON.stringify(composition, null, 4)
+  if (argv.o) {
+    fs.writeFileSync(argv.o, composition.concat('\n'), { encoding: 'utf8' })
+  } else if (argv.file) {
+    const { dir, name } = path.parse(argv._[0])
+    fs.writeFileSync(path.format({ dir, name, ext: '.json' }), composition.concat('\n'), { encoding: 'utf8' })
+  } else {
+    console.log(composition)
+  }
 }
