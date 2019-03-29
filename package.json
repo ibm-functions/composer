@@ -1,6 +1,6 @@
 {
   "name": "openwhisk-composer",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Composer is a new programming model for composing cloud functions built on Apache OpenWhisk.",
   "homepage": "https://github.com/apache/incubator-openwhisk-composer",
   "main": "composer.js",

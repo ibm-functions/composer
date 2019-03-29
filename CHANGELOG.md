@@ -19,6 +19,13 @@
 
 # Changelog
 
+
+## v0.11.0
+* Annotate conductor actions with the `provide-api-key` annotation.
+* Add `--kind` and `--timeout` flags to `deploy` command.
+* Add `--file` and `-o` flags to `compose` command.
+* Update documentation.
+
 ## v0.10.0
 
 * Add new [parallel](docs/COMBINATORS.md#parallel) and
