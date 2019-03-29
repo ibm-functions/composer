@@ -54,7 +54,7 @@ if (argv._.length !== 1 || path.extname(argv._[0]) !== '.js') {
   console.error('  compose composition.js [flags]')
   console.error('Flags:')
   console.error('  --ast                  only output the ast for the composition')
-  console.error('  --file                 write output to .json file with path and name matching input file')
+  console.error('  --file                 write output to a file next to the input file')
   console.error('  --js                   output the conductor action code for the composition')
   console.error('  -o FILE                write output to FILE')
   console.error('  -v, --version          output the composer version')
@@ -63,6 +63,7 @@ if (argv._.length !== 1 || path.extname(argv._[0]) !== '.js') {
 }
 
 let composition
+let file
 try {
   composition = composer.parse(require(path.resolve(argv._[0]))) // load and validate composition
   composition = composition.compile()
@@ -72,16 +73,19 @@ try {
   process.exit(422 - 256) // Unprocessable Entity
 }
 if (argv.js) {
-  console.log(conductor.generate(composition, argv.debug).action.exec.code)
+  composition = conductor.generate(composition, argv.debug).action.exec.code
 } else {
   if (argv.ast) composition = composition.ast
   composition = JSON.stringify(composition, null, 4)
-  if (argv.o) {
-    fs.writeFileSync(argv.o, composition.concat('\n'), { encoding: 'utf8' })
-  } else if (argv.file) {
-    const { dir, name } = path.parse(argv._[0])
-    fs.writeFileSync(path.format({ dir, name, ext: '.json' }), composition.concat('\n'), { encoding: 'utf8' })
-  } else {
-    console.log(composition)
-  }
+}
+if (argv.o) {
+  file = argv.o
+} else if (argv.file) {
+  const { dir, name } = path.parse(argv._[0])
+  file = path.format({ dir, name, ext: argv.js ? '.conductor.js' : '.json' })
+}
+if (file) {
+  fs.writeFileSync(file, composition.concat('\n'), { encoding: 'utf8' })
+} else {
+  console.log(composition)
 }

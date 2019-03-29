@@ -39,21 +39,29 @@ Usage:
   compose composition.js [flags]
 Flags:
   --ast                  only output the ast for the composition
+  --file                 write output to a file next to the input file
   --js                   output the conductor action code for the composition
+  -o FILE                write output to FILE
   -v, --version          output the composer version
   --debug LIST           comma-separated list of debug flags (when using --js flag)
 ```
 The `compose` command takes a Javascript module that exports a composition
 object (for example [demo.js](../samples/demo.js)) and compiles this object to a
-portable JSON format on the standard output.
+portable JSON format on the standard output or in file.
 ```
-compose demo.js > demo.json
+compose demo.js -o demo.json
 ```
 If the `--ast` option is specified, the `compose` command only outputs a JSON
 representation of the Abstract Syntax Tree for the composition.
 
 If the `--js` option is specified, the `compose` command outputs the conductor
-action code for the composition.
+action code for the composition instead of the generated JSON.
+
+If the `-o` option is used, the `compose` command outputs to the specified file.
+
+If the `--file` option is specified, the `compose` command outputs to a file
+next to the input file with a `.json` or `.conductor.js` extension (if the
+`--js` option is specified).
 
 # Deploy
 
@@ -68,6 +76,8 @@ Flags:
   -A, --annotation-file KEY=FILE    add KEY annotation with FILE content
   --apihost HOST                    API HOST
   -i, --insecure                    bypass certificate checking
+  --kind KIND                       the KIND of the conductor action runtime
+  -t, --timeout LIMIT               the timeout LIMIT in milliseconds for the conductor action
   -u, --auth KEY                    authorization KEY
   -v, --version                     output the composer version
   -w, --overwrite                   overwrite actions if already defined
@@ -92,6 +102,13 @@ The `-w` option authorizes the `deploy` command to overwrite existing
 definitions. More precisely, it deletes the deployed actions before recreating
 them. As a result, default parameters, limits, and annotations on preexisting
 actions are lost.
+
+The `--timeout` option specifies the timeout for the conductor action.
+
+The `--kind` option specifies the kind for the conductor action runtime. By
+default, the `nodejs:default` OpenWhisk runtime is used. The chosen runtime must
+be based on Node.js. Other Node.js runtimes may or may not be compatible with
+Composer.
 
 ### Annotations
 
