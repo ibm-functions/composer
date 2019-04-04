@@ -1,4 +1,4 @@
-Apache OpenWhisk
+Apache OpenWhisk Composer
 Copyright 2016-2019 The Apache Software Foundation
 
 This product includes software developed at
