@@ -19,19 +19,19 @@
 
 # Apache OpenWhisk Composer
 
-[![Travis](https://travis-ci.org/apache/incubator-openwhisk-composer.svg?branch=master)](https://travis-ci.org/apache/incubator-openwhisk-composer)
+[![Travis](https://travis-ci.org/apache/openwhisk-composer.svg?branch=master)](https://travis-ci.org/apache/openwhisk-composer)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Join
 Slack](https://img.shields.io/badge/join-slack-9B69A0.svg)](http://slack.openwhisk.org/)
 
 Composer is a new programming model for composing cloud functions built on
-[Apache OpenWhisk](https://github.com/apache/incubator-openwhisk). With
+[Apache OpenWhisk](https://github.com/apache/openwhisk). With
 Composer, developers can build even more serverless applications including using
 it for IoT, with workflow orchestration, conversation services, and devops
 automation, to name a few examples.
 
 Composer synthesizes OpenWhisk [conductor
-actions](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md)
+actions](https://github.com/apache/openwhisk/blob/master/docs/conductors.md)
 to implement compositions. Compositions have all the attributes and capabilities
 of an action, e.g., default parameters, limits, blocking invocation, web export.
 
@@ -141,7 +141,7 @@ actions.
 
 Compositions are implemented by means of OpenWhisk conductor actions. The
 [documentation of conductor
-actions](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md)
+actions](https://github.com/apache/openwhisk/blob/master/docs/conductors.md)
 explains execution traces in greater details.
 
 While composer does not limit in principle the length of a composition,
@@ -207,7 +207,3 @@ dictionary must contain a field named `ignore_certs` with value `true`:
 
 This explicit SSL configuration is currently only necessary when using parallel
 combinators or the `async` combinator.
-
-# Disclaimer
-
-Apache OpenWhisk Composer is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
