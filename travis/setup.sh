@@ -32,7 +32,7 @@ docker pull openwhisk/nodejs6action &
 
 # Clone OpenWhisk
 cd $ROOTDIR
-git clone --depth=1 https://github.com/apache/incubator-openwhisk.git openwhisk
+git clone --depth=1 https://github.com/apache/openwhisk.git openwhisk
 
 # Install Ansible
 pip install --user ansible==2.5.2

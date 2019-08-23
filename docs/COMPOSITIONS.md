@@ -126,12 +126,12 @@ Deploying such a composition deploys the embedded actions.
 ## Conductor actions
 
 Compositions are implemented by means of OpenWhisk [conductor
-actions](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md).
+actions](https://github.com/apache/openwhisk/blob/master/docs/conductors.md).
 Compositions have all the attributes and capabilities of an action, e.g.,
 default parameters, limits, blocking invocation, web export. Execution
-[traces](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md#activations)
+[traces](https://github.com/apache/openwhisk/blob/master/docs/conductors.md#activations)
 and
-[limits](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md#limits)
+[limits](https://github.com/apache/openwhisk/blob/master/docs/conductors.md#limits)
 of compositions follow from conductor actions.
 
 The conductor action code for a composition may be obtained by means of the

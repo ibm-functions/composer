@@ -22,11 +22,11 @@ set -e
 SCRIPTDIR=$(cd $(dirname "$0") && pwd)
 ROOTDIR="$SCRIPTDIR/../"
 HOMEDIR="$SCRIPTDIR/../../"
-UTIL_DIR="$HOMEDIR/incubator-openwhisk-utilities"
+UTIL_DIR="$HOMEDIR/openwhisk-utilities"
 
 # clone OpenWhisk utilities repo. in order to run scanCode.py
 cd $HOMEDIR
-git clone https://github.com/apache/incubator-openwhisk-utilities.git
+git clone https://github.com/apache/openwhisk-utilities.git
 
 # run scancode
 cd $UTIL_DIR
