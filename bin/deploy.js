@@ -30,7 +30,7 @@ const path = require('path')
 const argv = minimist(process.argv.slice(2), {
   string: ['apihost', 'auth', 'source', 'annotation', 'annotation-file', 'debug', 'kind'],
   boolean: ['insecure', 'version', 'overwrite'],
-  alias: { auth: 'u', insecure: 'i', version: 'v', annotation: 'a', 'annotation-file': 'A', overwrite: 'w', timeout: 't' }
+  alias: { auth: 'u', insecure: 'i', version: 'v', annotation: 'a', 'annotation-file': 'A', overwrite: 'w', timeout: 't', memory: 'm', logsize: 'l' }
 })
 
 if (argv.version) {
@@ -47,7 +47,9 @@ if (argv._.length !== 2 || path.extname(argv._[1]) !== '.json') {
   console.error('  --apihost HOST                    API HOST')
   console.error('  -i, --insecure                    bypass certificate checking')
   console.error('  --kind KIND                       the KIND of the conductor action runtime')
-  console.error('  -t, --timeout LIMIT               the timeout LIMIT in milliseconds for the conductor action')
+  console.error('  -l, --logsize LIMIT               the maximum log size LIMIT in MB for the conductor action (default 10)')
+  console.error('  -m, --memory LIMIT                the maximum memory LIMIT in MB for the conductor action (default 256)')
+  console.error('  -t, --timeout LIMIT               the timeout LIMIT in milliseconds for the conductor action (default 60000)')
   console.error('  -u, --auth KEY                    authorization KEY')
   console.error('  -v, --version                     output the composer version')
   console.error('  -w, --overwrite                   overwrite actions if already defined')
@@ -94,7 +96,13 @@ try {
 if (typeof argv.timeout !== 'undefined' && typeof argv.timeout !== 'number') {
   throw Error('Timeout must be a number')
 }
-client(options).compositions.deploy(composition, argv.overwrite, argv.debug, argv.kind, argv.timeout)
+if (typeof argv.memory !== 'undefined' && typeof argv.memory !== 'number') {
+  throw Error('Maximum memory must be a number')
+}
+if (typeof argv.logsize !== 'undefined' && typeof argv.logsize !== 'number') {
+  throw Error('Maximum log size must be a number')
+}
+client(options).compositions.deploy(composition, argv.overwrite, argv.debug, argv.kind, argv.timeout, argv.memory, argv.logsize)
   .then(actions => {
     const names = actions.map(action => action.name)
     console.log(`ok: created action${actions.length > 1 ? 's' : ''} ${names}`)

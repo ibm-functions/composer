@@ -73,6 +73,9 @@ composer.action('hello')
 composer.action('myPackage/myAction')
 composer.action('/whisk.system/utils/echo')
 ```
+
+### Action definition
+
 The optional `options` dictionary makes it possible to provide a definition for
 the action being composed.
 ```javascript
@@ -87,7 +90,6 @@ composer.action('hello', { action: hello })
 
 // specify the code for the action as a string
 composer.action('hello', { action: "const message = 'hello'; function main() { return { message } }" })
-
 
 // specify the code and runtime for the action
 composer.action('hello', {
@@ -107,6 +109,18 @@ The action may be defined by providing the code for the action as a string, as a
 Javascript function, or as a file name. Alternatively, a sequence action may be
 defined by providing the list of sequenced actions. The code (specified as a
 string) may be annotated with the kind of the action runtime.
+
+### Limits
+
+If a definition is provided for the action, the `options` dictionary may also
+specify `limits`, for instance:
+```javascript
+composer.action('hello', { filename: 'hello.js', limits: { logs: 1, memory: 128, timeout: 10000 } })
+```
+The `limits` object optionally specifies any combination of:
+- the maximum log size LIMIT in MB for the action,
+- the maximum memory LIMIT in MB for the action,
+- the timeout LIMIT in milliseconds for the action.
 
 ### Environment capture in actions
 
