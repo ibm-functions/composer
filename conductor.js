@@ -42,7 +42,6 @@ module.exports = { generate }
 // runtime code
 function main (composition) {
   const openwhisk = require('openwhisk')
-  const redis = require('redis')
   const uuid = require('uuid').v4
   let wsk
   let db
@@ -52,7 +51,7 @@ function main (composition) {
   function done (id) { return `composer/join/${id}` }
 
   function createRedisClient (p) {
-    const client = redis.createClient(p.s.redis.uri, p.s.redis.ca ? { tls: { ca: Buffer.from(p.s.redis.ca, 'base64').toString('binary') } } : {})
+    const client = require('redis').createClient(p.s.redis.uri, p.s.redis.ca ? { tls: { ca: Buffer.from(p.s.redis.ca, 'base64').toString('binary') } } : {})
     const noop = () => { }
     let handler = noop
     client.on('error', error => handler(error))
