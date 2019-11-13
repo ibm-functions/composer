@@ -358,7 +358,10 @@ Object.assign(composer, {
       exec = { kind: 'nodejs:default', code: exec }
     }
     const composition = { type: 'action', name, '.combinator': () => combinators.action }
-    if (exec) composition.action = { exec }
+    if (exec) {
+      composition.action = { exec }
+      if (isObject(options.limits)) composition.action.limits = options.limits
+    }
     return new Composition(composition)
   },
 
