@@ -77,7 +77,9 @@ Flags:
   --apihost HOST                    API HOST
   -i, --insecure                    bypass certificate checking
   --kind KIND                       the KIND of the conductor action runtime
-  -t, --timeout LIMIT               the timeout LIMIT in milliseconds for the conductor action
+  -l, --logsize LIMIT               the maximum log size LIMIT in MB for the conductor action (default 10)
+  -m, --memory LIMIT                the maximum memory LIMIT in MB for the conductor action (default 256)
+  -t, --timeout LIMIT               the timeout LIMIT in milliseconds for the conductor action (default 60000)
   -u, --auth KEY                    authorization KEY
   -v, --version                     output the composer version
   -w, --overwrite                   overwrite actions if already defined
@@ -103,6 +105,8 @@ definitions. More precisely, it deletes the deployed actions before recreating
 them. As a result, default parameters, limits, and annotations on preexisting
 actions are lost.
 
+The `--logsize` option specifies the maximum log size for the conductor action.
+The `--memory` option specifies the maximum memory for the conductor action.
 The `--timeout` option specifies the timeout for the conductor action.
 
 The `--kind` option specifies the kind for the conductor action runtime. By
