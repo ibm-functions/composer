@@ -153,5 +153,5 @@ The `needle` option activates `needle` verbose logging.
 The `needle<defaults>` option enables overriding `needle` default parameters.
 The specified `defaults` must be be a json dictionary, as for example in:
 ```
-deploy demo demo.json --debug needle<{"connection":"keep-alive","open_timeout":60000}>
+deploy demo demo.json --debug 'needle<{"connection":"keep-alive","open_timeout":60000}>'
 ```
