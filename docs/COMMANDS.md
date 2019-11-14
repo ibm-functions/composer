@@ -75,6 +75,8 @@ Flags:
   -a, --annotation KEY=VALUE        add KEY annotation with VALUE
   -A, --annotation-file KEY=FILE    add KEY annotation with FILE content
   --apihost HOST                    API HOST
+  --basic                           force basic authentication
+  --bearer                          force bearer token authentication
   -i, --insecure                    bypass certificate checking
   --kind KIND                       the KIND of the conductor action runtime
   -l, --logsize LIMIT               the maximum log size LIMIT in MB for the conductor action (default 10)
@@ -133,17 +135,37 @@ specifying the OpenWhisk instance to use:
   -i, --insecure                    bypass certificate checking
   -u, --auth KEY                    authorization KEY
 ```
+In addition the `deploy` command supports the flags:
+```
+  --basic                           force basic authentication
+  --bearer                          force bearer token authentication
+```
 If the `--apihost` flag is absent, the environment variable `__OW_API_HOST` is
 used in its place. If neither is available, the `deploy` command extracts the
-`APIHOST` key from the whisk property file for the current user.
+`APIHOST` key from the whisk property file.
 
 If the `--insecure` flag is set or the environment variable `__OW_IGNORE_CERTS`
 is set to `true`, the `deploy` command ignores SSL certificates validation
 failures.
 
-If the `--auth` flag is absent, the environment variable `__OW_API_KEY` is used
-in its place. If neither is available, the `deploy` command extracts the `AUTH`
-key from the whisk property file for the current user.
+The default target namespace is the value of environment variable
+`__OW_NAMESPACE` if defined. If not, it is the value of the `NAMESPACE` property
+in the whisk property file if present. Otherwise, the default `_` value is used.
+
+If the `--basic` flag is set, the `deploy` command uses basic authentication. If
+the `--bearer` flag is set, the `deploy` command uses bearer token
+authentication. If neither flag is set, the `deploy` command uses basic
+authentication only if the default target namespace is `_`. Setting both flags
+is an error.
+
+For basic authentication, the authentication key is obtained from the `--auth`
+flag. If the `--auth` flag is absent, the environment variable `__OW_API_KEY` is
+used in its place. If neither is available, the `deploy` command extracts the
+`AUTH` key from the whisk property file.
+
+For bearer token authentication, the token is either the value of the
+environment variable `__OW_APIGW_TOKEN` if defined or the value of property
+`APIGW_ACCESS_TOKEN` in the whisk property file.
 
 The default path for the whisk property file is `$HOME/.wskprops`. It can be
 altered by setting the `WSK_CONFIG_FILE` environment variable.
