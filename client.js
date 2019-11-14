@@ -26,11 +26,14 @@ const os = require('os')
 const path = require('path')
 
 // return enhanced openwhisk client capable of deploying compositions
-module.exports = function (options) {
+module.exports = function (options, basic, bearer) {
   // try to extract apihost and key first from whisk property file file and then from process.env
   let apihost
   let apikey
   let ignorecerts
+  let namespace = '_'
+  let token
+  let authHandler
 
   try {
     const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
@@ -43,6 +46,10 @@ module.exports = function (options) {
           apihost = parts[1]
         } else if (parts[0] === 'AUTH') {
           apikey = parts[1]
+        } else if (parts[0] === 'NAMESPACE') {
+          namespace = parts[1]
+        } else if (parts[0] === 'APIGW_ACCESS_TOKEN') {
+          token = parts[1]
         }
       }
     }
@@ -50,9 +57,20 @@ module.exports = function (options) {
 
   if (process.env.__OW_API_HOST) apihost = process.env.__OW_API_HOST
   if (process.env.__OW_API_KEY) apikey = process.env.__OW_API_KEY
+  if (process.env.__OW_NAMESPACE) namespace = process.env.__OW_NAMESPACE
   if (process.env.__OW_IGNORE_CERTS) ignorecerts = process.env.__OW_IGNORE_CERTS
+  if (process.env.__OW_APIGW_TOKEN) token = process.env.__OW_APIGW_TOKEN
 
-  const wsk = openwhisk(Object.assign({ apihost, api_key: apikey, ignore_certs: ignorecerts }, options))
+  if (bearer || (!basic && namespace !== '_')) {
+    // switch from basic auth to bearer token
+    authHandler = {
+      getAuthHeader: () => {
+        return Promise.resolve(`Bearer ${token}`)
+      }
+    }
+  }
+
+  const wsk = openwhisk(Object.assign({ apihost, api_key: apikey, auth_handler: authHandler, namespace, ignore_certs: ignorecerts }, options))
   wsk.compositions = new Compositions(wsk)
   return wsk
 }

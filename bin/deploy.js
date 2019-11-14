@@ -29,7 +29,7 @@ const path = require('path')
 
 const argv = minimist(process.argv.slice(2), {
   string: ['apihost', 'auth', 'source', 'annotation', 'annotation-file', 'debug', 'kind'],
-  boolean: ['insecure', 'version', 'overwrite'],
+  boolean: ['insecure', 'version', 'overwrite', 'basic', 'bearer'],
   alias: { auth: 'u', insecure: 'i', version: 'v', annotation: 'a', 'annotation-file': 'A', overwrite: 'w', timeout: 't', memory: 'm', logsize: 'l' }
 })
 
@@ -45,6 +45,8 @@ if (argv._.length !== 2 || path.extname(argv._[1]) !== '.json') {
   console.error('  -a, --annotation KEY=VALUE        add KEY annotation with VALUE')
   console.error('  -A, --annotation-file KEY=FILE    add KEY annotation with FILE content')
   console.error('  --apihost HOST                    API HOST')
+  console.error('  --basic                           force basic authentication')
+  console.error('  --bearer                          force bearer token authentication')
   console.error('  -i, --insecure                    bypass certificate checking')
   console.error('  --kind KIND                       the KIND of the conductor action runtime')
   console.error('  -l, --logsize LIMIT               the maximum log size LIMIT in MB for the conductor action (default 10)')
@@ -93,6 +95,9 @@ try {
   console.error(error)
   process.exit(400 - 256) // Bad Request
 }
+if (argv.basic && argv.bearer) {
+  throw Error('Must select either basic authentication of bearer token authentication')
+}
 if (typeof argv.timeout !== 'undefined' && typeof argv.timeout !== 'number') {
   throw Error('Timeout must be a number')
 }
@@ -102,7 +107,7 @@ if (typeof argv.memory !== 'undefined' && typeof argv.memory !== 'number') {
 if (typeof argv.logsize !== 'undefined' && typeof argv.logsize !== 'number') {
   throw Error('Maximum log size must be a number')
 }
-client(options).compositions.deploy(composition, argv.overwrite, argv.debug, argv.kind, argv.timeout, argv.memory, argv.logsize)
+client(options, argv.basic, argv.bearer).compositions.deploy(composition, argv.overwrite, argv.debug, argv.kind, argv.timeout, argv.memory, argv.logsize)
   .then(actions => {
     const names = actions.map(action => action.name)
     console.log(`ok: created action${actions.length > 1 ? 's' : ''} ${names}`)
