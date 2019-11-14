@@ -207,3 +207,13 @@ dictionary must contain a field named `ignore_certs` with value `true`:
 
 This explicit SSL configuration is currently only necessary when using parallel
 combinators or the `async` combinator.
+
+# Installation from Source
+
+To install composer from a source release, download the composer source code
+from the [Apache OpenWhisk
+Downloads](https://openwhisk.apache.org/downloads.html) page, rename the release
+tarball to `openwhisk-composer.tgz` and install it with command:
+```shell
+npm install -g openwhisk-composer.tgz
+```
