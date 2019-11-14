@@ -42,7 +42,6 @@ module.exports = { generate }
 // runtime code
 function main (composition) {
   const openwhisk = require('openwhisk')
-  const uuid = require('uuid').v4
   let wsk
   let db
   const expiration = 86400 // expire redis key after a day
@@ -101,7 +100,7 @@ function main (composition) {
       return
     }
     const stack = [{ marker: true }].concat(p.s.stack)
-    const barrierId = uuid()
+    const barrierId = require('uuid').v4()
     console.log(`barrierId: ${barrierId}, spawning: ${array.length}`)
     if (!wsk) wsk = openwhisk(p.s.openwhisk)
     if (!db) db = createRedisClient(p)
