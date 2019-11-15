@@ -29,6 +29,7 @@ const path = require('path')
 module.exports = function (options, basic, bearer) {
   // try to extract apihost and key first from whisk property file file and then from process.env
   let apihost
+  let apiversion
   let apikey
   let ignorecerts
   let namespace = '_'
@@ -44,6 +45,8 @@ module.exports = function (options, basic, bearer) {
       if (parts.length === 2) {
         if (parts[0] === 'APIHOST') {
           apihost = parts[1]
+        } else if (parts[0] === 'APIVERSION') {
+          apiversion = parts[1]
         } else if (parts[0] === 'AUTH') {
           apikey = parts[1]
         } else if (parts[0] === 'NAMESPACE') {
@@ -70,7 +73,7 @@ module.exports = function (options, basic, bearer) {
     }
   }
 
-  const wsk = openwhisk(Object.assign({ apihost, api_key: apikey, auth_handler: authHandler, namespace, ignore_certs: ignorecerts }, options))
+  const wsk = openwhisk(Object.assign({ apihost, apiversion, api_key: apikey, auth_handler: authHandler, namespace, ignore_certs: ignorecerts }, options))
   wsk.compositions = new Compositions(wsk)
   return wsk
 }
