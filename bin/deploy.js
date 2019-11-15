@@ -28,7 +28,7 @@ const minimist = require('minimist')
 const path = require('path')
 
 const argv = minimist(process.argv.slice(2), {
-  string: ['apihost', 'auth', 'source', 'annotation', 'annotation-file', 'debug', 'kind'],
+  string: ['apihost', 'apiversion', 'auth', 'source', 'annotation', 'annotation-file', 'debug', 'kind'],
   boolean: ['insecure', 'version', 'overwrite', 'basic', 'bearer'],
   alias: { auth: 'u', insecure: 'i', version: 'v', annotation: 'a', 'annotation-file': 'A', overwrite: 'w', timeout: 't', memory: 'm', logsize: 'l' }
 })
@@ -45,6 +45,7 @@ if (argv._.length !== 2 || path.extname(argv._[1]) !== '.json') {
   console.error('  -a, --annotation KEY=VALUE        add KEY annotation with VALUE')
   console.error('  -A, --annotation-file KEY=FILE    add KEY annotation with FILE content')
   console.error('  --apihost HOST                    API HOST')
+  console.error('  --apiversion VERSION              API VERSION')
   console.error('  --basic                           force basic authentication')
   console.error('  --bearer                          force bearer token authentication')
   console.error('  -i, --insecure                    bypass certificate checking')
@@ -88,6 +89,7 @@ try {
 const options = { ignore_certs: argv.insecure }
 if (argv.apihost) options.apihost = argv.apihost
 if (argv.auth) options.api_key = argv.auth
+if (argv.apiversion) options.apiversion = argv.apiversion
 try {
   composition.name = fqn(argv._[0])
 } catch (error) {
