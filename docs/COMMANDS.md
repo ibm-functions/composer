@@ -75,6 +75,7 @@ Flags:
   -a, --annotation KEY=VALUE        add KEY annotation with VALUE
   -A, --annotation-file KEY=FILE    add KEY annotation with FILE content
   --apihost HOST                    API HOST
+  --apiversion VERSION              API VERSION
   --basic                           force basic authentication
   --bearer                          force bearer token authentication
   -i, --insecure                    bypass certificate checking
@@ -143,6 +144,10 @@ In addition the `deploy` command supports the flags:
 If the `--apihost` flag is absent, the environment variable `__OW_API_HOST` is
 used in its place. If neither is available, the `deploy` command extracts the
 `APIHOST` key from the whisk property file.
+
+The `apiversion` may be specified using the `--apiversion` flag, or, if absent,
+the `APIVERSION` property of the whisk property file. If both are absent, the
+default is assumed.
 
 If the `--insecure` flag is set or the environment variable `__OW_IGNORE_CERTS`
 is set to `true`, the `deploy` command ignores SSL certificates validation
