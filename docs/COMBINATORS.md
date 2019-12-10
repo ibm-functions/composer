@@ -69,10 +69,14 @@ assumed.
 
 Examples:
 ```javascript
-composer.action('hello')
+composer.action('hello') // default package
 composer.action('myPackage/myAction')
 composer.action('/whisk.system/utils/echo')
 ```
+To be clear, if no package is specified, the default package is assumed even if
+the composition itself is not deployed to the default package. To invoke an
+action from the same package as the composition the [`dynamic`](#dynamic)
+combinator may be used as illustrated [below](#example).
 
 ### Action definition
 
@@ -532,3 +536,29 @@ Other fields of the input parameter object are ignored.
 The `dynamic` combinator invokes the action named _name_ with the input
 parameter object _params_. The output parameter object for the composition is
 the output parameter object of the action invocation.
+
+### Example
+
+The `dynamic` combinator may be used for example to invoke an action that
+belongs to the same package as the composition, without having to specify the
+package name beforehand.
+
+```javascript
+const composer = require('openwhisk-composer')
+
+function invoke (actionShortName) {
+  return composer.let(
+    { actionShortName },
+    params => ({ type: 'action', params, name: process.env.__OW_ACTION_NAME.split('/').slice(0, -1).concat(actionShortName).join('/') }),
+    composer.dynamic())
+}
+
+module.exports = composer.seq(
+  composer.action('echo'), // echo action from the default package
+  invoke('echo')           // echo action from the same package as the composition
+)
+```
+In this example, `let` captures the target action short name at compile time
+without expanding it to a fully qualified name. Then, at run time, the package
+name is obtained from the environment variable `__OW_ACTION_NAME` and combined
+with the action short name. Finally, `dynamic` is used to invoke the action.
