@@ -1,7 +1,7 @@
 {
   "license": "Apache-2.0",
   "name": "openwhisk-composer",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Composer is a new programming model for composing cloud functions built on Apache OpenWhisk.",
   "homepage": "https://github.com/apache/openwhisk-composer",
   "main": "composer.js",
