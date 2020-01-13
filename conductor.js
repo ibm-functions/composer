@@ -41,7 +41,7 @@ module.exports = { generate }
 
 // runtime code
 function main (composition) {
-  const openwhisk = require('openwhisk')
+  const openwhisk = require(/* webpackIgnore: true */ 'openwhisk')
   let wsk
   let db
   const expiration = 86400 // expire redis key after a day
@@ -50,11 +50,11 @@ function main (composition) {
   function done (id) { return `composer/join/${id}` }
 
   function createRedisClient (p) {
-    const client = require('redis').createClient(p.s.redis.uri, p.s.redis.ca ? { tls: { ca: Buffer.from(p.s.redis.ca, 'base64').toString('binary') } } : {})
+    const client = require(/* webpackIgnore: true */ 'redis').createClient(p.s.redis.uri, p.s.redis.ca ? { tls: { ca: Buffer.from(p.s.redis.ca, 'base64').toString('binary') } } : {})
     const noop = () => { }
     let handler = noop
     client.on('error', error => handler(error))
-    require('redis-commands').list.forEach(f => {
+    require(/* webpackIgnore: true */ 'redis-commands').list.forEach(f => {
       client[`${f}Async`] = function () {
         let failed = false
         return new Promise((resolve, reject) => {
@@ -100,7 +100,7 @@ function main (composition) {
       return
     }
     const stack = [{ marker: true }].concat(p.s.stack)
-    const barrierId = require('uuid').v4()
+    const barrierId = require(/* webpackIgnore: true */ 'uuid').v4()
     console.log(`barrierId: ${barrierId}, spawning: ${array.length}`)
     if (!wsk) wsk = openwhisk(p.s.openwhisk)
     if (!db) db = createRedisClient(p)
