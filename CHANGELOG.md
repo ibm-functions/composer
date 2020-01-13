@@ -19,6 +19,18 @@
 
 # Changelog
 
+## v0.12.0
+* Running sequential compositions no longer requires the action runtime to
+  contain the `redis` and `uuid` modules.
+* The `deploy` command supports additional options:
+  * `--logsize` and `--memory` to set limits for the conductor action,
+  * `--basic` and `--bearer` to control the authentication method,
+  * `--apiversion` to specify the API version of the target OpenWhisk instance.
+* The `deploy` method supports passing through `httpOptions`.
+* A workaround for Webpack has been implemented (dependency analysis of the
+  conductor code).
+* The `openwhisk-client-js` module has been updated to version `3.20.0`.
+* The documentation has been improved.
 
 ## v0.11.0
 * Annotate conductor actions with the `provide-api-key` annotation.
