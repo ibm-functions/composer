@@ -2,27 +2,24 @@
     "runtimes": {
         "nodejs": [
             {
-                "kind": "nodejs",
-                "image": {
-                    "prefix": "openwhisk",
-                    "name": "nodejsaction",
-                    "tag": "latest"
-                },
-                "deprecated": true
-            },
-            {
-                "kind": "nodejs:6",
+                "kind": "nodejs:10",
                 "default": true,
                 "image": {
                     "prefix": "openwhisk",
-                    "name": "nodejs6action",
-                    "tag": "latest"
+                    "name": "action-nodejs-v10",
+                    "tag": "nightly"
                 },
                 "deprecated": false,
-                "stemCells": [{
-                    "count": 2,
-                    "memory": "256 MB"
-                }]
+                "attached": {
+                    "attachmentName": "codefile",
+                    "attachmentType": "text/plain"
+                },
+                "stemCells": [
+                    {
+                        "count": 2,
+                        "memory": "256 MB"
+                    }
+                ]
             }
         ]
     },
