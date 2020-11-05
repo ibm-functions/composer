@@ -33,7 +33,7 @@
   ],
   "dependencies": {
     "minimist": "^1.2.0",
-    "openwhisk": "^3.21.1",
+    "openwhisk": "^3.21.3",
     "terser": "^3.8.2"
   },
   "devDependencies": {
