@@ -64,7 +64,35 @@ module.exports = function (options, basic, bearer) {
   if (process.env.__OW_IGNORE_CERTS) ignorecerts = process.env.__OW_IGNORE_CERTS
   if (process.env.__OW_APIGW_TOKEN) token = process.env.__OW_APIGW_TOKEN
 
-  if (bearer || (!basic && namespace !== '_')) {
+  //
+  // check for IAM-based namespaces, first
+  if (namespace !== '_') {
+    // for authentication, we'll use the user IAM access token
+    let iamToken
+    try {
+      // read the IAM Access token from the ibm cloud config file
+      const ibmCloudPropsPath = process.env.IC_CONFIG_FILE || path.join(os.homedir(), '.bluemix/config.json')
+      const ibmCloudConfig = JSON.parse(fs.readFileSync(ibmCloudPropsPath, { encoding: 'utf8' }))
+
+      iamToken = ibmCloudConfig.IAMToken
+    } catch (error) {
+      console.error('Failed to read IBM Cloud configuration')
+      throw error
+    }
+
+    // ignore the API key value, in case of an IAM-based namespace
+    apikey = undefined
+
+    // use bearer token for IAM authentication
+    authHandler = {
+      getAuthHeader: () => {
+        return Promise.resolve(iamToken)
+      }
+    }
+
+  //
+  // in case of CF-based namespaces, the user can opt-in for using bearer token authentication instead of using the default basic authentication
+  } else if (bearer || (!basic && namespace !== '_')) {
     // switch from basic auth to bearer token
     authHandler = {
       getAuthHeader: () => {
