@@ -22,6 +22,7 @@
 const conductor = require('./conductor')
 const fs = require('fs')
 const openwhisk = require('openwhisk')
+const ibmcloudUtils = require('./ibmcloud-utils')
 const os = require('os')
 const path = require('path')
 
@@ -66,29 +67,12 @@ module.exports = function (options, basic, bearer) {
 
   //
   // check for IAM-based namespaces, first
-  if (namespace !== '_') {
-    // for authentication, we'll use the user IAM access token
-    let iamToken
-    try {
-      // read the IAM Access token from the ibm cloud config file
-      const ibmCloudPropsPath = process.env.IC_CONFIG_FILE || path.join(os.homedir(), '.bluemix/config.json')
-      const ibmCloudConfig = JSON.parse(fs.readFileSync(ibmCloudPropsPath, { encoding: 'utf8' }))
-
-      iamToken = ibmCloudConfig.IAMToken
-    } catch (error) {
-      console.error('Failed to read IBM Cloud configuration')
-      throw error
-    }
+  if (ibmcloudUtils.isIamBasedNamespace()) {
+    // for authentication, we'll use the user IAM access token and set an appropriate authentication handler
+    authHandler = ibmcloudUtils.getIamAuthHandler()
 
     // ignore the API key value, in case of an IAM-based namespace
     apikey = undefined
-
-    // use bearer token for IAM authentication
-    authHandler = {
-      getAuthHeader: () => {
-        return Promise.resolve(iamToken)
-      }
-    }
 
   //
   // in case of CF-based namespaces, the user can opt-in for using bearer token authentication instead of using the default basic authentication
