@@ -20,32 +20,35 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-const isIamBasedNamespace = () => {
-  let namespace
+const getCloudFunctionsConfig = () => {
   try {
-    const wskpropsPath = process.env.WSK_CONFIG_FILE || path.join(os.homedir(), '.wskprops')
-    const lines = fs.readFileSync(wskpropsPath, { encoding: 'utf8' }).split('\n')
+    // read the ibm cloud functions cli config file
+    const ibmCloudFunctionsPropsPath =
+      process.env.IC_FN_CONFIG_FILE || path.join(os.homedir(), '.bluemix/plugins/cloud-functions/config.json')
+    const ibmCloudFunctionsConfig = JSON.parse(fs.readFileSync(ibmCloudFunctionsPropsPath, { encoding: 'utf8' }))
 
-    for (let line of lines) {
-      let parts = line.trim().split('=')
-      if (parts.length === 2) {
-        if (parts[0] === 'NAMESPACE') {
-          namespace = parts[1]
-        }
-      }
-    }
-  } catch (error) {}
+    return ibmCloudFunctionsConfig
+  } catch (error) {
+    console.error('Could not open ibmcloud functions plugin config')
+    throw error
+  }
+}
 
-  // in case the user targeted an IAM-based namespace, the value is set to '_'
-  return namespace !== '_'
+const getNamespaceType = () => {
+  return getCloudFunctionsConfig().WskCliNamespaceMode
+}
+
+const getNamespaceId = () => {
+  return getCloudFunctionsConfig().WskCliNamespaceId
 }
 
 /**
- * return a Apache OpenWhisk Client SDK for JavaScript compliant authentication handler
+ * return a Apache OpenWhisk Client SDK for JavaScript compliant authentication header token,
+ * which can be used within a custom authentication handler
  * see https://github.com/apache/openwhisk-client-js#using-3rd-party-authentication-handler
  * for further details
  */
-const getIamAuthHandler = () => {
+const getIamAuthHeader = () => {
   // for authentication, we'll use the user IAM access token
   let iamToken
   try {
@@ -55,21 +58,17 @@ const getIamAuthHandler = () => {
 
     iamToken = ibmCloudConfig.IAMToken
   } catch (error) {
-    console.error('Failed to read IBM Cloud configuration')
+    console.error('Could not open ibmcloud config')
     throw error
   }
 
   // return an object that provides a getAuthHeader function to comply with the authentication handler interface
   // required by OpenWhisk Client SDK for JavaScript
-  return {
-    getAuthHeader: () => {
-      // use bearer token for IAM authentication
-      return Promise.resolve(iamToken)
-    }
-  }
+  return iamToken
 }
 
 module.exports = {
-  getIamAuthHandler,
-  isIamBasedNamespace
+  getIamAuthHeader,
+  getNamespaceType,
+  getNamespaceId
 }
