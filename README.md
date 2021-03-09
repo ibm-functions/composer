@@ -49,12 +49,12 @@ Node Package Manager:
 ```
 npm install -g openwhisk-composer
 ```
-We recommend to install the package globally (with `-g` option) if you intend to
+We recommend installing the package globally (with `-g` option) if you intend to
 use the `compose` and `deploy` commands to compile and deploy compositions.
 
 ## Defining a composition
 
-A composition is typically defined by means of a Javascript expression as
+A composition is typically defined by means of a JavaScript expression as
 illustrated in [samples/demo.js](samples/demo.js):
 ```javascript
 const composer = require('openwhisk-composer')
@@ -73,7 +73,7 @@ compositions) as parameters. It invokes the first one and, depending on the
 result of this invocation, invokes either the second or third action.
 
  This composition includes the definitions of the three composed actions. If the
- actions are defined and deployed elsewhere, the composition code can be shorten
+ actions are defined and deployed elsewhere, the composition code can be shortened
  to:
 ```javascript
 composer.if('authenticate', 'success', 'failure')
