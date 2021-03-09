@@ -45,7 +45,7 @@ Flags:
   -v, --version          output the composer version
   --debug LIST           comma-separated list of debug flags (when using --js flag)
 ```
-The `compose` command takes a Javascript module that exports a composition
+The `compose` command takes a JavaScript module that exports a composition
 object (for example [demo.js](../samples/demo.js)) and compiles this object to a
 portable JSON format on the standard output or in file.
 ```
