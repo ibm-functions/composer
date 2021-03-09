@@ -85,10 +85,10 @@ output parameter objects of `myAction`.
 
 ## Components
 
-Components of a compositions can be actions, Javascript functions, or
+Components of a compositions can be actions, JavaScript functions, or
 compositions.
 
-Javascript functions can be viewed as simple, anonymous actions that do not need
+JavaScript functions can be viewed as simple, anonymous actions that do not need
 to be deployed and managed separately from the composition they belong to.
 Functions are typically used to alter a parameter object between two actions
 that expect different schemas, as in:

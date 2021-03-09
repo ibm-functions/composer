@@ -29,7 +29,7 @@ The `composer` module offers a number of combinators to define compositions:
 | [`dynamic`](#dynamic) | dynamic invocation | `composer.dynamic()`
 | [`empty`](#empty) | empty sequence | `composer.empty()`
 | [`finally`](#finally) | finalization | `composer.finally('tryThis', 'doThatAlways')` |
-| [`function`](#function) | Javascript function | `composer.function(({ x, y }) => ({ product: x * y }))` |
+| [`function`](#function) | JavaScript function | `composer.function(({ x, y }) => ({ product: x * y }))` |
 | [`if` and `if_nosave`](#if) | conditional | `composer.if('authenticate', 'success', 'failure')` |
 | [`let`](#let) | variable declarations | `composer.let({ count: 3, message: 'hello' }, ...)` |
 | [`literal` or `value`](#literal) | constant value | `composer.literal({ message: 'Hello, World!' })` |
@@ -46,7 +46,7 @@ The `composer` module offers a number of combinators to define compositions:
 | [`while` and `while_nosave`](#while) | loop | `composer.while('notEnough', 'doMore')` |
 
 The `action`, `function`, and `literal` combinators construct compositions
-respectively from OpenWhisk actions, Javascript functions, and constant values.
+respectively from OpenWhisk actions, JavaScript functions, and constant values.
 The other combinators combine existing compositions to produce new compositions.
 
 ## Shorthands
@@ -110,7 +110,7 @@ composer.action('hello', { filename: 'hello.js' })
 composer.action('helloAndBye', { sequence: ['hello', 'bye'] })
 ```
 The action may be defined by providing the code for the action as a string, as a
-Javascript function, or as a file name. Alternatively, a sequence action may be
+JavaScript function, or as a file name. Alternatively, a sequence action may be
 defined by providing the list of sequenced actions. The code (specified as a
 string) may be annotated with the kind of the action runtime.
 
@@ -128,7 +128,7 @@ The `limits` object optionally specifies any combination of:
 
 ### Environment capture in actions
 
-Javascript functions used to define actions cannot capture any part of their
+JavaScript functions used to define actions cannot capture any part of their
 declaration environment. The following code is not correct as the declaration of
 `name` would not be available at invocation time:
 ```javascript
@@ -144,7 +144,7 @@ composer.action('hello', { action: `function main() { return { message: 'Hello '
 
 ## Function
 
-`composer.function(fun)` is a composition with a single Javascript function
+`composer.function(fun)` is a composition with a single JavaScript function
 _fun_. It applies the specified function to the input parameter object for the
 composition.
  - If the function returns a value of type `function`, the composition returns
@@ -313,7 +313,7 @@ if not.
 A _condition_ composition evaluates to true if and only if it produces a JSON
 dictionary with a field `value` with value `true`. Other fields are ignored.
 Because JSON values other than dictionaries are implicitly lifted to
-dictionaries with a `value` field, _condition_ may be a Javascript function
+dictionaries with a `value` field, _condition_ may be a JavaScript function
 returning a Boolean value. An expression such as `params.n > 0` is not a valid
 condition (or in general a valid composition). One should write instead `params
 => params.n > 0`. The input parameter object for the composition is the input
