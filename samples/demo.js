@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-const composer = require('@ibm-functions/composer')
+const composer = require('openwhisk-composer')
 
 module.exports = composer.if(
   composer.action('authenticate', { action: function ({ password }) { return { value: password === 'abc123' } } }),

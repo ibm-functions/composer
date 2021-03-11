@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -15,17 +17,17 @@
 # limitations under the License.
 #
 
-language: node_js
-node_js:
-  - 10
-services:
-  - docker
+set -e
 
-env:
-  global:
-    - __OW_IGNORE_CERTS=true
-    - REDIS=redis://172.17.0.1:6379
-before_install:
-  - ./travis/scancode.sh
-before_script:
-  - ./travis/setup.sh
+SCRIPTDIR=$(cd $(dirname "$0") && pwd)
+ROOTDIR="$SCRIPTDIR/../"
+HOMEDIR="$SCRIPTDIR/../../"
+UTIL_DIR="$HOMEDIR/openwhisk-utilities"
+
+# clone OpenWhisk utilities repo. in order to run scanCode.py
+cd $HOMEDIR
+git clone https://github.com/apache/openwhisk-utilities.git
+
+# run scancode
+cd $UTIL_DIR
+scancode/scanCode.py --config scancode/ASF-Release.cfg $ROOTDIR

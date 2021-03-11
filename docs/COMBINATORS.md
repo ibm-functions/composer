@@ -26,14 +26,17 @@ The `composer` module offers a number of combinators to define compositions:
 | [`action`](#action) | named action | `composer.action('echo')` |
 | [`async`](#async) | asynchronous invocation | `composer.async('compress', 'upload')` |
 | [`dowhile` and `dowhile_nosave`](#dowhile) | loop at least once | `composer.dowhile('fetchData', 'needMoreData')` |
+| [`dynamic`](#dynamic) | dynamic invocation | `composer.dynamic()`
 | [`empty`](#empty) | empty sequence | `composer.empty()`
 | [`finally`](#finally) | finalization | `composer.finally('tryThis', 'doThatAlways')` |
-| [`function`](#function) | Javascript function | `composer.function(({ x, y }) => ({ product: x * y }))` |
+| [`function`](#function) | JavaScript function | `composer.function(({ x, y }) => ({ product: x * y }))` |
 | [`if` and `if_nosave`](#if) | conditional | `composer.if('authenticate', 'success', 'failure')` |
 | [`let`](#let) | variable declarations | `composer.let({ count: 3, message: 'hello' }, ...)` |
 | [`literal` or `value`](#literal) | constant value | `composer.literal({ message: 'Hello, World!' })` |
+| [`map`](#map) | parallel map | `composer.map('validate', 'compute')` |
 | [`mask`](#mask) | variable hiding | `composer.let({ n }, composer.while(_ => n-- > 0, composer.mask(composition)))` |
 | [`merge`](#merge) | data augmentation | `composer.merge('hash')` |
+| [`parallel` or `par`](#parallel) | parallel composition | `composer.parallel('compress', 'hash')` |
 | [`repeat`](#repeat) | counted loop | `composer.repeat(3, 'hello')` |
 | [`retain` and `retain_catch`](#retain) | persistence | `composer.retain('validateInput')` |
 | [`retry`](#retry) | error recovery | `composer.retry(3, 'connect')` |
@@ -43,7 +46,7 @@ The `composer` module offers a number of combinators to define compositions:
 | [`while` and `while_nosave`](#while) | loop | `composer.while('notEnough', 'doMore')` |
 
 The `action`, `function`, and `literal` combinators construct compositions
-respectively from OpenWhisk actions, Javascript functions, and constant values.
+respectively from OpenWhisk actions, JavaScript functions, and constant values.
 The other combinators combine existing compositions to produce new compositions.
 
 ## Shorthands
@@ -66,10 +69,17 @@ assumed.
 
 Examples:
 ```javascript
-composer.action('hello')
+composer.action('hello') // default package
 composer.action('myPackage/myAction')
 composer.action('/whisk.system/utils/echo')
 ```
+To be clear, if no package is specified, the default package is assumed even if
+the composition itself is not deployed to the default package. To invoke an
+action from the same package as the composition the [`dynamic`](#dynamic)
+combinator may be used as illustrated [below](#example).
+
+### Action definition
+
 The optional `options` dictionary makes it possible to provide a definition for
 the action being composed.
 ```javascript
@@ -84,7 +94,6 @@ composer.action('hello', { action: hello })
 
 // specify the code for the action as a string
 composer.action('hello', { action: "const message = 'hello'; function main() { return { message } }" })
-
 
 // specify the code and runtime for the action
 composer.action('hello', {
@@ -101,13 +110,25 @@ composer.action('hello', { filename: 'hello.js' })
 composer.action('helloAndBye', { sequence: ['hello', 'bye'] })
 ```
 The action may be defined by providing the code for the action as a string, as a
-Javascript function, or as a file name. Alternatively, a sequence action may be
+JavaScript function, or as a file name. Alternatively, a sequence action may be
 defined by providing the list of sequenced actions. The code (specified as a
 string) may be annotated with the kind of the action runtime.
 
+### Limits
+
+If a definition is provided for the action, the `options` dictionary may also
+specify `limits`, for instance:
+```javascript
+composer.action('hello', { filename: 'hello.js', limits: { logs: 1, memory: 128, timeout: 10000 } })
+```
+The `limits` object optionally specifies any combination of:
+- the maximum log size LIMIT in MB for the action,
+- the maximum memory LIMIT in MB for the action,
+- the timeout LIMIT in milliseconds for the action.
+
 ### Environment capture in actions
 
-Javascript functions used to define actions cannot capture any part of their
+JavaScript functions used to define actions cannot capture any part of their
 declaration environment. The following code is not correct as the declaration of
 `name` would not be available at invocation time:
 ```javascript
@@ -123,7 +144,7 @@ composer.action('hello', { action: `function main() { return { message: 'Hello '
 
 ## Function
 
-`composer.function(fun)` is a composition with a single Javascript function
+`composer.function(fun)` is a composition with a single JavaScript function
 _fun_. It applies the specified function to the input parameter object for the
 composition.
  - If the function returns a value of type `function`, the composition returns
@@ -292,7 +313,7 @@ if not.
 A _condition_ composition evaluates to true if and only if it produces a JSON
 dictionary with a field `value` with value `true`. Other fields are ignored.
 Because JSON values other than dictionaries are implicitly lifted to
-dictionaries with a `value` field, _condition_ may be a Javascript function
+dictionaries with a `value` field, _condition_ may be a JavaScript function
 returning a Boolean value. An expression such as `params.n > 0` is not a valid
 condition (or in general a valid composition). One should write instead `params
 => params.n > 0`. The input parameter object for the composition is the input
@@ -421,7 +442,123 @@ composer.seq(composer.retain(composition_1, composition_2, ...), ({ params, resu
 
 ## Async
 
+The `async` combinator may require an SSL configuration as discussed
+[here](../README.md#openwhisk-ssl-configuration).
+
 `composer.async(composition_1, composition_2, ...)` runs a sequence of
 compositions asynchronously. It invokes the sequence but does not wait for it to
 execute. It immediately returns a dictionary that includes a field named
 `activationId` with the activation id for the sequence invocation.
+
+The spawned sequence operates on a copy of the execution context for the parent
+composition. Variables declared in the parent are defined for the child and are
+initialized with the parent values at the time of the `async`. But mutations or
+later declarations in the parent are not visible in the child and vice versa.
+
+## Parallel
+
+Parallel combinators require access to a Redis instance as discussed
+[here](../README.md#parallel-compositions-with-redis).
+
+Parallel combinators may require an SSL configuration as discussed
+[here](../README.md#openwhisk-ssl-configuration).
+
+`composer.parallel(composition_1, composition_2, ...)` and its synonymous
+`composer.par(composition_1, composition_2, ...)` invoke a series of
+compositions (possibly empty) in parallel.
+
+This combinator runs _composition_1_, _composition_2_, ... in parallel and waits
+for all of these compositions to complete.
+
+The input parameter object for the composition is the input parameter object for
+every branch in the composition. The output parameter object for the composition
+has a single field named `value` of type array. The elements of the array are
+the output parameter objects for the branches in order.
+
+Error results from the branches are included in the array of results like normal
+results. In particular, an error result from a branch does not interrupt the
+parallel execution of the other branches. Moreover, since errors results are
+nested inside an output parameter object with a single `value` field, an error
+from a branch does not trigger the execution of the current error handler. The
+caller should walk the array and decide if and how to handle errors.
+
+The `composer.let` variables in scope at the `parallel` combinator are in scope
+in the branches. But each branch has its own copy of the execution context.
+Variable mutations in one branch are not reflected in other branches or in the
+parent composition.
+
+## Map
+
+Parallel combinators require access to a Redis instance as discussed
+[here](../README.md#parallel-compositions-with-redis).
+
+Parallel combinators may require an SSL configuration as discussed
+[here](../README.md#openwhisk-ssl-configuration).
+
+`composer.map(composition_1, composition_2, ...)` makes multiple parallel
+invocations of a sequence of compositions.
+
+The input parameter object for the `map` combinator should include an array of
+named _value_. The `map` combinator spawns one sequence for each element of this
+array. The input parameter object for the nth instance of the sequence is the
+nth array element if it is a dictionary or an object with a single field named
+`value` with the nth array element as the field value. Fields on the input
+parameter object other than the `value` field are discarded. These sequences run
+in parallel. The `map` combinator waits for all the sequences to complete. The
+output parameter object for the composition has a single field named `value` of
+type array. The elements of the array are the output parameter objects for the
+branches in order.
+
+Error results from the branches are included in the array of results like normal
+results. In particular, an error result from a branch does not interrupt the
+parallel execution of the other branches. Moreover, since errors results are
+nested inside an output parameter object with a single `value` field, an error
+from a branch does not trigger the execution of the current error handler. The
+caller should walk the array and decide if and how to handle errors.
+
+The `composer.let` variables in scope at the `map` combinator are in scope in
+the branches. But each branch has its own copy of the execution context.
+Variable mutations in one branch are not reflected in other branches or in the
+parent composition.
+
+## Dynamic
+
+`composer.dynamic()` invokes an action specified by means of the input parameter
+object.
+
+The input parameter object for the `dynamic` combinator must be a dictionary
+including the following three fields:
+- a field `type` with string value `"action"`,
+- a field `name` of type string,
+- a field `params` of type dictionary.
+Other fields of the input parameter object are ignored.
+
+The `dynamic` combinator invokes the action named _name_ with the input
+parameter object _params_. The output parameter object for the composition is
+the output parameter object of the action invocation.
+
+### Example
+
+The `dynamic` combinator may be used for example to invoke an action that
+belongs to the same package as the composition, without having to specify the
+package name beforehand.
+
+```javascript
+const composer = require('openwhisk-composer')
+
+function invoke (actionShortName) {
+  return composer.let(
+    { actionShortName },
+    params => ({ type: 'action', params, name: process.env.__OW_ACTION_NAME.split('/').slice(0, -1).concat(actionShortName).join('/') }),
+    composer.dynamic())
+}
+
+module.exports = composer.seq(
+  composer.action('echo'), // echo action from the default package
+  invoke('echo')           // echo action from the same package as the composition
+)
+```
+In this example, `let` captures the target action short name at compile time
+without expanding it to a fully qualified name. Then, at run time, the package
+name is obtained from the environment variable `__OW_ACTION_NAME` and combined
+with the action short name. Finally, `dynamic` is used to invoke the action.

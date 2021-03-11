@@ -15,17 +15,22 @@
 # limitations under the License.
 #
 
-language: node_js
-node_js:
-  - 10
-services:
-  - docker
-
-env:
-  global:
-    - __OW_IGNORE_CERTS=true
-    - REDIS=redis://172.17.0.1:6379
-before_install:
-  - ./travis/scancode.sh
-before_script:
-  - ./travis/setup.sh
+github:
+  description: "Apache OpenWhisk Composer provides a high-level programming model in JavaScript for composing serverless functions"
+  homepage: https://openwhisk.apache.org/
+  labels:
+  - openwhisk
+  - apache
+  - serverless
+  - faas
+  - functions-as-a-service
+  - cloud
+  - serverless-architectures
+  - serverless-functions
+  - functions
+  - composer
+  - composition
+  - node
+  - node-js
+  - nodejs
+  - javascript

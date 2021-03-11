@@ -25,12 +25,14 @@ _compositions_. An example composition is described in
 
 ## Control flow
 
-Compositions can express the control flow of typical a sequential imperative
-programming language: sequences, conditionals, loops, structured error handling.
-This control flow is specified using _combinator_ methods such as:
+Compositions can express the control flow of typical imperative programming
+language: sequences, conditionals, loops, structured error handling. This
+control flow is specified using _combinator_ methods such as:
 - `composer.sequence(firstAction, secondAction)`
 - `composer.if(conditionAction, consequentAction, alternateAction)`
 - `composer.try(bodyAction, handlerAction)`
+
+Parallel constructs are also available.
 
 Combinators are described in [COMBINATORS.md](COMBINATORS.md).
 
@@ -58,6 +60,12 @@ the sequence is not executed. Moreover, if the sequence is enclosed in an error
 handling composition like a `composer.try(sequence, handler)` combinator, the
 execution continues with the error handler.
 
+### Reserved parameter name
+
+The field name `$composer` is reserved for composer internal use. Compositions
+and composed actions should not expect or return parameter objects with a
+top-level field named `$composer`.
+
 ## Data flow
 
 The invocation of a composition triggers a series of computations (possibly
@@ -77,10 +85,10 @@ output parameter objects of `myAction`.
 
 ## Components
 
-Components of a compositions can be actions, Javascript functions, or
+Components of a compositions can be actions, JavaScript functions, or
 compositions.
 
-Javascript functions can be viewed as simple, anonymous actions that do not need
+JavaScript functions can be viewed as simple, anonymous actions that do not need
 to be deployed and managed separately from the composition they belong to.
 Functions are typically used to alter a parameter object between two actions
 that expect different schemas, as in:
@@ -118,10 +126,20 @@ Deploying such a composition deploys the embedded actions.
 ## Conductor actions
 
 Compositions are implemented by means of OpenWhisk [conductor
-actions](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md).
+actions](https://github.com/apache/openwhisk/blob/master/docs/conductors.md).
 Compositions have all the attributes and capabilities of an action, e.g.,
 default parameters, limits, blocking invocation, web export. Execution
-[traces](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md#activations)
+[traces](https://github.com/apache/openwhisk/blob/master/docs/conductors.md#activations)
 and
-[limits](https://github.com/apache/incubator-openwhisk/blob/master/docs/conductors.md#limits)
+[limits](https://github.com/apache/openwhisk/blob/master/docs/conductors.md#limits)
 of compositions follow from conductor actions.
+
+The conductor action code for a composition may be obtained by means of the
+`generate` method of the `conductor` module or using the `compose` command with
+the `--js` flag. The conductor action code may be deployed using, e.g., the
+OpenWhisk CLI.
+```
+compose demo.js --js > demo-conductor.js
+wsk action create demo demo-conductor.js -a conductor true
+```
+The `conductor` annotation must be set on conductor actions.

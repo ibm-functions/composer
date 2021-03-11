@@ -285,7 +285,10 @@ const combinators = {
   mask: { components: true },
   action: { args: [{ name: 'name', type: 'name' }, { name: 'action', type: 'object', optional: true }] },
   function: { args: [{ name: 'function', type: 'object' }] },
-  async: { components: true }
+  async: { components: true },
+  parallel: { components: true },
+  map: { components: true },
+  dynamic: {}
 }
 
 Object.assign(composer, declare(combinators))
@@ -303,7 +306,8 @@ const extra = {
   retain_catch: { components: true, def: lowerer.retain_catch },
   value: { args: [{ name: 'value', type: 'value' }], def: lowerer.literal },
   literal: { args: [{ name: 'value', type: 'value' }], def: lowerer.literal },
-  merge: { components: true, def: lowerer.merge }
+  merge: { components: true, def: lowerer.merge },
+  par: { components: true, def: composer.parallel }
 }
 
 Object.assign(composer, declare(extra))
@@ -354,7 +358,10 @@ Object.assign(composer, {
       exec = { kind: 'nodejs:default', code: exec }
     }
     const composition = { type: 'action', name, '.combinator': () => combinators.action }
-    if (exec) composition.action = { exec }
+    if (exec) {
+      composition.action = { exec }
+      if (isObject(options.limits)) composition.action.limits = options.limits
+    }
     return new Composition(composition)
   },
 
