@@ -17,12 +17,6 @@
 #
 -->
 
-# Notice
-
-Composer is now part of the Apache OpenWhisk incubator project. The Composer
-code is now hosted at https://github.com/apache/incubator-openwhisk-composer.
-Issues and pull requests should be filed against the new repository.
-
 # @ibm-functions/composer
 
 [![Travis](https://travis-ci.org/ibm-functions/composer.svg?branch=master)](https://travis-ci.org/ibm-functions/composer)
