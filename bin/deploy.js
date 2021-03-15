@@ -46,7 +46,7 @@ if (argv._.length !== 2 || path.extname(argv._[1]) !== '.json') {
   console.error('  -A, --annotation-file KEY=FILE    add KEY annotation with FILE content')
   console.error('  --apihost HOST                    API HOST')
   console.error('  --apiversion VERSION              API VERSION')
-  console.error('  --basic                           force basic authentication')
+  console.error('  --basic                           force basic authentication. Note: this option can only be chosen for CF-based namespaces')
   console.error('  --bearer                          force bearer token authentication')
   console.error('  -i, --insecure                    bypass certificate checking')
   console.error('  --kind KIND                       the KIND of the conductor action runtime')
