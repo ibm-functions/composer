@@ -79,11 +79,11 @@ module.exports = function (options, basic, bearer) {
     const tokenTimestamp = ibmcloudUtils.getIamTokenTimestamp()
 
     if (ibmcloudUtils.iamTokenExpired(tokenTimestamp)) {
-        console.log(
-            'Error: Your IAM token seems to be expired. Plase perform an `ibmcloud login` ' +
+      console.log(
+        'Error: Your IAM token seems to be expired. Plase perform an `ibmcloud login` ' +
             'to make sure your token is up to date.'
-        )
-        throw new Error(`IAM token expired`)
+      )
+      throw new Error('IAM token expired')
     }
 
     // for authentication, we'll use the user IAM access token

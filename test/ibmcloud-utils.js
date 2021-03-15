@@ -30,44 +30,44 @@ const client = require('../client')
 describe('ibmcloud-utils', function () {
   describe('ibmcloud-utils.token-expiration', function () {
     it('read timestamp', function () {
-        mock({
-            [path.join(os.homedir(), '.bluemix/plugins/cloud-functions')]: {
-                'config.json': '{ "IamTimeTokenRefreshed": "2021-03-15T13:24:14+01:00" }'
+      mock({
+        [path.join(os.homedir(), '.bluemix/plugins/cloud-functions')]: {
+          'config.json': '{ "IamTimeTokenRefreshed": "2021-03-15T13:24:14+01:00" }'
+        }
+      })
+      const timestamp = ibmcloudUtils.getIamTokenTimestamp()
+      assert.strictEqual(timestamp.getTime(), new Date(2021, 2, 15, 13, 24, 14).getTime())
+    })
+
+    it('token not expired', function () {
+      const timeRefreshed = new Date(2021, 2, 13, 13, 24, 14)
+      const timeReference = new Date(2021, 2, 13, 13, 30, 0)
+      const tokenExpired = ibmcloudUtils.iamTokenExpired(timeRefreshed, timeReference)
+      assert.strictEqual(tokenExpired, false)
+    })
+
+    it('token expired', function () {
+      const timeRefreshed = new Date(2021, 2, 13, 13, 24, 14)
+      const timeReference = new Date(2021, 2, 13, 14, 25, 0)
+      const tokenExpired = ibmcloudUtils.iamTokenExpired(timeRefreshed, timeReference)
+      assert.strictEqual(tokenExpired, true)
+    })
+
+    it('client fails when token expired', function () {
+      mock({
+        [path.join(os.homedir(), '.bluemix')]: {
+          'config.json': '{ "IAMToken": "some-token" }',
+          'plugins': {
+            'cloud-functions': {
+              'config.json': '{ "IamTimeTokenRefreshed": "2021-03-14T12:00:00+01:00", ' +
+                        '"WskCliNamespaceId": "some-namespace-id", ' +
+                        '"WskCliNamespaceMode": "IAM" }'
             }
-        })
-        const timestamp = ibmcloudUtils.getIamTokenTimestamp()
-        assert.equal(timestamp.getTime(), new Date(2021, 2, 15, 13, 24, 14).getTime())
-    })
+          }
+        }
+      })
 
-    it('token not expired', function() {
-        const timeRefreshed = new Date(2021, 2, 13, 13, 24, 14)
-        const timeReference = new Date(2021, 2, 13, 13, 30, 0)
-        const tokenExpired = ibmcloudUtils.iamTokenExpired(timeRefreshed, timeReference)
-        assert.equal(tokenExpired, false)
-    })
-
-    it('token expired', function() {
-        const timeRefreshed = new Date(2021, 2, 13, 13, 24, 14)
-        const timeReference = new Date(2021, 2, 13, 14, 25, 0)
-        const tokenExpired = ibmcloudUtils.iamTokenExpired(timeRefreshed, timeReference)
-        assert.equal(tokenExpired, true)
-    })
-
-    it('client fails when token expired', function() {
-        mock({
-            [path.join(os.homedir(), '.bluemix')]: {
-                'config.json': '{ "IAMToken": "some-token" }',
-                'plugins': {
-                    'cloud-functions': {
-                        'config.json': '{ "IamTimeTokenRefreshed": "2021-03-14T12:00:00+01:00", '
-                        + '"WskCliNamespaceId": "some-namespace-id", '
-                        + '"WskCliNamespaceMode": "IAM" }'
-                    }
-                }
-            }
-        })
-
-        assert.throws(() => client(), /IAM token expired/)
+      assert.throws(() => client(), /IAM token expired/)
     })
   })
 })

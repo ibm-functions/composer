@@ -68,17 +68,17 @@ const getIamAuthHeader = () => {
 }
 
 const getIamTokenTimestamp = () => {
-   const timestamp = getCloudFunctionsConfig().IamTimeTokenRefreshed
-   return new Date(timestamp)
+  const timestamp = getCloudFunctionsConfig().IamTimeTokenRefreshed
+  return new Date(timestamp)
 }
 
 const iamTokenExpired = (timeRefreshed, timeReference) => {
-    if (typeof(timeReference) === 'undefined') {
-        timeReference = new Date()
-    }
+  if (typeof (timeReference) === 'undefined') {
+    timeReference = new Date()
+  }
 
-    // time difference in hours exceeds 1 hour
-    return (timeReference - timeRefreshed) / 1000 / 3600 > 1
+  // time difference in hours exceeds 1 hour
+  return (timeReference - timeRefreshed) / 1000 / 3600 > 1
 }
 
 module.exports = {
