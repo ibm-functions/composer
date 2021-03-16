@@ -21,8 +21,6 @@
 
 const assert = require('assert')
 const mock = require('mock-fs')
-const os = require('os')
-const path = require('path')
 
 const ibmcloudUtils = require('../ibmcloud-utils')
 const client = require('../client')
@@ -31,9 +29,7 @@ describe('ibmcloud-utils', function () {
   describe('ibmcloud-utils.token-expiration', function () {
     it('read timestamp', function () {
       mock({
-        [path.join(os.homedir(), '.bluemix/plugins/cloud-functions')]: {
-          'config.json': '{ "IamTimeTokenRefreshed": "2021-03-15T13:24:14+01:00" }'
-        }
+        'test/cf-plugin-config.json': '{ "IamTimeTokenRefreshed": "2021-03-15T13:24:14+01:00" }'
       })
       const timestamp = ibmcloudUtils.getIamTokenTimestamp()
       assert.strictEqual(timestamp.getTime(), new Date(2021, 2, 15, 13, 24, 14).getTime())
@@ -55,16 +51,10 @@ describe('ibmcloud-utils', function () {
 
     it('client fails when token expired', function () {
       mock({
-        [path.join(os.homedir(), '.bluemix')]: {
-          'config.json': '{ "IAMToken": "some-token" }',
-          'plugins': {
-            'cloud-functions': {
-              'config.json': '{ "IamTimeTokenRefreshed": "2021-03-14T12:00:00+01:00", ' +
-                        '"WskCliNamespaceId": "some-namespace-id", ' +
-                        '"WskCliNamespaceMode": "IAM" }'
-            }
-          }
-        }
+        'test/cf-plugin-config.json': '{ "IamTimeTokenRefreshed": "2021-03-14T12:00:00+01:00", ' +
+            '"WskCliNamespaceId": "some-namespace-id", ' +
+            '"WskCliNamespaceMode": "IAM" }',
+        'test/cf-config.json': '{ "IAMToken": "some-token" }'
       })
 
       assert.throws(() => client(), /IAM token expired/)
