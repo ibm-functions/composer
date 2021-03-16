@@ -32,7 +32,7 @@ describe('ibmcloud-utils', function () {
         'test/cf-plugin-config.json': '{ "IamTimeTokenRefreshed": "2021-03-15T13:24:14+01:00" }'
       })
       const timestamp = ibmcloudUtils.getIamTokenTimestamp()
-      assert.strictEqual(timestamp.getTime(), new Date(2021, 2, 15, 13, 24, 14).getTime())
+      assert.strictEqual(timestamp.getTime(), Date.UTC(2021, 2, 15, 12, 24, 14))
     })
 
     it('token not expired', function () {
