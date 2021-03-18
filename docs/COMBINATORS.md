@@ -544,7 +544,7 @@ belongs to the same package as the composition, without having to specify the
 package name beforehand.
 
 ```javascript
-const composer = require('openwhisk-composer')
+const composer = require('@ibm-functions/composer')
 
 function invoke (actionShortName) {
   return composer.let(
