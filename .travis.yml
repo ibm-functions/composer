@@ -25,6 +25,7 @@ env:
     - __OW_IGNORE_CERTS=true
     - REDIS=redis://172.17.0.1:6379
     - IC_FN_CONFIG_FILE=./test/cf-plugin-config.json
+    - IC_CONFIG_FILE=./test/cf-config.json
 before_install:
   - ./travis/scancode.sh
 before_script:
