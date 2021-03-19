@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-const composer = require('openwhisk-composer')
+const composer = require('@ibm-functions/composer')
 
 function generateEvenNumber (args) {
   const number = Math.floor(Math.random() * 10)

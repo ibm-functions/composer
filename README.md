@@ -17,9 +17,9 @@
 #
 -->
 
-# Apache OpenWhisk Composer
+# @ibm-functions/composer
 
-[![Travis](https://travis-ci.com/apache/openwhisk-composer.svg?branch=master)](https://travis-ci.com/apache/openwhisk-composer)
+[![Travis](https://travis-ci.org/ibm-functions/composer.svg?branch=master)](https://travis-ci.org/ibm-functions/composer)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Join
 Slack](https://img.shields.io/badge/join-slack-9B69A0.svg)](http://slack.openwhisk.org/)
@@ -47,7 +47,7 @@ This repository includes:
 Composer is distributed as Node.js package. To install this package, use the
 Node Package Manager:
 ```
-npm install -g openwhisk-composer
+npm install -g @ibm-functions/composer
 ```
 We recommend installing the package globally (with `-g` option) if you intend to
 use the `compose` and `deploy` commands to compile and deploy compositions.
@@ -57,7 +57,7 @@ use the `compose` and `deploy` commands to compile and deploy compositions.
 A composition is typically defined by means of a JavaScript expression as
 illustrated in [samples/demo.js](samples/demo.js):
 ```javascript
-const composer = require('openwhisk-composer')
+const composer = require('@ibm-functions/composer')
 
 module.exports = composer.if(
     composer.action('authenticate', { action: function ({ password }) { return { value: password === 'abc123' } } }),
@@ -98,9 +98,9 @@ existing definitions.
 ## Running a composition
 
 The `demo` composition may be invoked like any action, for instance using the
-OpenWhisk CLI:
+[IBM Cloud CLI](https://cloud.ibm.com/docs/cli):
 ```
-wsk action invoke demo -p password passw0rd
+ibmcloud fn action invoke demo -p password passw0rd
 ```
 ```
 ok: invoked /_/demo with id 09ca3c7f8b68489c8a3c7f8b68b89cdc
@@ -108,7 +108,7 @@ ok: invoked /_/demo with id 09ca3c7f8b68489c8a3c7f8b68b89cdc
 The result of this invocation is the result of the last action in the
 composition, in this case the `failure` action since the password in incorrect:
 ```
-wsk activation result 09ca3c7f8b68489c8a3c7f8b68b89cdc
+ibmcloud fn activation result 09ca3c7f8b68489c8a3c7f8b68b89cdc
 ```
 ```json
 {
@@ -119,7 +119,7 @@ wsk activation result 09ca3c7f8b68489c8a3c7f8b68b89cdc
 
 This invocation creates a trace, i.e., a series of activation records:
 ```
-wsk activation list
+ibmcloud fn activation list
 ```
 <pre>
 Datetime            Activation ID                    Kind     Start Duration   Status  Entity
@@ -211,9 +211,8 @@ combinators or the `async` combinator.
 # Installation from Source
 
 To install composer from a source release, download the composer source code
-from the [Apache OpenWhisk
-Downloads](https://openwhisk.apache.org/downloads.html) page, rename the release
-tarball to `openwhisk-composer.tgz` and install it with command:
+from [our GitHub repo](https://github.com/ibm-functions/composer/releases),
+rename the release tarball to `composer.tgz` and install it with command:
 ```shell
-npm install -g openwhisk-composer.tgz
+npm install -g composer.tgz
 ```

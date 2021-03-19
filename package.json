@@ -1,9 +1,9 @@
 {
   "license": "Apache-2.0",
-  "name": "openwhisk-composer",
+  "name": "@ibm-functions/composer",
   "version": "0.12.0",
   "description": "Composer is a new programming model for composing cloud functions built on Apache OpenWhisk.",
-  "homepage": "https://github.com/apache/openwhisk-composer",
+  "homepage": "https://github.com/ibm-functions/composer",
   "main": "composer.js",
   "scripts": {
     "test": "standard && mocha"
@@ -17,13 +17,14 @@
     "client.js",
     "composer.js",
     "conductor.js",
-    "fqn.js",
     "docs/*.md",
+    "fqn.js",
+    "ibmcloud-utils.js",
     "samples/"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/apache/openwhisk-composer.git"
+    "url": "https://github.com/ibm-functions/composer.git"
   },
   "keywords": [
     "functions",

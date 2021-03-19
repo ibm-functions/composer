@@ -30,3 +30,11 @@ before_install:
   - ./travis/scancode.sh
 before_script:
   - ./travis/setup.sh
+deploy:
+  provider: npm
+  email: reggeenr@de.ibm.com
+  api_key:
+    secure: lyftFmbsZ0S/kcAjf5nVR1W+a1IrtsSghQ7o9w6A7COTKNwBh1QNnF+yh8OL72Sc4/PgRiV4Z6Jg9ZFCt3bWd3tsRcXqTXXspFC/lHsj//0s6M+a0c9pFr/uhND0hWXrIkVr0VLXNPp/3LMORS7fzjKktx/yksivBcdGHj4SX4sz3wHI3uq6gfb9OQXWqcs7jBOgMClKFeqOLaDAFJzRf9DZFsV9z5Eq2MwCALaoXZBbbmNcq795fioHKnMLzMVlN16aWsuDyFxGn/LLMdlmgaDLiF0KITtLM1V9XNrEETurLD41TcNChlsBcsHA15Seg9bsiKU7PX7+s+kb55eB3Gg9wJYhXfND5OFh+DL3GT7tLPetXda8sHaCkoEKOEdy30HEqPYZLy7X2fYQj7Ety4sqhe6SRkPFYhuS6+r179B/0Xu+KF17y1VG7CWHwTEKotZOLF4TLOudJ9O7+rUI0xOlNXj7tAURjXY6OJ1DMAefpRcwM5xaC8/3OIimK7Ab3BZn4or1PwpzK5qQDnaI/350IAK9wDkLyyT1OFywq7xNyfgKhv5gIgjoYEBAdwNTjjMcrGaTyFxLSoo3SluXXMYy9H3FXfBwNJfbF8mfHf3K/U1IdjlJ4TxlEPoUvPSv1a5M2oswZwKeRM6Mqmal+P0tAJzOY2rsJxTtpwkeMpk=
+  on:
+    tags: true
+    repo: ibm-functions/composer
