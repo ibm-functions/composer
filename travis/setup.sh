@@ -35,7 +35,7 @@ cd $ROOTDIR
 git clone --depth=1 https://github.com/apache/openwhisk.git openwhisk
 
 # Install Ansible
-pip install --user ansible==2.5.2
+pip install --user ansible==2.8.19
 
 # Configure runtimes
 cp $SCRIPTDIR/runtimes.json $WHISKDIR/ansible/files
