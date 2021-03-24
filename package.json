@@ -1,7 +1,7 @@
 {
   "license": "Apache-2.0",
   "name": "@ibm-functions/composer",
-  "version": "0.12.0",
+  "version": "1.0.0",
   "description": "Composer is a new programming model for composing cloud functions built on Apache OpenWhisk.",
   "homepage": "https://github.com/ibm-functions/composer",
   "main": "composer.js",
